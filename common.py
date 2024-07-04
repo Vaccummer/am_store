@@ -105,7 +105,7 @@ def restart_program(path_f):
     os.execl(python_f, python_f, path_f)
 
 
-def multi(target_f:function, 
+def multi(target_f, 
           args_list:List[Tuple] | List[Dict], 
           process_num, 
           pl_stratagey=Literal["queue", "pool"], 
@@ -202,7 +202,8 @@ def get_file_size(path_f:str):
         for root, dirs, files in os.walk(path_f):
             for file in files:
                 file_path = os.path.join(root, file)
-                size_f += os.path.getsize(file_path)
+                if os.path.exists(file_path):
+                    size_f += os.path.getsize(file_path)
     return size_f
 
 
