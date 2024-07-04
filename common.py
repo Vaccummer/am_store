@@ -1,7 +1,7 @@
 import os
 import re
 import sys
-from typing import Literal, Optional, List, Tuple, Dict
+from typing import Literal, Optional, List, Tuple, Dict, Union
 
 
 def path_format(string_f:str):
@@ -106,7 +106,7 @@ def restart_program(path_f):
 
 
 def multi(target_f, 
-          args_list:List[Tuple] | List[Dict], 
+          args_list:Union[List[Tuple], List[Dict]], 
           process_num, 
           pl_stratagey=Literal["queue", "pool"], 
           return_flag:Literal[True, False]=False):
