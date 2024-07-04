@@ -1,6 +1,5 @@
 import os
 import subprocess
-import shutil
 
 def update():
     repo_path = "https://github.com/Vaccummer/am_store.git"
