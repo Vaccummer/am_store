@@ -193,7 +193,7 @@ def time_count(func_f, args, return_time_flag:Literal[True, False]=False):
         return output_f
 
 
-def get_file_size(path_f:str):
+def get_file_size(path_f:str, unit:Literal['B', 'KB', 'MB', 'GB']='MB'):
     # get the size of a file or a directory
     size_f = 0
     if os.path.isfile(path_f):
@@ -202,9 +202,13 @@ def get_file_size(path_f:str):
         for root, dirs, files in os.walk(path_f):
             for file in files:
                 file_path = os.path.join(root, file)
-                if os.path.exists(file_path):
-                    size_f += os.path.getsize(file_path)
-    return size_f
+                try:
+                    size_fi = os.path.getsize(file_path)
+                except Exception:
+                    size_fi = 0
+                size_f += size_fi
+    divide_dict = {'B':1, 'KB':1024, 'MB':1024**2, 'GB':1024**3, "TB":1024**4}
+    return size_f/divide_dict[unit]
 
 
 def get_script_path():
