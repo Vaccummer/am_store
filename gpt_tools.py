@@ -27,10 +27,7 @@ class Model_Path_Manager:
     
 
     def print_dict(self):
-        # format print model_dict
-        if not hasattr(self, 'model_dict'):
-            self.model_dict = self.get_model_dict()
-        
+        # format print model_dict   
         for sponsor, model_list in self.model_dict.items():
             print(f"{sponsor}: ")
             for model_name_i, model_path_i in model_list:
@@ -42,9 +39,6 @@ class Model_Path_Manager:
         # return None if not found, or return input if it's already an absolute path
         if os.path.isabs(relative_path):
             return relative_path
-
-        if not hasattr(self, 'model_dict'):
-            self.model_dict = self.get_model_dict()
         
         if "/" in relative_path:
             sponsor, model_name = relative_path.split("/")
@@ -68,14 +62,20 @@ class Model_Path_Manager:
     def search_model(self, prompt:str):
         # search model by prompt indicating model_name
         # return a list of matched model_name
-        if not hasattr(self, 'model_dict'):
-            self.model_dict = self.get_model_dict()
         tar_model_list = []
         for sponsor, model_list in self.model_dict.items():
             for model_name_i, model_path_i in model_list:
                 if prompt in model_name_i:
                     tar_model_list.append(model_name_i)
         return tar_model_list
+    
+
+    def rm_empty_dir(self):
+        # remove model_path if it's empty
+        for sponsor, model_list in self.model_dict.items():
+            for model_name_i, model_path_i in model_list:
+                if not os.listdir(model_path_i):
+                    os.rmdir(model_path_i)
     
     
     
