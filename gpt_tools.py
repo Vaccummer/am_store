@@ -9,9 +9,9 @@ class Model_Path_Manager:
         self.model_dict = self.get_model_dict()
     
 
-    def get_model_dict(self):
+    def get_model_dict(self, force_update=False):
         # get total sponsor-model_name dict
-        if hasattr(self, 'model_dict'):
+        if not force_update and hasattr(self, 'model_dict'):
             return self.model_dict
 
         path_list = glob(os.path.join(self.model_set_path, "*", "*"))
@@ -76,6 +76,8 @@ class Model_Path_Manager:
             for model_name_i, model_path_i in model_list:
                 if not os.listdir(model_path_i):
                     os.rmdir(model_path_i)
+                    print(f"Empty dir {sponsor}/{model_name_i} removed.")
+        self.get_model_dict(force_update=True)
     
     
     
