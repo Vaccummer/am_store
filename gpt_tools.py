@@ -4,7 +4,7 @@ import warnings
 
 
 class Model_Path_Manager:
-    def __init__(self, model_set_path:str) -> None:
+    def __init__(self, model_set_path:str='/home/am/DL/disk1/Models') -> None:
         self.model_set_path = model_set_path
         self.model_dict = self.get_model_dict()
     
@@ -26,15 +26,18 @@ class Model_Path_Manager:
         return self.model_dict
     
 
-    def print_dict(self):
+    def print_dict(self, print_path=False):
         # format print model_dict   
         for sponsor, model_list in self.model_dict.items():
             print(f"{sponsor}: ")
             for model_name_i, model_path_i in model_list:
-                print(f"  - {model_name_i}")
+                if print_path:
+                    print(f"  - {model_name_i}: {model_path_i}")
+                else:
+                    print(f"  - {model_name_i}")
     
 
-    def translate_path(self, relative_path:str):
+    def translate(self, relative_path:str, print_flag=False):
         # translate relative_path "sponsor/model_name" or model_name to absolute model_path
         # return None if not found, or return input if it's already an absolute path
         if os.path.isabs(relative_path):
@@ -49,25 +52,33 @@ class Model_Path_Manager:
             else:
                 for model_name_i, model_path_i in model_list:
                     if model_name_i == model_name:
+                        if print_flag:
+                            print(f'Model "{relative_path}" tranlated to "{model_path_i}".')
                         return model_path_i
         else:
             for sponsor, model_list in self.model_dict.items():
                 for model_name_i, model_path_i in model_list:
                     if model_name_i == relative_path:
+                        if print_flag:
+                            print(f'Model "{relative_path}" tranlated to "{model_path_i}".')
                         return model_path_i
         warnings.warn(f'Model "{relative_path}" not found in model set.')
         return None
 
 
-    def search_model(self, prompt:str):
+    def search(self, prompt:str, print_flag=True):
         # search model by prompt indicating model_name
         # return a list of matched model_name
-        tar_model_list = []
+        tar_model_dict = {}
         for sponsor, model_list in self.model_dict.items():
             for model_name_i, model_path_i in model_list:
                 if prompt in model_name_i:
-                    tar_model_list.append(model_name_i)
-        return tar_model_list
+                    tar_model_dict[f'{sponsor}/{model_name_i}'] = model_path_i
+        if print_flag:
+            print(f'Models containing "{prompt}":')
+            for key_i, value_i in tar_model_dict.items():
+                print(f'  - {key_i}: {value_i}')
+        return tar_model_dict
     
 
     def rm_empty_dir(self):
@@ -80,4 +91,4 @@ class Model_Path_Manager:
         self.get_model_dict(force_update=True)
     
     
-    
+# class Training_Data_Manager:
