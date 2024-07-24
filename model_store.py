@@ -147,15 +147,17 @@ class AttentionTP(nn.Module):
         super().__init__()
         self.head_dim = d_model // heads_num
         self.heads_num = heads_num
-        self.wq = nn.Linear(d_model, self.heads_num * self.head_dim, bias=False)
-        self.wk = nn.Linear(d_model, self.heads_num * self.head_dim, bias=False)
-        self.wv = nn.Linear(d_model, self.heads_num * self.head_dim, bias=False)
+        self.wq = nn.Linear(d_model, d_model, bias=False)
+        self.wk = nn.Linear(d_model, d_model, bias=False)
+        self.wv = nn.Linear(d_model, d_model, bias=False)
 
         self.wo = nn.Linear(heads_num * self.head_dim, d_model, bias=False)
     def forward(self, x):
-        print(x.shape)
         bsz, seqlen, _ = x.shape
         xq, xk, xv = self.wq(x), self.wk(x), self.wv(x)
+        print(xq.shape)
+        print(xk.shape)
+        print(xv.shape)
         xq = xq.view(bsz, seqlen, self.heads_num, self.head_dim)
         xk = xk.view(bsz, seqlen, self.heads_num, self.head_dim)
         xv = xv.view(bsz, seqlen, self.heads_num, self.head_dim)
