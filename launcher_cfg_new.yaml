@@ -18,7 +18,7 @@ Common:
     srh_r: 200 # radius of search model Icon
     ass_icon_r: 40
     shortcut_entr_icon_r: 60
-    shortcut_button_r: 80
+    shortcut_button_r: 150
   window_names: 
     - main_window
     - associate_list
@@ -55,14 +55,15 @@ Common:
     white: \#F1F1F1
   task_bar_title: Super Launcher      
   max_op_num: 99
-  horizontal_button_num: 4
+  horizontal_button_num: 5
   vertical_button_num: 4
   max_ass_num: 10
+  script_path: "./launcher_init.py"
 
 MainWindow:
   Size:
     switch_button: [gap,gap,0,het]
-    top_button: []
+    top_button: [win_x-0.5*gap-8*het, 0.5*gap, 8*het, 1.7*het]
 
   switch_button:
     font: {Family: *jetbrains, PixelSize: 35}
@@ -71,7 +72,7 @@ MainWindow:
       maximum: "./load/MainWindow/maximum.svg"
       minimum: "./load/MainWindow/minimum.svg"
       close: "./load/MainWindow/close.svg"
-      middle: "./load/MainWindow/midlle.svg"
+      middle: "./load/MainWindow/middle.svg"
   taskbar_icon:
     path: "./load/MainWindow/taskbar_icon.ico"
 
@@ -83,12 +84,14 @@ Launcher:
     opto_icon: null
     shortcut_entry: [win_x-gap-het,1.5*gap+1.1*het,0.8*het,0.8*het]
     shortcut_button: [(win_x+gap)/2, 1.8*gap+2*het,(win_x-3*gap)/2,win_y-2.8*gap-2*het]
+    shortcut_setting: ["0", "0", (15*win_x)/16, (16*win_y)/15]
     associate_list: [gap,1.8*gap+2*het,win_x/2-gap,win_y-2.8*gap-2*het]
     gpt_box: null
     opto_box: null
     opto_settings: null
+  
   path:
-    settings_xlsx: "./load/Launcher Mode/*.xlsx"
+    settings_xlsx: "./load/Launcher/launcher_set.xlsx"
   
   input_box:
     font: 
@@ -102,12 +105,13 @@ Launcher:
       icon_list: './load/Launcher/assoicate_list/iocns/*'
       default_icon: './load/Launcher/assoicate_list/default_icon.svg'
   
-  shortcut_botton:
+  shortcut_button:
     font:
       button_title: {Family: *jetbrains, PixelSize: 40, Weight: 60}
     path:
       button_icons: &shortcut_button_icons './load/Launcher/shortcut_botton/button_icons/*'
-      setting_xlsx: &shortcut_setting_xlsx './load/Launcher/shortcut_setting/*.xlsx'
+      setting_xlsx: &shortcut_setting_xlsx './load/Launcher/shortcut_setting/shortcut_set.xlsx'
+      default_button_icon: './load/Launcher/shortcut_botton/default_button_icon.svg'
     color:
       button_hover: "#619F99"
   
@@ -122,10 +126,10 @@ Launcher:
       app_name_label: {Family: *jetbrains, PixelSize: 60, Weight: 70}
       exe_lineedit: {Family: *yahei, PixelSize: 60, Weight: 70}
       option_button: {Family: *jetbrains, PixelSize: 60, Weight: 70}
-
     path:
       setting_xlsx: *shortcut_setting_xlsx
       taskbar_icon: './load/Launcher/shortcut_setting/taskbar_icon.svg'
+      button_icons_dir: './load/Launcher/shortcut_botton/button_icons'
       button_icons: *shortcut_button_icons
       coordinate_button_set: "./load/Launcher/shortcut_setting/coordinate/svg"
       default_app_icon: *default_button_icon
@@ -143,7 +147,19 @@ Launcher:
       colwidth_2: [90, 70]
       colwidth_3: [700, 70]
       colwidth_4: [90, 70]
-
+    color:
+      launcher0 : "#008080"
+      launcher1 : "#68E4D6"
+      launcher2 : "#FA8072"
+      shortcut0 : "#44BBB1"
+      shortcut1 : "#2CE1B3"
+      shortcut0 : "#349179"
+      confirm0 : "#286FB1"
+      confirm1 : "#2CC1E1"
+      confirm2 : "#349179"
+      cancel0 : "#C60618"
+      cancel1 : "#FF4A6C"
+      cancel2 : "#349179"
 
 Searcher:
   Size:

@@ -495,7 +495,6 @@ class SuperLauncher(QMainWindow):
 
 
 
-
     ## hotkey function
     def model_tp(self, prompt_f):
         if type(prompt_f) == int:
@@ -612,7 +611,7 @@ class SuperLauncher(QMainWindow):
         else:
             self.set_color(self.opto_box, self.color_dict['opto'])
             self.opto_box.insertPlainText(text_f+'\n')
-        
+    
     # to update associate_words
     def update_associated_words(self):
         current_text = self.get_input()
@@ -893,35 +892,7 @@ class SuperLauncher(QMainWindow):
         size_ori = button_f.iconSize().width()
         size_dst = int(button_f.iconSize().width()*0.4)
         self.animations(button_f, size_ori, size_dst, lambda:self.animations(button_f, size_dst, size_ori, func_f))
-    # rewrite close event
-    def closeEvent(self, event):
-        event.ignore()  # ignore the close event
-        self.hide()  # hide the main window
-        self.tray_icon.showMessage("Super Launcher", "Main Window is now hidden", QSystemTrayIcon.Information)
-    # create taskbar hide icon
-    def createTrayIcon(self):
-        self.tray_icon = QSystemTrayIcon(self)
-        self.tray_icon.setIcon(QIcon(self.path_set['main_window']['taskbar_icon']))
-        self.tray_icon.setToolTip("Super Launcher")
 
-        show_action = QAction("Show", self)
-        show_action.triggered.connect(self.show)
-        max_action = QAction("Maximum", self)
-        max_action.triggered.connect(self.showMaximized)
-        quit_action = QAction("Quit", self)
-        quit_action.triggered.connect(self.programm_exit)
-        restart_action = QAction("Restart", self)
-        script_path = f'"{self.name_set["script_path"]}"'
-        restart_action.triggered.connect(self.programm_restart)
-        tray_menu = QMenu()
-        
-        tray_menu.addAction(max_action)
-        tray_menu.addAction(restart_action)
-        tray_menu.addAction(quit_action)
-
-        self.tray_icon.setContextMenu(tray_menu)
-        self.tray_icon.activated.connect(self.show)
-        self.tray_icon.show()
     
     # for top button control
     def maximum(self):

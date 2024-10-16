@@ -246,9 +246,9 @@ def is_url(str_f:str):
     match_f = url_pattern.match(str_f)
     return bool(match_f)
 def get_screen_size(target: Literal['pixel', 'physical', "dpi"]="pixel"):
+    app = QApplication.instance() if QApplication.instance() else QApplication([])
     allowed_values = ["pixel", "physical","dpi"]
     assert target in allowed_values, f"Invalid value: {target}. Allowed values are: {allowed_values}"
-    app = QApplication([])  # QApplication 对象
     screen = app.primaryScreen()  # 获取主屏幕对象
     match target:
         case "pixel":
@@ -266,18 +266,29 @@ def get_screen_size(target: Literal['pixel', 'physical', "dpi"]="pixel"):
         case "dpi":
             app.quit()
             return screen.physicalDotsPerInch()
-def excel_to_df(excel_path_f:str, region:str, sheet_name_f:Union[int, str]='Sheet1'):
+def excel_to_df(excel_path_f:str, region:str, sheet_name_f:Union[int, str, list]='Sheet1'):
     # Read XLSX doc and transform it into dataframe
     # region format : 'A1:Z7'
     # sheet_name_f : Sheet name or Sheet order number(start from 1)
     import pandas as pd
-    assert os.path.exists(excel_path_f), f"Invalid path: {excel_path_f}. PATH NOT EXISTS!"
+    assert is_path(excel_path_f, exist_check=True), f"Invalid path: {excel_path_f}. PATH NOT EXISTS!"
     try:
-        dataframe_f = pd.read_excel(excel_path_f, sheet_name=sheet_name_f, usecols=region)
+        dataframe_f = []
+        if sheet_name_f == "all":
+            workbook = openpyxl.load_workbook(excel_path_f)
+            sheet_name_f = workbook.sheetnames
+        if isinstance(sheet_name_f, list):
+            for sheet_i in sheet_name_f:
+                dataframe_i = pd.read_excel(excel_path_f, sheet_name=sheet_i, usecols=region)
+                dataframe_f.append(dataframe_i)
+            dataframe_f = pd.concat(dataframe_f, ignore_index=True)
+        else:
+            dataframe_f = pd.read_excel(excel_path_f, sheet_name=sheet_name_f, usecols=region)
     except Exception as e:
         dataframe_f = None
         warnings.warn(f"excel_to_df('{excel_path_f}') encounter error {e}, return None in default")
     return dataframe_f
+
 def font_get(para_dict_f={"Family":None,
                         'PointSize':None,
                         'PixelSize':None,
@@ -396,7 +407,6 @@ class Config_Manager:
         res_y = res_x
         
         # resize 
-        common_size = self.config['Common']['Size']
         targets = ['win_x', "win_y", "gap", "het", "srh_r"]
         for target_i in targets:
             value_i = self.config['Common']['Size'][target_i]
@@ -404,7 +414,7 @@ class Config_Manager:
             self.config['Common']['Size'][target_i] = value_f
             setattr(self, target_i, value_f)
         
-        modes = ["Launcher", "Searcher", "GPT"]
+        modes = ["MainWindow", "Launcher", "Searcher", "GPT"]
         for mode_i in modes:
             for key_i, value_i in self.config[mode_i]['Size'].items():
                 ori = self.config[mode_i]['Size'][key_i]
@@ -455,6 +465,8 @@ class Config_Manager:
         else:
             return dict_f
     
+    def __getitem__(self, key):
+        return self.get(key)
 
     
 

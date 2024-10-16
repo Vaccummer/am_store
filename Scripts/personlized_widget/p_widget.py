@@ -8,7 +8,7 @@ from typing import Literal, Optional, Tuple, Union
 class YohoPushButton(QPushButton):
     def __init__(self, icon_i:Union[str, QIcon], 
                  size:Union[int, QSize], 
-                 an_type:Literal["shake", 'resize', None], 
+                 an_type:Literal["shake", 'resize', None]=None, 
                  an_time:int=180,
                  change_size:float=0.6,
                  change_period:float=0.7):
@@ -19,6 +19,7 @@ class YohoPushButton(QPushButton):
         self.setIcon(icon_i)
         self.size_f = size if isinstance(size, QSize) else QSize(size, size)
         self.setIconSize(self.size_f)
+        self.setFixedSize(int(1.2*self.iconSize().width()), int(1.2*self.iconSize().width()))
         self.an_time = an_time
         self.change_size = change_size
         self.change_period = change_period
@@ -62,8 +63,34 @@ class YohoPushButton(QPushButton):
         # 开始动画
         self.animation.start()
 
+class ColorfulButton(QPushButton):
+    def __init__(self, text:str, font:QFont, ori_color:str, hover_color:str, click_color:str):
+        super().__init__()
+        self.setText(text)
+        self.setFont(font)
+        self.ori_color = ori_color
+        self.hover_color = hover_color
+        self.click_color = click_color
+    def _initUI(self):
+        self.setStyleSheet(f'''
+                            QPushButton {{
+                            padding: 10px;
+                            color: #fff;
+                            border: none;
+                            border-radius: 10px;
+                            background-color: {self.ori_color};
+                        }}
+                        QPushButton:hover {{
+                            background-color: {self.hover_color}; 
+                        }}
+                        QPushButton:pressed {{
+                                background-color: {self.click_color};
+                        }}
+                        ''')
+
 class AutoLabel(QLabel):
-    def __init__(self, text:str, font:QFont, color:str="black"):
+    def __init__(self, text:str, font:QFont, color:str="#171818"):
+        super().__init__()
         self.setText(text)
         self.setFont(font)
         self.set_color(color)
@@ -72,12 +99,12 @@ class AutoLabel(QLabel):
         self.setText(text)
         self.adjustSize()
     def set_color(self, color:str):
-        self.setStyleSheet(f'''
-                           QLabel {{
-                            color: {color};  # 字体颜色
-                            background-color: transparent;  # 背景透明
-                            }}
-                            ''')
-
+        pass
+        # self.setStyleSheet(f'''
+        #                    QLabel {{
+        #                     color: {color};  # 字体颜色
+        #                     background-color: transparent;  # 背景透明
+        #                     }}
+        #                     ''')
 
 

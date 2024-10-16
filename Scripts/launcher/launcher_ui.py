@@ -1,14 +1,16 @@
 # words match method
 import os
 import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+wkdr = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.append(wkdr)
 from Scripts.tools.toolbox import *
 from PySide2.QtWidgets import QListWidget, QMainWindow, QWidget,QListWidgetItem,QPushButton, QHBoxLayout, QVBoxLayout, QLabel
 from PySide2.QtGui import QFontMetrics, QIcon
 from PySide2.QtCore import QSize, Qt
-from personlized_widget.p_widget import *
+from Scripts.personlized_widget.p_widget import *
 from functools import partial
 import shutil
+
 
 class Associate:
     def __init__(self, program_info_df, ouput_num_f):
@@ -86,7 +88,6 @@ class Associate:
             return output_0[0]
         elif len(output_1) == 1:
             return output_1[0]
-        
 
 class AssociateList(QListWidget):
     def __init__(self, associate:Associate, config:Config_Manager, parent:Union[QMainWindow, QWidget]):  
@@ -96,10 +97,11 @@ class AssociateList(QListWidget):
         self.name = "associate_list"
         self.config = config.deepcopy()
         self.config.group_chose(mode="Launcher", widget=self.name)
-        self.num = self.config.get(mode="max_ass_num", widget=None, obj='max_ass_num')
-        self.ass_icon_list = self.config.get("icon_list", obj="path")
-        self.ass_icon_name = [os.path.splitext(os.path.basename(i))[0] for i in self.ass_icon_list]
+        self.num = self.config.get("max_ass_num", mode="Common", widget=None, obj=None)
         self.ass_icon_default = self.config.get("default_icon", obj="path")
+        self.ass_icon_list = self.config.get("icon_list", obj="path")
+        self.ass_icon_list = self.ass_icon_list if self.ass_icon_list else [self.ass_icon_default]*self.num
+        self.ass_icon_name = [os.path.splitext(os.path.basename(i))[0] for i in self.ass_icon_list]
 
         # init
         self._personlize()
@@ -138,26 +140,6 @@ class AssociateList(QListWidget):
         QListView::item:selected {
             background-color: #14B699;  /* 设置选中项的背景颜色 */
             color: white;  /* 设置选中项的文字颜色 */
-        }
-        """)
-        self.setStyleSheet("""
-        QScrollBar:vertical {
-            background: transparent;
-            width: 25px;
-            margin: 5px;
-        }
-
-        QScrollBar::handle:vertical {
-            background: #32CC99;
-            min-height: 80px;
-            border-radius: 7px;
-        }
-
-        QScrollBar::sub-line:vertical,
-        QScrollBar::add-line:vertical,
-        QScrollBar::sub-page:vertical,
-        QScrollBar::add-page:vertical {
-            background: none;
         }
         """)
         self.horizontalScrollBar().setStyleSheet("""
@@ -267,23 +249,23 @@ class AssociateList(QListWidget):
             pass
 
 class SwitchButton(QComboBox):
-    def __init__(self, parent: QMainWindow, mode_list:list[str], config:Config_Manager) -> None:
+    def __init__(self, parent: QMainWindow, config:Config_Manager) -> None:
         super().__init__(parent)
         self.up = parent
         self.name = "switch_button"
         self.config = config.deepcopy()
         self.config.group_chose(mode="MainWindow", widget=self.name)
-        self._initUI()
-        self.mode_list = mode_list
+        self.mode_list = self.config.get("mode_list", mode="Common", widget=None, obj=None)
         self.gem = self.config.get(self.name, widget=None, obj="Size")
         self.currentIndexChanged.connect(self._change_length)  # 连接信号槽
+        self._initUI()
     def _initUI(self):
+        font_f = self.config.get("font", obj=None)
+        self.setFont(font_f)
         for model_if in self.mode_list:
             self.addItem(model_if)
-        self.setCurrentIndex(self.up.mode)
+        self.setCurrentIndex(self.mode_list.index(self.up.mode))
 
-        font_f = self.config.get("Font", obj=None)
-        self.setFont(font_f)
         font_metrics = QFontMetrics(self.font())
         w_f = font_metrics.boundingRect(self.up.mode).width() + 30  # 加上一些额外空间，你可以根据需要修改
         self.setGeometry(self.gem[0], self.gem[1], w_f, self.gem[-1])
@@ -330,7 +312,6 @@ class TopButton(QWidget):
         self.layout_1 = QHBoxLayout()
 
         self._initbuttons()
-        self.max_button.clicked.connect(self.max_click)
         self.setLayout(self.layout_1)
         self.setGeometry(*tuple(self.geom))
         
@@ -339,18 +320,20 @@ class TopButton(QWidget):
         size_i = QSize(int(1.5*self.up.het), 1.5*self.up.het)
         self.max_path = self.config.get('maximum', obj="path")
         self.min_path = self.config.get('minimum', obj="path")
-        self.middle_path = self.config.get('close', obj="path")
-        self.close_path = self.config.get('middle', obj="path")
+        self.middle_path = self.config.get('middle', obj="path")
+        self.close_path = self.config.get('close', obj="path")
 
-        self.max_button = YohoPushButton(QIcon(self.max_path), size_i, None)
-        self.min_button = YohoPushButton(QIcon(self.min_path), size_i, None)
-        self.close_button = YohoPushButton(QIcon(self.close_path), size_i, None)
-        self.layout_1.addItem(self.max_button)
-        self.layout_1.addItem(self.min_button)
-        self.layout_1.addItem(self.close_button)
+        self.max_button = YohoPushButton(QIcon(self.max_path), size_i, 'resize')
+        self.max_button.clicked.connect(self.max_click)
+        self.min_button = YohoPushButton(QIcon(self.min_path), size_i, 'resize')
+        self.close_button = YohoPushButton(QIcon(self.close_path), size_i, 'resize')
+        self.layout_1.addWidget(self.max_button)
+        self.layout_1.addWidget(self.min_button)
+        self.layout_1.addWidget(self.close_button)
+
     
     def max_click(self):
-        if self.max_state:     
+        if self.max_state:
             self.max_button.setIcon(QIcon(self.middle_path))
             self.max_state = False
         else:
@@ -392,14 +375,16 @@ class ShortcutButton(QWidget):
         self.up = parent
         self.config = config.deepcopy().group_chose(mode="Launcher", widget=self.name)
         self.layout_0 = QVBoxLayout()
+        self.setLayout(self.layout_0)
         self._initpara()
         self._initUI()
+        self.setGeometry(*self.config.get(None, widget="Size", obj=self.name))
 
     def _initpara(self):
-        self.v_num = self.config.get('vertical_button_num', mode="Common", widget=None, ob=None)
-        self.h_num = self.config.get('horizontal_button_num', mode="Common", widget=None, ob=None)
+        self.v_num = self.config.get('vertical_button_num', mode="Common", widget=None, obj=None)
+        self.h_num = self.config.get('horizontal_button_num', mode="Common", widget=None, obj=None)
         self.h_layout = [QHBoxLayout() for _ in range(self.v_num)]
-        self.df_path = self.config.get("setting_xlsx", obj='path')
+        self.df_path = self.config.get("setting_xlsx", mode="Launcher", widget=self.name, obj='path')
         self.df:pd.DataFrame = excel_to_df(self.df_path,region="A:C")
         self.num_real = self.df.shape[0]
         self.buttonlabel_list = []
@@ -415,13 +400,16 @@ class ShortcutButton(QWidget):
     def _initUI(self):
         index_f = 0
         for v_i in range(self.v_num):
+            layout_if = QHBoxLayout()
+            layout_if.setAlignment(Qt.AlignCenter)
             for h_i in range(self.h_num):
                 if index_f < self.num_real:
-                    name, icon, path = self.df.iloc[0:3, index_f]
+                    name, icon, path = self.df.iloc[index_f, 0:3]
                 else:
                     name = "Unset"
                     icon = self.config.get('default_button_icon', obj='path')
-                    path = 'C:\\'
+                    path = os.getcwd()
+                layout_i = QVBoxLayout()
                 button_i = YohoPushButton(icon, self.size_i, an_type="resize")
                 label_i = AutoLabel(name, self.font_i)
                 button_i.setStyleSheet(f'''  QPushButton {{
@@ -432,9 +420,12 @@ class ShortcutButton(QWidget):
                                             background-color: {self.color_i}; }}''')
                 button_i.clicked.connect(partial(self._launch, path=path))
                 self.buttonlabel_list.append((button_i, label_i))
-                self.h_layout[v_i].addItem(button_i)
-                self.h_layout[v_i].addItem(label_i)
-            self.layout_0.addLayout(self.h_layout[v_i])
+                layout_i.addWidget(button_i)
+                layout_i.addWidget(label_i)
+                layout_if.addLayout(layout_i)
+                index_f += 1
+            self.layout_0.addLayout(layout_if)                    
+    
     def refresh(self):
         self.df:pd.DataFrame = excel_to_df(self.df_path,region="A:C")
         index_f = 0
@@ -446,7 +437,7 @@ class ShortcutButton(QWidget):
                 else:
                     name = "Unset"
                     icon = self.config.get('default_button_icon', obj='path')
-                    path = 'C:\\'
+                    path = os.getcwd()
                 button_i, label_i = self.buttonlabel_list[index_f]
                 button_i.clicked.disconnect()  # cutoff all connections
                 button_i.clicked.connect(partial(self._launch, path=path))
@@ -459,6 +450,7 @@ class ShortcutSetting(QWidget):
         self.up = parent
         self.name = 'shortcut_setting'
         self.config = config.deepcopy().group_chose(mode="Launcher", widget=self.name)
+        self.layout_0 = QVBoxLayout()
         self._windowset()
         self._initpara()
         self._initUI()
@@ -467,17 +459,17 @@ class ShortcutSetting(QWidget):
         self.setWindowFlags(self.windowFlags() | Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setWindowTitle("Shortcut Setting")
-        self.setWindowIcon(QIcon(self.up.path_set['Shortcut Setting']['window_button']))
+
+        self.setWindowIcon(QIcon(self.config.get("taskbar_icon", obj="path")))
     
     def _initpara(self):
         # init other para
         self.title_i = self.config.get('window_title', obj='name')
-        self.v_num = self.config.get('vertical_button_num', mode="Common", widget=None, ob=None)
-        self.h_num = self.config.get('horizontal_button_num', mode="Common", widget=None, ob=None)
+        self.v_num = self.config.get('vertical_button_num', mode="Common", widget=None, obj=None)
+        self.h_num = self.config.get('horizontal_button_num', mode="Common", widget=None, obj=None)
         self.num_t = int(self.v_num*self.h_num)
-        self.data_load = [{}]*self.num_t
         self.objs = []
-        
+        self.option_button = []
         # init font para
         self.config.group_chose(obj='font')
         self.window_title_font = self.config.get('window_title')
@@ -494,7 +486,6 @@ class ShortcutSetting(QWidget):
         self.button_icons = self.config.get('button_icons')
         self.default_app_icon = self.config.get('default_app_icon')
         self.default_folder_icon = self.config.get('default_folder_icon')
-        self.config.get('')
 
         self.col_coordinate_icon = self.config.get('col_coordinate_icon')
         self.col_name_icon = self.config.get('col_name_icon')
@@ -504,25 +495,103 @@ class ShortcutSetting(QWidget):
 
         # size para
         self.config.group_chose(obj='size')
-        for i in range(4):
+        for i in range(5):
             setattr(self, f"colwidth_{i}", self.config.get(f"colwidth_{i}"))
-
-    def _initUI(self):
-        x, y, w, h = self.up.get_geometry(self.up)
-        x_1, y_1, w_1, h_1 = self.up.window_size_set_ori_data['Launcher']['main_window']
-        self.w_1 = int(w_1*15/16)
-        self.h_1 = int(h_1*16/15)
-        self.setGeometry(x+w//2-w_1//2, y+h//2-h_1//2, self.w_1, self.h_1)
+        pass
+    def _check_path_validity(self, index_f:int):
+        line_edit:QLineEdit = self.objs[index_f]['exe_edit']
+        text_f = line_edit.text()
+        if os.path.exists(text_f) or (not text_f):
+            line_edit.setStyleSheet("border: 1px solid grey; background-color: transparent;")  # 路径不存在，变红
+        elif os.path.isabs(text_f):
+            line_edit.setStyleSheet("border: 3px solid #F0F411; background-color: transparent;")  # 路径不存在，变红
+        else:
+            line_edit.setStyleSheet("border: 3px solid #EE1515; background-color: transparent;")  # 路径存在，变黄
+    
+    def _icon_change(self, index_f:int):
+        icon_path_ori = self.df.iloc[index_f, 1]
+        icon_dir_ori = os.path.basename(icon_path_ori)
+        name = self.objs[index_f]['name_edit'].text()
+        dir_f = icon_dir_ori if os.path.exists(icon_dir_ori) else ""
+        options = QFileDialog.Options()
+        file_filter = "SVG Files (*.svg);;ICO Files (*.ico)"
+        file_path, _ = QFileDialog.getOpenFileName(self, f"Choose '{name}' icon", dir_f, file_filter, options=options)
+        if not file_path:
+            return
+        _, format_f = os.path.splitext(file_path)
         
-        self.layout_0 = QVBoxLayout()
+        icon_dir = self.config.get("button_icons_dir", mode="Launcher", widget="shortcut_setting", obj="path")
+        dst = os.path.join(icon_dir, name+format_f)
+        if os.path.exists(icon_path_ori):
+            os.remove(icon_path_ori)
+        if os.path.exit(dst):
+            os.remove(dst)
+        shutil.copy2(file_path, dst)
+        self.df.iloc[index_f, 1] = dst
+        self.objs[index_f]['icon_button'].setIcon(QIcon(dst))
+
+    def _exe_search(self, index_f:int):
+        exe_path_ori = self.df.iloc[index_f, 2]
+        exe_dir_ori = os.path.basename(exe_path_ori)
+        name = self.objs[index_f]['name_edit'].text()
+        dir_f = exe_dir_ori if os.path.exists(exe_dir_ori) else ""
+        options = QFileDialog.Options()
+        file_filter = "All Files (*);;Folders"
+        file_path, _ = QFileDialog.getOpenFileName(self, f"Choose '{name}' launch file", dir_f, file_filter, options=options)
+        if file_path:
+            self.objs[index_f]['exe_edit'].setText(path_format(file_path))
+    
+    def _read_data(self):
+        for i in range(self.num_t):
+            name = self.objs[i]['name_edit'].text()
+            exe_path = self.objs[i]['exe_edit'].text()
+            if is_path(exe_path, exist_check=True):
+                self.df[i][2] = exe_path
+            self.df[i][0] = name
+    
+    def _confirm_action(self, sign_f:Literal[True, False, "launcher", "shortcut"]):
+        match sign_f:
+            case "launcher":
+                self.up.launch("launcher")
+                return
+            case "shortcut":
+                self.up.launch("shortcut")
+                return 
+            case False:
+                self.close()
+                return
+            case True:
+                pass
+            case _:
+                warnings.warn(f"ShorcutSetting._confirm_action recive illegal para {sign_f}")
+                return
+        
+        self.up.reload_shortcutbutton()
+        self.hide()
+        self._read_data()
+        # write in dataframe
+        wb = openpyxl.load_workbook(self.up.path_set['Shortcut Setting']['shortcut_set'], data_only=True)
+        ws = wb.worksheets[0]
+        for row_i in range(self.num_t):
+            for col_i in range(3):
+                ws.cell(row=row_i+2, column=col_i+1, value=self.df.iloc[row_i, col_i])
+        wb.save(self.df_path)
+        self.close()
+    
+
+    ## UI set
+    def _initUI(self):
+        up_geom = self.up.geometry()
+        x, y, w, h = up_geom.x(), up_geom.y(), up_geom.width(), up_geom.height()
+        x_1, y_1, w_1, h_1 = self.config.get(self.name, widget=None, obj="Size")
+        self.setGeometry(x+w//2-w_1//2, y+h//2-h_1//2, w_1, h_1)
+        
         self._init_title()
         self._init_colname()
-        self.init_obj()
-        self.init_button()
+        self._init_obj()
+        self._init_action_button()
         self.setLayout(self.layout_0)
 
-        
-    
     def _init_title(self):
         title_label = AutoLabel(self.title_i, self.window_title_font)
         title_label.setFixedHeight(int(1.5*self.up.het))  # 指定标题高度
@@ -554,67 +623,75 @@ class ShortcutSetting(QWidget):
         self.layout_0.addLayout(self.layout_col)
     
     def _get_obj(self, index:int):
+        if index < self.df.shape[0]:
+            name_if = self.df.iloc[index, 0]
+            icon_if = self.df.iloc[index, 1] if is_path(self.df.iloc[index, 1], True) else self.default_app_icon
+            exe_f = self.df.iloc[index, 2]
+        else:
+            name_if = 'Uncertain'
+            icon_if = self.default_app_icon
+            exe_f = os.getcwd()
         output = []
         # coordinate define
         coordinate_name = f"{(index+1)%self.h_num}, {(index+1)//self.h_num+1}"
         
         cor_label = AutoLabel(coordinate_name, self.coordinate_label_font)
-
         cor_label.setStyleSheet('''background-color: transparent;
                                         border:none''')  # 设置标题透明背景
         output.append(cor_label)
 
-        name_if = self.df.iloc[index, 0]
+        
         name_if = name_if if isinstance(name_if, str) else 'Uncertain'
         name_edit = QLineEdit(name_if)
-        name_edit.setFixedSize(*self.colwith_1)
+        name_edit.setFixedSize(*self.colwidth_1)
         name_edit.setFont(self.app_name_label_font)
         name_edit.setStyleSheet("background-color: transparent;")
         output.append(name_edit)
 
         
-        icon_if = self.df.iloc[index, 1] if is_path(self.df.loc[index, 1], True) else self.default_app_icon
-        icon_button = YohoPushButton(icon_if, self.up.het, an_time="resize")
+        icon_button = YohoPushButton(icon_if, self.up.het, an_type='resize', an_time="resize")
         icon_button.setFixedSize(*self.colwidth_2)
         icon_button.setStyleSheet('''QPushButton {
                                     background-color: transparent;
                                     border: none;
                                     padding: 10px 20px;
                                     }
-
                                     QPushButton:pressed {
                                         padding: 8px 18px;
                                     }
                                     ''')
         output.append(icon_button)
         
-        exe_f = self.df.iloc[index, 2]
+        
         exe_edit = QLineEdit()
         exe_edit.setFixedSize(*self.colwidth_3)
-        check_f = partial(self._check_path_validity, line_edit=exe_edit)
-        exe_edit.textChanged.connect(check_f)
         exe_edit.setPlaceholderText(exe_f)
-        exe_edit.setFont(font_get(self.up.font_set['opto_setting_exe_edit']))
+        exe_edit.setFont(self.exe_lineedit_font)
         exe_edit.setStyleSheet("background-color: transparent;")
         output.append(exe_edit)
         
 
-        folder_button = YohoPushButton(self.default_folder_icon, self.colwidth_4[1])
+        folder_button = YohoPushButton(self.default_folder_icon, self.colwidth_4[1], an_type='resize')
         folder_button.setFixedSize(*self.colwidth_4)
         folder_button.setStyleSheet("background-color: transparent;border:none")
         output.append(folder_button)
         return output
 
-    def init_obj(self):
+    def _init_obj(self):
         obj_layout = QVBoxLayout()
         num_t = int(self.v_num*self.h_num)
         for i_f in range(num_t):
-            self.data_load[i_f] = {'Display_Name':None,
-                                   'Icon_Path':None,
-                                   'EXE_Path':None}
-            layout_row = QHBoxLayout()
-            
-        
+            layout_h = QHBoxLayout()
+            col_label, name_edit, icon_button, exe_edit, folder_button = self._get_obj(i_f)
+            self.objs.append({"index":i_f, "col_label":col_label, "name_edit":name_edit, 
+                              "icon_button":icon_button, "exe_edit":exe_edit, "folder_button":folder_button})
+            icon_button.clicked.connect(partial(self._icon_change, index_f=i_f))
+            exe_edit.textChanged.connect(partial(self._check_path_validity, index_f=i_f))
+            folder_button.clicked.connect(partial(self._exe_search, index_f=i_f))
+            for i in [col_label, name_edit, icon_button, exe_edit, folder_button]:
+                layout_h.addWidget(i)
+            obj_layout.addLayout(layout_h)
+
         # Create a scroll area and add the content layout to it
         scroll_content = QWidget()  # Create a widget to contain the layout
         scroll_content.setLayout(obj_layout)
@@ -642,7 +719,6 @@ class ShortcutSetting(QWidget):
                 margin: 5px;
                 
             }
-
             QScrollBar::handle:vertical {
                 background: rgba(255, 255, 255, 25);
                 min-height: 20px;
@@ -652,217 +728,62 @@ class ShortcutSetting(QWidget):
             QScrollBar::handle:vertical:hover {
                 background: #737373;
             }
-
             QScrollBar::add-line:vertical {
                 background: transparent;
                 height: 0px;
                 subcontrol-position: bottom;
                 subcontrol-origin: margin;
             }
-
             QScrollBar::sub-line:vertical {
                 background: transparent;
                 height: 0px;
                 subcontrol-position: top;
                 subcontrol-origin: margin;
             }
-            
             QScrollBar::sub-page:vertical, QScrollBar::add-page:vertical {
-            background: transparent; /* 将滚动槽的背景色设置为透明 */
+            background: transparent; 
             }
         """)
 
-    def init_button(self):
+    def _init_action_button(self):
         button_layout = QHBoxLayout()
-        # 创建确认和取消按钮
-        confirm_button = QPushButton("Confirm")
-        confirm_button.setFont(font_get({'Family':'Jetbrains Mono', 'PixelSize':30, 'Weight':70}))
-        confirm_button.clicked.connect(self.confirm_action)
-        confirm_button.setStyleSheet('''
-        QPushButton {
-            padding: 10px;
-            color: #fff;
-            border: none;
-            border-radius: 10px;
-            background-color: #286FB1;
-        }
+        self.config.group_chose("Launcher", "shortcut_setting", "color")
+        launcher_button = ColorfulButton("Launcher",
+                                         self.option_button_font, 
+                                         self.config['launcher0'],
+                                         self.config['launcher1'],
+                                         self.config['launcher2'],)
+        launcher_button.clicked.connect(self._confirm_action)
+        shortcut_button = ColorfulButton("Shortcut",
+                                         self.option_button_font, 
+                                         self.config['shortcut0'],
+                                         self.config['shortcut1'],
+                                         self.config['shortcut2'])
+        shortcut_button.clicked.connect(self._confirm_action)
+        confirm_button = ColorfulButton("Confirm", 
+                                        self.option_button_font, 
+                                        self.config['confirm0'],
+                                        self.config['confirm1'],
+                                        self.config['confirm2'],
+                                        )
+        confirm_button.clicked.connect(self._confirm_action)
 
-        QPushButton:hover {
-            background-color: #2CC1E1; /* 设置悬停时的颜色 */
-        }
-        
-        QPushButton:pressed {
-                background-color: #349179;
-            }
-        
-        ''')
-        
-        
-        cancel_button = QPushButton("Cancel")
-        cancel_button.setFont(font_get({'Family':'Jetbrains Mono', 'PixelSize':30, 'Weight':70}))
-        cancel_button.clicked.connect(self.cancel_action)
-        cancel_button.setStyleSheet('''
-        QPushButton {
-            padding: 10px;
-            color: #fff;
-            border: none;
-            border-radius: 10px;
-            background-color: #C60618;
-        }
+        cancel_button = ColorfulButton("Cancel",
+                                       self.option_button_font,
+                                       self.config['cancel0'],
+                                       self.config['cancel1'],
+                                       self.config['cancel2'],)
+        cancel_button.clicked.connect(self._confirm_action)
 
-        QPushButton:hover {
-            background-color: #FF4A6C; /* 设置悬停时的颜色 */
-        }
-        
-        QPushButton:pressed {
-            background-color: #349179;
-        }
-        
-        ''')
-        
-        name_1 = "Launcher"
-        launcher_excel_open_button = QPushButton(name_1)
-        launcher_excel_open_button.setFont(font_get({'Family':'Jetbrains Mono', 'PixelSize':30, 'Weight':70}))
-        func_1 = partial(self.open_func, sign_f=name_1)
-        launcher_excel_open_button.clicked.connect(func_1)
-        launcher_excel_open_button.setStyleSheet('''
-        QPushButton {
-            padding: 10px;
-            color: #fff;
-            border: none;
-        }
-        QPushButton {
-            border-radius: 10px;
-            background-color: #44BBB1;
-        }
-
-        QPushButton:hover {
-            background-color:#2CE1B3; /* 设置悬停时的颜色 */
-        }
-        
-        QPushButton:pressed {
-            background-color: #349179;
-        }
-        
-        ''')
-        
-        name_2 = "Shortcut"
-        shortcut_excel_open_button = QPushButton(name_2)
-        shortcut_excel_open_button.setFont(font_get({'Family':'Jetbrains Mono', 'PixelSize':30, 'Weight':70}))
-        func_2 = partial(self.open_func, sign_f=name_2)
-        shortcut_excel_open_button.clicked.connect(func_2)
-        shortcut_excel_open_button.setStyleSheet('''
-            QPushButton {
-                padding: 10px;
-                color: #fff;
-                border: none;
-                border-radius: 10px;
-                background-color: #44BBB1;
-            }
-
-            QPushButton:hover {
-                background-color: #2CE1B3; /* 设置悬停时的颜色 */
-            }
-            QPushButton:pressed {
-                background-color: #349179;
-            }
-            ''')
-        
-        button_layout.addWidget(launcher_excel_open_button)
-        button_layout.addWidget(shortcut_excel_open_button)
+        self.option_button.extend([launcher_button, shortcut_button, confirm_button, cancel_button])
+        button_layout.addWidget(launcher_button)
+        button_layout.addWidget(shortcut_button)
         button_layout.addWidget(confirm_button)
         button_layout.addWidget(cancel_button)
-        
         self.layout_0.addLayout(button_layout)
-    
-    def confirm_action(self):
-        df_n = self.dict_trans()
-        print(df_n)
-        self.up.shortcut_df = df_n
-        # relaunch button set
-        self.up.shortcut_button.close()
-        self.up.shortcut_button = Shortcuts(self.up)
-        self.hide()
-        # write in dataframe
-        wb = openpyxl.load_workbook(self.up.path_set['Shortcut Setting']['shortcut_set'], data_only=True)
-        ws = wb.worksheets[0]
-        for row_i in range(len(df_n)):
-            for col_i in range(3):
-                ws.cell(row=row_i+2, column=col_i+1, value=df_n.iloc[row_i, col_i])
-        wb.save(self.up.path_set['Shortcut Setting']['shortcut_set'])
-        self.close()
 
-    
-    def dict_trans(self):
-        df_copy = copy.deepcopy(self.df)
-        for key_i, dict_i in self.data_load.items():
-            for key_ii, value_i in dict_i.items():
-                if key_ii in ['Display_Name', 'EXE_Path']:
-                    if value_i.text():
-                        df_copy.at[key_i, key_ii] = value_i.text()
-                    else:
-                        df_copy.at[key_i, key_ii] = self.df.loc[key_i, key_ii]
-            for key_ii, value_i in dict_i.items():
-                if key_ii == 'Icon_Path':
-                    format_n = value_i.split('.')[-1]
-                    obj_name = df_copy.loc[key_i, 'Display_Name']
-                    path_new = os.path.join(os.path.dirname(self.icon_set_path[0]), f'{obj_name}.{format_n}')
-                    if value_i != path_new:
-                        shutil.copy(value_i, path_new)
-                    df_copy.at[key_i, key_ii] = path_new
-        return df_copy
-    
-    def cancel_action(self):
-        self.close()
-    
-    def open_func(self, sign_f):
-        if sign_f == 'Launcher':
-            path_f = self.up.path_set['Launcher Mode']['launcher_set']
-        elif sign_f == 'Shortcut':
-            path_f = self.up.path_set['Shortcut Setting']['shortcut_set']
-        else:
-            path_f = ''
-        subprocess.Popen(['explorer', path_f])
-    # animation define function
-    def animations(self, button_f, size_ori, size_dst, func_f):
-        self.animation1 = QPropertyAnimation(self, targetObject=button_f, propertyName=b'iconSize')
-        self.animation1.setDuration(120)
-        # self.animation1.setTargetObject(button_f)
-        self.animation1.setStartValue(QSize(size_ori, size_ori))
-        self.animation1.setEndValue(QSize(size_dst, size_dst))
-        self.animation1.finished.connect(func_f)
-        self.animation1.start()
-    # button click total func
-    def button_flash(self):
-        button_f = self.sender()
-        func_f = self.effect_dict[button_f.objectName()]
-        size_ori = button_f.iconSize().width()
-        size_dst = int(button_f.iconSize().width()*0.5)
-        self.animations(button_f, size_ori, size_dst, lambda:self.animations(button_f, size_dst, size_ori, func_f))
-    # icon click conduct function
-    def icon_click(self, button_f, row_f):
-        filename_f, _ = QFileDialog.getOpenFileName(None, "Chose your Icon", "", "Photo File (*.png *.jpg *.bmp *.jepg *.svg *ico)")
-        if not filename_f:
-            return
-        self.data_load[row_f]['Icon_Path'] = filename_f.replace('/', '\\')
-        button_f.setIcon(QIcon(filename_f))
-        button_f.setIconSize(QSize(60, 60))
-    # check exe path validity
-    def _check_path_validity(self, text, line_edit):
-        text_f = line_edit.text()
-        if os.path.exists(text_f) or (not text_f):
-            line_edit.setStyleSheet("border: 1px solid grey; background-color: transparent;")  # 路径不存在，变红
-        elif os.path.isabs(text_f):
-            line_edit.setStyleSheet("border: 3px solid #F0F411; background-color: transparent;")  # 路径不存在，变红
-        else:
-            line_edit.setStyleSheet("border: 3px solid #EE1515; background-color: transparent;")  # 路径存在，变黄
-    # excel path search
-    def exe_search(self, line_f):
-        file_path_f, _ = QFileDialog.getOpenFileName(None, "Chose Your EXE Path", "", "All Files (*);;Folders")
-        if file_path_f:
-            line_f.setText(file_path_f.replace('/', '\\').strip())
 
-    
+
 
 
 
