@@ -9,11 +9,13 @@ from typing import Literal, Optional, Tuple, Union
 import re
 from PySide2.QtGui import QScreen
 from PySide2.QtWidgets import QApplication
+from PySide2.QtGui import QFont
 import warnings
 import math
 from sympy import symbols, sympify
-from am_store2.common_tools import yml
-from PySide2.QtGui import QFont
+from am_store.common_tools import yml, AMPATH
+import paramiko
+
 
 def is_path(string_f, exist_check:bool=False):
     # To judge whether a variable is Path or not
@@ -312,6 +314,34 @@ def font_get(para_dict_f={"Family":None,
             exec(f'font_f.set{key}(value)', dict_f)
     return font_f
 
+def parse_ssh_config(file_path):
+    hosts = {}
+    with open(file_path, 'r') as file:
+        current_host = None
+        host_config = {}
+
+        for line in file:
+            line = line.strip()
+
+            if not line or line.startswith('#'):
+                continue
+
+            if line.lower().startswith('host '):
+                if current_host:
+                    hosts[current_host] = host_config
+                current_host = line.split()[1]
+                host_config = {}
+                continue
+
+            match = re.match(r'(\w+)\s+(.+)', line)
+            if match:
+                key, value = match.groups()
+                host_config[key] = value
+        if current_host:
+            hosts[current_host] = host_config
+
+    return hosts
+
 class dicta:
     @staticmethod
     def flatten_dict(dict_f:dict):
@@ -474,10 +504,88 @@ class Config_Manager(object):
     def __getitem__(self, key):
         return self.get(key)
 
+class LauncherPathManager(object):
+    def __init__(self, config:Config_Manager):
+        self.config = config
+        self.data_path = AMPATH(self.config.get("settings_xlsx", mode="Launcher", widget="path", obj=None))
+        self.col_names= ['Name', 'Chinese Name', 'Description', 'EXE Path', "Icon_Path", 'ID', 'Group']
+        self._read_xlsx()
+        self.check()
+    def _read_xlsx(self):
+        xls = pd.ExcelFile(self.data_path)
+        self.df = pd.DataFrame()
+        # read all sheets and add a column to indicate the group
+        for sheet_name in xls.sheet_names:
+            df_t = pd.read_excel(self.data_path, sheet_name=sheet_name)
+            df_t['Group'] = sheet_name
+            self.df = pd.concat([self.df, df_t], ignore_index=True)
+        # check the hash ID
+        self.df.fillna("", inplace=True)
+        self.df['ID'] = self.df.apply(lambda row: row['Name']+"-_-"+row['Chinese Name'], axis=1)
+    def save_xlsx(self):
+        groups = list(self.df['Group'].unique())
+        with pd.ExcelWriter(self.data_path) as writer:
+            for gropu_i in groups:
+                self.df[self.df['Group']==gropu_i].to_excel(writer, sheet_name=gropu_i, index=False)
+    def check(self):
+        self.df['EXE Path'] = self.df['EXE Path'].apply(lambda x: x if os.path.exists(x) else "")
+        self.df['Icon Path'] = self.df['Icon Path'].apply(lambda x: x if os.path.exists(x) else "")
+
+class ShortcutsPathManager(object):
+    def __init__(self, config:Config_Manager):
+        self.config = config
+        self.col_name = ["Display_Name", "Icon_Path", "EXE_Path"]
+        self.data_path = AMPATH(self.config.get("setting_xlsx", mode="Launcher", widget="shortcut_setting", obj="path"))
+        self._read_xlsx()
+        self.check()
+    def _read_xlsx(self):
+        self.df = pd.read_excel(self.data_path)
+    def check(self):
+        self.df['EXE_Path'] = self.df['EXE_Path'].apply(lambda x: x if os.path.exists(x) else "")
+        self.df['Icon_Path'] = self.df['Icon_Path'].apply(lambda x: x if os.path.exists(x) else "")
+    def save(self):
+        self.df.to_excel(self.data_path, index=False)
+
+class SshManager(object):
+    def __init__(self, config:Config_Manager):
+        self.config = config
+        self.config_path = self.config.get("ssh_config", "Launcher", None, "path")
+        self.server=None
+        self.hostname_n = None
+    def _read_ssh_config(self):
+        self.hosts = parse_ssh_config(self.config_path)
+        self.hostnames = list(self.hosts.keys())
+
+    def connect(self, host_name:str):
+        assert host_name in self.hosts.keys(), f"Host name {host_name} not found in config file"
+        host = self.hosts[host_name]
+        self.server = paramiko.SSHClient()
+        self.server.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        self.server.connect(host['HostName'], 
+                            port=int(host.get('Port', 22)), 
+                            username=host.get('User', os.getlogin()), 
+                            password=host.get('Password', None))
+        self.sftp = self.server.open_sftp()
+        self.hostname_n = host_name
+    def check_connection(self):
+        try:
+            # 执行简单命令（例如 uptime）来检测连接
+            stdin, stdout, stderr = self.server.exec_command("uptime")
+            output = stdout.read().decode('utf-8')
+            
+            if output:
+                return True
+            else:
+                return False
+        except Exception as e:
+            return False
     
-
-
+    def close(self):
+        self.server.close()
+    
+    def list_files(self, path:str):
+        if not self.check_connection():
+            self.connect(self.hostname_n)
+        self.sftp.listdir(path)
 
         
-        
-

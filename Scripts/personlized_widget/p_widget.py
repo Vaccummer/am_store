@@ -4,10 +4,16 @@ from PySide2.QtWidgets import *
 from typing import Literal, Optional, Tuple, Union, List
 from abc import abstractmethod
 
-
+class Asize(QSize):
+    def __init__(self, width:int, height:int):
+        super().__init__(width, height)
+    def __mul__(self, c:Union[int, float]):
+        return QSize(int(self.width()*c), int(self.height()*c))
+    def q(self):
+        return QSize(self.width(), self.height())
 class YohoPushButton(QPushButton):
     def __init__(self, icon_i:Union[str, QIcon], 
-                 size:Union[int, QSize], 
+                 size_f:Union[int, Asize], 
                  an_type:Literal["shake", 'resize', None]=None, 
                  an_time:int=180,
                  change_size:float=0.6,
@@ -17,9 +23,15 @@ class YohoPushButton(QPushButton):
         # 设置按钮图标
         icon_i = icon_i if isinstance(icon_i, QIcon) else QIcon(icon_i)
         self.setIcon(icon_i)
-        self.size_f = size if isinstance(size, QSize) else QSize(size, size)
+        if isinstance(size_f, int):
+            size_f = QSize(size_f, size_f)
+        elif isinstance(size_f, QSize):
+            pass
+        elif isinstance(size_f, list):
+            size_f = QSize(*size_f)
+        self.size_f = size_f 
         self.setIconSize(self.size_f)
-        self.setFixedSize(int(1.3*self.iconSize().width()), int(1.3*self.iconSize().width()))
+        self.setFixedSize(int(1.5*self.iconSize().width()), int(1.5*self.iconSize().width()))
         self.an_time = an_time
         self.change_size = change_size
         self.change_period = change_period
@@ -41,27 +53,22 @@ class YohoPushButton(QPushButton):
         self.animation = QPropertyAnimation(self, b"geometry")
         start_rect = self.geometry()
         self.animation.setDuration(self.an_time)
-        self.animation.setKeyValueAt(0, QRect(start_rect))
+        self.animation.setStartValue(0, QRect(start_rect))
         self.animation.setKeyValueAt(0.2, QRect(start_rect.x() - 5, start_rect.y(), start_rect.width(), start_rect.height()))
         self.animation.setKeyValueAt(0.4, QRect(start_rect.x() + 5, start_rect.y(), start_rect.width(), start_rect.height()))
         self.animation.setKeyValueAt(0.6, QRect(start_rect.x() - 5, start_rect.y(), start_rect.width(), start_rect.height()))
         self.animation.setKeyValueAt(0.8, QRect(start_rect.x() + 5, start_rect.y(), start_rect.width(), start_rect.height()))
-        self.animation.setKeyValueAt(1, QRect(start_rect))
+        self.animation.setEndValue(QRect(start_rect))
         self.animation.start()
     
     def resize_icon(self):
-        # 创建放大缩小动画
         self.animation = QPropertyAnimation(self, b"iconSize")
-        
-        # 动画持续时间为 500 毫秒
         self.animation.setDuration(self.an_time)
         size_n = QSize(int(self.change_size*self.size_f.width()), int(self.change_size*self.size_f.height()))
-        # 设置动画的起始大小（默认大小）和目标大小（放大的大小）
         self.animation.setStartValue(self.size_f)
-        self.animation.setKeyValueAt(self.change_period, size_n)  # 放大到100x100
-        self.animation.setEndValue(self.size_f)  # 返回到默认大小
-
-        # 开始动画
+        self.animation.setKeyValueAt(self.change_period, size_n)  
+        self.animation.setEndValue(self.size_f)  
+        print(self.size_f)
         self.animation.start()
 
 class ColorfulButton(QPushButton):

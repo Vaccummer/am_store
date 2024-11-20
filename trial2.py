@@ -1,35 +1,56 @@
-from PySide2.QtWidgets import QApplication, QPushButton, QWidget, QVBoxLayout
-from PySide2.QtCore import Qt
+import paramiko
+import os
+import re
+def parse_ssh_config(file_path):
+    # 用于存储每个 host 的配置
+    hosts = {}
+    with open(file_path, 'r') as file:
+        current_host = None
+        host_config = {}
 
-class WheelButton(QPushButton):
-    def __init__(self, text, parent=None):
-        super(WheelButton, self).__init__(text, parent)
+        for line in file:
+            line = line.strip()
 
-    def wheelEvent(self, event):
-        # 检查滚轮方向
-        if event.angleDelta().y() > 0:
-            self.setText("滚轮向上")
-        else:
-            self.setText("滚轮向下")
-        # 你可以在这里添加其他响应鼠标滚轮的操作
-        event.accept()
+            if not line or line.startswith('#'):
+                continue
 
-app = QApplication([])
+            if line.lower().startswith('host '):
+                if current_host:
+                    hosts[current_host] = host_config
+                current_host = line.split()[1]
+                host_config = {}
+                continue
 
-# 创建主窗口
-window = QWidget()
-window.setWindowTitle("滚轮响应按钮")
+            match = re.match(r'(\w+)\s+(.+)', line)
+            if match:
+                key, value = match.groups()
+                host_config[key] = value
+        if current_host:
+            hosts[current_host] = host_config
 
-# 创建一个布局
-layout = QVBoxLayout()
+    return hosts
 
-# 创建一个自定义的 WheelButton
-wheel_button = WheelButton("滚动鼠标滚轮")
-
-# 将自定义按钮添加到布局
-layout.addWidget(wheel_button)
-
-# 设置窗口布局
-window.setLayout(layout)
-window.show()
-app.exec_()
+class SshManager(object):
+    def __init__(self):
+        self.config_path = r'C:\Users\am\.ssh\config'
+        self.server=None
+        self._read_ssh_config()
+    def _read_ssh_config(self):
+        self.hosts = parse_ssh_config(self.config_path)
+        self.hostnames = list(self.hosts.keys())
+    def connect(self, host_name:str):
+        assert host_name in self.hosts.keys(), f"Host name {host_name} not found in config file"
+        host = self.hosts[host_name]
+        self.server = paramiko.SSHClient()
+        self.server.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        try:
+            self.server.connect(host['HostName'], 
+                            port=int(host.get('Port', 22)), 
+                            username=host.get('User', os.getlogin()), 
+                            password=host.get('Password', None))
+            
+        except Exception as e:
+            return e
+ssh = SshManager()
+#print(ssh.hosts)
+print(ssh.connect('bmc'))

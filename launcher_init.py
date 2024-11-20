@@ -2,7 +2,7 @@ from PySide2.QtWidgets import QApplication
 from Scripts.tools.toolbox import QApplication
 from launcher_base import BaseLauncher
 from Scripts.tools.toolbox import *
-from Scripts.launcher.launcher_UI import *
+from Scripts.launcher.launcher_ui import *
 from abc import abstractmethod
 
 class UILauncher(BaseLauncher):
@@ -50,8 +50,15 @@ class UILauncher(BaseLauncher):
         self.layout_top.addWidget(self.top_button)
     
     def _initLauncherUI(self):
+        self.path_switch_button = PathModeSwitch(self, config=self.config, mode_list=["Local", "V100s"])
+
         self.input_box = InputBox(self, self.config)
+        self.search_togle_button =SearchTogleButton(self, self.config)
+        button_action = QWidgetAction(self)
+        button_action.setDefaultWidget(self.search_togle_button)
+        self.input_box.addAction(button_action, QLineEdit.TrailingPosition)
         self.shortcut_entry = ShortcutEntry(self, self.config)
+        self.layout_input.addWidget(self.path_switch_button)
         self.layout_input.addWidget(self.input_box)
         self.layout_input.addWidget(self.shortcut_entry)
 

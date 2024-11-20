@@ -15,16 +15,16 @@ import pandas
 import pathlib
 
 class Associate:
-    def __init__(self, config:Config_Manager, program_info_df:pandas.DataFrame):
+    def __init__(self, config:Config_Manager, program_info_df:pandas.DataFrame=pandas.read_excel(r'E:\SuperLauncher\load\Launcher\launcher_set.xlsx')):
         self.config = config.deepcopy()
         self.num = config
         self.df = program_info_df
-        self.df = self.df.fillna(None)
+        self.df = self.df.fillna(value="")
         self.names = nan_to_sign(list(self.df['Name'].values))
         self.ch_names = nan_to_sign(list(self.df['Chinese Name'].values))
         self.description = nan_to_sign(list(self.df['Description'].values))
         self.exe_path = nan_to_sign(list(self.df['EXE Path'].values))
-        self.icon_path = nan_to_sign(list(self.df['Icon Path'].values))
+        #self.icon_path = nan_to_sign(list(self.df['Icon Path'].values))
     # To Associate subdirectory of certain path
     def path(self, prompt_f):
         if not prompt_f:
@@ -82,7 +82,8 @@ class Associate:
                     return os.path.join(sup_path, name_wait_list[0], os.sep)
                 else:
                     return None
-    
+    # Automatically complete Remote PATH
+
     # Automatically complete Name
     def fill_name(self, prompt_f):
         output_0 = [name_i for name_i in self.names if name_i.lower().startswith(prompt_f.lower())]
@@ -91,6 +92,7 @@ class Associate:
             return output_0[0]
         elif len(output_1) == 1:
             return output_1[0]
+
 
 class AssociateList(QListWidget):
     def __init__(self, associate:Associate, config:Config_Manager, parent:Union[QMainWindow, QWidget]):  
@@ -270,7 +272,7 @@ class SwitchButton(QComboBox):
         self.setCurrentIndex(self.mode_list.index(self.up.mode))
 
         font_metrics = QFontMetrics(self.font())
-        w_f = font_metrics.boundingRect(self.up.mode).width() + 30  # 加上一些额外空间，你可以根据需要修改
+        w_f = font_metrics.boundingRect(self.up.mode).width() + 30  
         self.setFixedSize(w_f, self.gem[-1])
         button_style = """
         QComboBox {
@@ -295,6 +297,54 @@ class SwitchButton(QComboBox):
         }
         
         
+        """
+        self.setStyleSheet(button_style)
+    def _change_length(self):
+        mode_n = self.currentText()
+        font_metrics = QFontMetrics(self.font())
+        w_f = font_metrics.boundingRect(mode_n).width() + 30  
+        self.setFixedSize(w_f, self.gem[-1])
+
+class PathModeSwitch(QComboBox):
+    def __init__(self, parent:QMainWindow, config:Config_Manager, mode_list:List[str]) -> None:
+        super().__init__(parent)
+        self.up = parent
+        self.name = "path_mode_switch"
+        self.config = config.deepcopy()
+        self.config.group_chose(mode="Launcher", widget=self.name, obj=None)
+        self.setFont(self.config.get("font"))
+        self.gem = self.config.get(self.name, widget=None, obj="Size")
+        self.currentIndexChanged.connect(self._change_length)
+        self.mode_list = mode_list
+        self._initUI()
+    def _initUI(self):
+        font_f = self.config.get("font", obj=None)
+        self.setFont(font_f)
+        for model_if in self.mode_list:
+            self.addItem(model_if)
+        self.setCurrentIndex(self.mode_list.index("Local"))
+        font_metrics = QFontMetrics(self.font())
+        w_f = font_metrics.boundingRect(self.up.mode).width() + 30  
+        self.setFixedSize(w_f, self.gem[-1])
+        button_style = """
+        QComboBox {
+            background-color: rgba(255, 255, 255, 50);
+            border: 0px solid #2980b9;
+            border-radius: 10px;
+            padding: 5px;
+            color: white;
+        }
+        QComboBox::drop-down {
+            border: none;  /* 移除下拉箭头的边框 */
+        }
+        QComboBox QAbstractItemView {
+        border-radius: 0px;
+        background-color:  qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #73B1A7, stop:1 #EDFFFF);
+        border: 0px solid #CCCCCC; /* 下拉列表的边框 */
+        color: black; /* 下拉列表的文本颜色 */
+        selection-background-color: #4CC1B5; /* 选中项的背景颜色 */
+        selection-color: black; /* 选中项的文本颜色 */
+        }
         """
         self.setStyleSheet(button_style)
     def _change_length(self):
@@ -354,12 +404,47 @@ class InputBox(QLineEdit):
         self.returnPressed.connect(self.clear)
     def _initUI(self):
         self.config.group_chose(mode=self.up.mode, widget="input_box")
-        self.setStyleSheet("border-radius: 20px; padding-left: 20px;")  # smooth four angle
+        self.setStyleSheet("border-radius: 20px; padding-left: 20px;padding-right: 15px")  # smooth four angle
         # self.up.input_box.textChanged.connect(self.up.update_associated_words)
         # self.up.input_box.returnPressed.connect(self.up.confirm_action)
         self.setFont(self.config.get("main", obj="font"))
         gemo = self.config.get(self.name, widget=None, obj="Size")
         self.setFixedHeight(gemo[-1])
+
+class SearchTogleButton(YohoPushButton):
+    def __init__(self, parent, config:Config_Manager):
+        self.up = parent
+        self.name = "search_togle_button"
+        self.config = config.deepcopy()
+        self.config.group_chose(mode="Launcher", widget=self.name, obj=None)
+        self.icons = self.config.get("icons")
+        self.urls = self.config.get("urls")
+        self.sign = self.config.get("sign")
+        # self.setIcon(QIcon(self.icons[0]))
+        self.url = self.urls[0]
+        button_size = Asize(*self.config.get(self.name, widget=None, obj="Size"))
+        super().__init__(icon_i=QIcon(self.icons[0]), 
+                        size_f=button_size.q(), an_type="resize")
+        self.setFixedSize(button_size)
+    
+        # self.setIconSize(self.icon_size)
+        # self.setFixedSize(1.3*self.icon_size)
+        # self.setStyleSheet("""
+        #     QPushButton {
+        #         border: none;
+        #         background-color: transparent;
+        #     }
+        # """)
+        # self.clicked.connect(self.print)
+    def wheelEvent(self, event):
+        delta = event.angleDelta().y()  # 获取鼠标滚轮的增量
+        index_n = self.urls.index(self.url)
+        if delta > 0:
+            index_n = (index_n+1) % len(self.urls)
+        elif delta < 0:
+            index_n = (index_n+len(self.icons)-1) % len(self.icons)
+        self.url = self.urls[index_n]
+        self.setIcon(QIcon(self.icons[index_n]))
 
 class SearchButton(YohoPushButton):
     def __init__(self, http_icon_tuple:tuple[str, QIcon], 

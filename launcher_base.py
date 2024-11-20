@@ -6,8 +6,8 @@ from PySide2.QtCore import QTimer, QPropertyAnimation, QEasingCurve, QSequential
 from PySide2.QtGui import QPixmap, QPalette, QIcon, QFont, QScreen, QFontMetrics, QWindow, QKeySequence
 from PySide2.QtGui import QPainter, QColor, QBrush, QPen, QLinearGradient, QTextCharFormat, QTextCursor
 from Scripts.tools.toolbox import *
-from am_store2.common_tools import *
-from Scripts.launcher.launcher_UI import *
+from am_store.common_tools import *
+from Scripts.launcher.launcher_ui import *
 
 class BaseLauncher(QMainWindow):
     def __init__(self, config:dict, app:QApplication):
@@ -117,7 +117,7 @@ class BaseLauncher(QMainWindow):
         self.ass_xlsx_path = self.config.get("settings_xlsx", "Launcher", widget="path", obj=None)
         self.ass_num = self.config.get("max_ass_num", "Common", None, None)
         self.ass_df = excel_to_df(self.ass_xlsx_path, region='A:D', sheet_name_f='all')
-        self.ass = Associate(self.ass_df, ouput_num_f=self.ass_num)
+        self.ass = Associate(self.config)
     
     def _mainwindow_set(self):
         self.setWindowFlags(self.windowFlags() | Qt.FramelessWindowHint)
@@ -136,6 +136,12 @@ class BaseLauncher(QMainWindow):
         painter.setPen(Qt.NoPen)
         painter.drawRoundedRect(self.rect(), 20, 20)
     
+    def _load_data(self):
+        self.launcher_data = LauncherPathManager(self.config)
+        self.shortcut_data = ShortcutsPathManager(self.config)
+        self.ssh_manager = SshManager(self.config)
+        
+
     @staticmethod
     def programm_exit():
         ## programm exit
