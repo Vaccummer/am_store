@@ -1,39 +1,45 @@
 # words match method
 import os
 import sys
-wkdr = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-sys.path.append(wkdr)
-from Scripts.tools.toolbox import *
+from ..tools.toolbox import *
+# wkdr = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+# sys.path.append(wkdr)
+# from Scripts.tools.toolbox import *
 from PySide2.QtWidgets import QListWidget, QMainWindow, QWidget,QListWidgetItem,QPushButton, QHBoxLayout, QVBoxLayout, QLabel
 from PySide2.QtGui import QFontMetrics, QIcon
 from PySide2.QtCore import QSize, Qt
-from Scripts.personlized_widget.p_widget import *
+from ..personlized_widget.p_widget import *
 from functools import partial
 import shutil
-
+import pandas
+import pathlib
 
 class Associate:
-    def __init__(self, program_info_df, ouput_num_f):
-        self.num = ouput_num_f
+    def __init__(self, config:Config_Manager, program_info_df:pandas.DataFrame):
+        self.config = config.deepcopy()
+        self.num = config
         self.df = program_info_df
+        self.df = self.df.fillna(None)
         self.names = nan_to_sign(list(self.df['Name'].values))
         self.ch_names = nan_to_sign(list(self.df['Chinese Name'].values))
         self.description = nan_to_sign(list(self.df['Description'].values))
         self.exe_path = nan_to_sign(list(self.df['EXE Path'].values))
+        self.icon_path = nan_to_sign(list(self.df['Icon Path'].values))
     # To Associate subdirectory of certain path
     def path(self, prompt_f):
         if not prompt_f:
             return []
+        path_f = pathlib.Path(prompt_f)
         # prompt is a specific file path
-        if os.path.exists(prompt_f) and os.path.isfile(prompt_f):
+        if path_f.exists and path_f.is_file():
             return []
         # prompt is a directory
         if os.path.exists(prompt_f):
             return os.listdir(prompt_f)
         # prompt is a unfilled diretory
-        sup_path = os.path.dirname(prompt_f)
-        dir_name_n = prompt_f.split('\\')[-1]
-        if not os.path.exists(sup_path):
+        sup_path = path_f.parent
+        dir_name_n = path_f.name
+        if not sup_path.exists():
             return []
         else:
             list_1f = sorted([dir_if for dir_if in os.listdir(sup_path) if dir_name_n in dir_if], key=lambda x:x.index(dir_name_n))
@@ -44,15 +50,12 @@ class Associate:
     def name(self, prompt_f):
         if not prompt_f:
             return []
-        try:
-            output_name = sorted([name_i for name_i in self.names if prompt_f.lower() in name_i.lower()], key=lambda s: (s.lower().index(prompt_f.lower()))/len(s))
-            output_chname = sorted([ch_name_i for ch_name_i in self.ch_names if prompt_f.lower() in ch_name_i.lower()], key=lambda s: (s.lower().index(prompt_f.lower()))/len(s))
-            output_des = [self.names[self.description.index(dsp_name_i)] for dsp_name_i in self.description if prompt_f.lower() in dsp_name_i.lower()]
-            output_chname_t = [i for i in output_chname if self.names[self.ch_names.index(i)] not in output_name]
-            output_des_t = [i for i in output_des if self.ch_names[self.names.index(i)] not in output_chname]
-            return rm_dp_list_elem(output_name+output_chname_t+output_des_t, reverse=False)[0:self.num]
-        except Exception as e:
-            return []
+        output_name = sorted([name_i for name_i in self.names if prompt_f.lower() in name_i.lower()], key=lambda s: (s.lower().index(prompt_f.lower()))/len(s))
+        output_chname = sorted([ch_name_i for ch_name_i in self.ch_names if prompt_f.lower() in ch_name_i.lower()], key=lambda s: (s.lower().index(prompt_f.lower()))/len(s))
+        output_des = [self.names[self.description.index(dsp_name_i)] for dsp_name_i in self.description if prompt_f.lower() in dsp_name_i.lower()]
+        output_chname_t = [i for i in output_chname if self.names[self.ch_names.index(i)] not in output_name]
+        output_des_t = [i for i in output_des if self.ch_names[self.names.index(i)] not in output_chname]
+        return rm_dp_list_elem(output_name+output_chname_t+output_des_t, reverse=False)[0:self.num]
     
     # To associate programmes with multiple prompts
     def multi_pro_name(self, prompt_list_f):
@@ -66,7 +69,7 @@ class Associate:
         # if prompt is a exsisting path
         if os.path.exists(prompt_f):
             if len(os.listdir(prompt_f))==1:
-                return os.path.join(prompt_f, os.listdir(prompt_f)[0])
+                return os.path.join(prompt_f, os.listdir(prompt_f)[0], os.sep)
             else:
                 return None
         else:
@@ -76,7 +79,7 @@ class Associate:
             else:
                 name_wait_list = [name_if for name_if in os.listdir(sup_path) if (name_if).lower().startswith((prompt_f.split('\\')[-1]).lower())]
                 if len(name_wait_list) == 1:
-                    return os.path.join(sup_path, name_wait_list[0])
+                    return os.path.join(sup_path, name_wait_list[0], os.sep)
                 else:
                     return None
     
@@ -268,7 +271,7 @@ class SwitchButton(QComboBox):
 
         font_metrics = QFontMetrics(self.font())
         w_f = font_metrics.boundingRect(self.up.mode).width() + 30  # 加上一些额外空间，你可以根据需要修改
-        self.setGeometry(self.gem[0], self.gem[1], w_f, self.gem[-1])
+        self.setFixedSize(w_f, self.gem[-1])
         button_style = """
         QComboBox {
             background-color: rgba(255, 255, 255, 50);
@@ -298,7 +301,7 @@ class SwitchButton(QComboBox):
         mode_n = self.currentText()
         font_metrics = QFontMetrics(self.font())
         w_f = font_metrics.boundingRect(mode_n).width() + 30  # 加上一些额外空间，你可以根据需要修改
-        self.setGeometry(self.gem[0], self.gem[1], w_f, self.gem[-1])
+        self.setFixedSize(w_f, self.gem[-1])
 
 class TopButton(QWidget):
     def __init__(self, parent: QMainWindow, config:Config_Manager) -> None:
@@ -310,14 +313,15 @@ class TopButton(QWidget):
         self.geom = self.config.get(self.name, widget=None, obj="Size")
         self.max_state = False
         self.layout_1 = QHBoxLayout()
+        self.layout_1.setAlignment(Qt.AlignRight | Qt.AlignCenter)
 
         self._initbuttons()
         self.setLayout(self.layout_1)
-        self.setGeometry(*tuple(self.geom))
+        self.setFixedSize(QSize(self.geom[-2], self.geom[-1]))
         
 
     def _initbuttons(self):
-        size_i = QSize(int(1.5*self.up.het), 1.5*self.up.het)
+        size_i = QSize(self.up.het, self.up.het)
         self.max_path = self.config.get('maximum', obj="path")
         self.min_path = self.config.get('minimum', obj="path")
         self.middle_path = self.config.get('middle', obj="path")
@@ -327,8 +331,8 @@ class TopButton(QWidget):
         self.max_button.clicked.connect(self.max_click)
         self.min_button = YohoPushButton(QIcon(self.min_path), size_i, 'resize')
         self.close_button = YohoPushButton(QIcon(self.close_path), size_i, 'resize')
-        self.layout_1.addWidget(self.max_button)
         self.layout_1.addWidget(self.min_button)
+        self.layout_1.addWidget(self.max_button)
         self.layout_1.addWidget(self.close_button)
 
     
@@ -355,7 +359,28 @@ class InputBox(QLineEdit):
         # self.up.input_box.returnPressed.connect(self.up.confirm_action)
         self.setFont(self.config.get("main", obj="font"))
         gemo = self.config.get(self.name, widget=None, obj="Size")
-        self.setGeometry(*gemo)
+        self.setFixedHeight(gemo[-1])
+
+class SearchButton(YohoPushButton):
+    def __init__(self, http_icon_tuple:tuple[str, QIcon], 
+                 size:Union[int, QSize], 
+                 an_type:Literal["shake", 'resize', None]=None, 
+                 an_time:int=180,
+                 change_size:float=0.6,
+                 change_period:float=0.7):
+        self.icon_add_l = http_icon_tuple
+        self.http_n = self.icon_add_l[0]
+        self.icon_n = self.icon_add_l[1]
+        super(SearchButton, self).__init__(self.icon_n, size, an_type, an_time, change_size, change_period)
+    def wheelEvent(self, event):
+        self.index_n = [i[0] for i in self.icon_add_l].index(self.http_n)
+        if event.angleDelta().y() > 0:
+            self.index_n += 1
+        else:
+            self.index_n -= 1
+        self.index_n = self.index_n % len(self.icon_add_l)
+        self.http_n, self.icon_n = self.icon_add_l[self.index_n]
+        self.setIcon(self.icon_n)
 
 class ShortcutEntry(YohoPushButton):
     def __init__(self, parent:QMainWindow, config:Config_Manager):
@@ -378,7 +403,7 @@ class ShortcutButton(QWidget):
         self.setLayout(self.layout_0)
         self._initpara()
         self._initUI()
-        self.setGeometry(*self.config.get(None, widget="Size", obj=self.name))
+        self.setFixedSize(*self.config.get(None, widget="Size", obj=self.name)[-2:], )
 
     def _initpara(self):
         self.v_num = self.config.get('vertical_button_num', mode="Common", widget=None, obj=None)

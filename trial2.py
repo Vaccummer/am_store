@@ -1,16 +1,35 @@
-from tools.toolbox import Config_Manager
-from am_store.common_tools import yml
-import os
+from PySide2.QtWidgets import QApplication, QPushButton, QWidget, QVBoxLayout
+from PySide2.QtCore import Qt
 
-# wkdr = r'E:\Super Launcher'
-# config  = yml.read(r'E:\Launcher_New\launcher_cfg_new.yaml')
-# config_m = Config_Manager(wkdr, config, "Launcher", None, "path")
-# print(config_m.get("settings_xlsx"))
+class WheelButton(QPushButton):
+    def __init__(self, text, parent=None):
+        super(WheelButton, self).__init__(text, parent)
 
+    def wheelEvent(self, event):
+        # 检查滚轮方向
+        if event.angleDelta().y() > 0:
+            self.setText("滚轮向上")
+        else:
+            self.setText("滚轮向下")
+        # 你可以在这里添加其他响应鼠标滚轮的操作
+        event.accept()
 
-import os
-# 打开文件
-os.startfile(r'E:\Launcher_New\load\Searcher\srh_icons\1_bing.svg')
-# 打开文件夹
-a = input('as')
-os.startfile(r'J:\dlc\Vgat\24.06.08-J24\dlc-models')
+app = QApplication([])
+
+# 创建主窗口
+window = QWidget()
+window.setWindowTitle("滚轮响应按钮")
+
+# 创建一个布局
+layout = QVBoxLayout()
+
+# 创建一个自定义的 WheelButton
+wheel_button = WheelButton("滚动鼠标滚轮")
+
+# 将自定义按钮添加到布局
+layout.addWidget(wheel_button)
+
+# 设置窗口布局
+window.setLayout(layout)
+window.show()
+app.exec_()

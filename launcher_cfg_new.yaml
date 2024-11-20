@@ -8,7 +8,7 @@ Hotkeys:
   play_pause: Ctrl+Space
   to_certain_model: "Ctrl"   # this is a special hotkey, which will be combined with number key to switch to certain mode(1-9)
 
-Common: 
+Common:    
   Size:
     # will be resize by multiply res_x or res_y
     win_x: 1600         # resolutino before resize
@@ -59,11 +59,11 @@ Common:
   vertical_button_num: 4
   max_ass_num: 10
   script_path: "./launcher_init.py"
-
+  
 MainWindow:
   Size:
-    switch_button: [gap,gap,0,het]
-    top_button: [win_x-0.5*gap-8*het, 0.5*gap, 8*het, 1.7*het]
+    switch_button: [gap,gap,0,1.3*het]
+    top_button: [win_x-0.5*gap-8*het, 0.5*gap, 8*het, 1.8*het]
 
   switch_button:
     font: {Family: *jetbrains, PixelSize: 35}

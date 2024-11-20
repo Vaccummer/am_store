@@ -12,7 +12,7 @@ from PySide2.QtWidgets import QApplication
 import warnings
 import math
 from sympy import symbols, sympify
-from am_store.common_tools import yml
+from am_store2.common_tools import yml
 from PySide2.QtGui import QFont
 
 def is_path(string_f, exist_check:bool=False):
@@ -233,7 +233,7 @@ def path_trans(path_dict_f, work_dir_f):
     return path_dict_f
 def nan_to_sign(list_f):
     # repalce nan with None
-    return ['~' if pd.isna(i) else str(i) for i in list_f]
+    return ['' if pd.isna(i) else str(i) for i in list_f]
 def is_url(str_f:str):
     # judge a variable whether is a url or not
     if not isinstance(str_f, str):
@@ -382,17 +382,21 @@ class dicta:
                 data_n[key_tuple[-1]] = value
         return data_n
 
-class Config_Manager:
+class Config_Manager(object):
+    @classmethod
+    def set_shared_config(cls, config:dict):
+        if not hasattr(cls, 'config'):
+            cls.config = config  
     def __init__(self, 
                  wkdir:str,
-                 config:dict, 
-                 mode_name:str, 
-                 widget_name:str, 
-                 obj_name:str,
+                 config:dict=None, 
+                 mode_name:str=None, 
+                 widget_name:str=None, 
+                 obj_name:str=None,
                  copy:bool=False):
-        os.chdir(wkdir)
         self.wkdr = wkdir
-        self.config = config
+        if not hasattr(self, 'config'):
+            self.config = config
         self.mode = mode_name
         self.widget = widget_name
         self.obj = obj_name
@@ -401,6 +405,7 @@ class Config_Manager:
     def deepcopy(self):
         new_copy = Config_Manager(self.wkdr, self.config, None, None, None, True)
         return new_copy
+    
     def _calculate_size(self):
         self.scr_x, self.scr_y = get_screen_size('pixel')
         res_x = math.sqrt(self.scr_x*self.scr_y/(2560*1600))
@@ -435,6 +440,7 @@ class Config_Manager:
                 }
         results = [int(sympify(expr).evalf(subs=values)) for expr in input_f]
         return results
+    
     def group_chose(self, mode="_", widget="_", obj="_"):
         self.mode = mode if mode != "_" else self.mode
         self.widget = widget if widget != "_" else self.widget

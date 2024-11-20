@@ -6,8 +6,8 @@ from PySide2.QtCore import QTimer, QPropertyAnimation, QEasingCurve, QSequential
 from PySide2.QtGui import QPixmap, QPalette, QIcon, QFont, QScreen, QFontMetrics, QWindow, QKeySequence
 from PySide2.QtGui import QPainter, QColor, QBrush, QPen, QLinearGradient, QTextCharFormat, QTextCursor
 from Scripts.tools.toolbox import *
-from am_store.common_tools import *
-from Scripts.launcher.launcher_ui import *
+from am_store2.common_tools import *
+from Scripts.launcher.launcher_UI import *
 
 class BaseLauncher(QMainWindow):
     def __init__(self, config:dict, app:QApplication):
@@ -22,7 +22,6 @@ class BaseLauncher(QMainWindow):
         self._init_para()
         self.createTrayIcon()
         self._mainwindow_set()
-        self._mainwindowUI()
     # For mouse control
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -125,10 +124,6 @@ class BaseLauncher(QMainWindow):
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setWindowTitle("Super Launcher")
         self.setWindowIcon(QIcon(self.config.get(None, "MainWindow", "taskbar_icon", "path")))
-    
-    def _mainwindowUI(self):
-        self.top_button = TopButton(self, self.config)
-        self.switch_button = SwitchButton(self, self.config)
     
     def paintEvent(self, event):
         painter = QPainter(self)
