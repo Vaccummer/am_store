@@ -1,8 +1,8 @@
 from PySide2.QtWidgets import QApplication
-from Scripts.tools.toolbox import QApplication
+from Scripts.toolbox import QApplication
 from launcher_base import BaseLauncher
-from Scripts.tools.toolbox import *
-from Scripts.launcher.launcher_ui import *
+from Scripts.toolbox import *
+from Scripts.launcher_ui import *
 from abc import abstractmethod
 
 class UILauncher(BaseLauncher):
@@ -62,7 +62,7 @@ class UILauncher(BaseLauncher):
         self.layout_input.addWidget(self.input_box)
         self.layout_input.addWidget(self.shortcut_entry)
 
-        self.associate_list = AssociateList(self.ass, config=self.config, parent=self)
+        self.associate_list = AssociateList(config=self.config, parent=self)
         self.shortcut_button = ShortcutButton(self, self.config)
         self.shortcut_setting = ShortcutSetting(self, self.config)
         self.layout_ass.addWidget(self.associate_list)

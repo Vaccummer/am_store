@@ -1,42 +1,29 @@
-from PySide2.QtCore import Qt, QTimer
-from PySide2.QtWidgets import QApplication, QWidget, QProgressBar, QVBoxLayout
-class ProgressBarExample(QWidget):
-    def __init__(self):
-        super().__init__()
-        
-        self.setWindowTitle("进度条示例")
-        self.setGeometry(100, 100, 300, 100)  # 设置窗口位置和大小
-        
-        # 创建进度条
-        self.progress_bar = QProgressBar(self)
-        self.progress_bar.setRange(0, 100)  # 设置进度条的最小值和最大值
-        self.progress_bar.setValue(0)  # 初始进度值为0
-        self.progress_bar.setTextVisible(False)  # 显示进度百分比文本
-        
-        # 创建布局，并将进度条添加到布局中
-        layout = QVBoxLayout(self)
-        layout.addWidget(self.progress_bar)
-        
-        # 定时器，每50毫秒更新一次进度条
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.update_progress)
-        self.timer.start(50)
-        
-        self.progress = 0  
+import os
+import ctypes
+from win32con import *
+from win32api import *
+from win32gui import *
+from win32com.shell import shell, shellcon
 
-    def update_progress(self):
-        """更新进度条的值"""
-        if self.progress < 100:
-            self.progress += 1
-            self.progress_bar.setValue(self.progress)
-        else:
-            self.timer.stop()  # 停止计时器，表示任务完成
-            self.progress_bar.setValue(0)
+def get_default_icon(extension):
+    """
+    获取指定扩展名的默认图标
+    :param extension: 文件扩展名，例如 '.txt', '.pdf', '.jpg' 等
+    :return: 图标句柄
+    """
+    # 获取文件扩展名的图标路径及索引
+    icon_info = shell.SHGetFileInfo(
+        extension, 0, shellcon.SHGFI_ICON | shellcon.SHGFI_SYSICONINDEX
+    )
 
-if __name__ == "__main__":
-    app = QApplication([])
-    
-    window = ProgressBarExample()
-    window.show()
-    
-    app.exec_()
+    # icon_info 是一个元组 (图标路径, 图标索引)
+    icon_handle = icon_info[0]
+
+    # 获取图标句柄
+    icon = ExtractIcon(0, icon_handle, icon_info[1])
+
+    return icon
+
+# 测试：获取 .txt 文件类型的默认图标
+icon = get_default_icon(".txt")
+print(icon)

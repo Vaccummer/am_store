@@ -5,9 +5,9 @@ from PySide2.QtCore import Qt, QEvent, QObject, Signal, QSize, Slot, QThread
 from PySide2.QtCore import QTimer, QPropertyAnimation, QEasingCurve, QSequentialAnimationGroup
 from PySide2.QtGui import QPixmap, QPalette, QIcon, QFont, QScreen, QFontMetrics, QWindow, QKeySequence
 from PySide2.QtGui import QPainter, QColor, QBrush, QPen, QLinearGradient, QTextCharFormat, QTextCursor
-from Scripts.tools.toolbox import *
+from Scripts.toolbox import *
 from am_store.common_tools import *
-from Scripts.launcher.launcher_ui import *
+from Scripts.launcher_ui import *
 
 class BaseLauncher(QMainWindow):
     def __init__(self, config:dict, app:QApplication):
@@ -87,7 +87,7 @@ class BaseLauncher(QMainWindow):
         quit_action = QAction("Quit", self)
         quit_action.triggered.connect(self.programm_exit)
         restart_action = QAction("Restart", self)
-        restart_action.triggered.connect(lambda : restart_program(self.config.get(None, "Common", "script_path", None)))
+        restart_action.triggered.connect(lambda : self.restart_program(self.config.get(None, "Common", "script_path", None)))
         tray_menu = QMenu()
 
         tray_menu.addAction(show_action)
@@ -141,7 +141,9 @@ class BaseLauncher(QMainWindow):
         self.shortcut_data = ShortcutsPathManager(self.config)
         self.ssh_manager = SshManager(self.config)
         
-
+    @staticmethod
+    def restart_program(script_path):
+        os.system(f"python {script_path}")
     @staticmethod
     def programm_exit():
         ## programm exit

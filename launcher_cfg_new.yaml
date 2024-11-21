@@ -57,7 +57,6 @@ Common:
   max_op_num: 99
   horizontal_button_num: 5
   vertical_button_num: 4
-  max_ass_num: 10
   script_path: "./launcher_init.py"
   
 MainWindow:
@@ -95,7 +94,17 @@ Launcher:
   path:
     settings_xlsx: "./load/Launcher/launcher_set.xlsx"
     ssh_config: "C:\\Users\\am\\.ssh\\config"
-  
+    default_icon: 
+      [exe] : "./load/Launcher/default_icon/exe.svg"
+      [file] : "./load/Launcher/default_icon/file.svg"
+      [folder] : "./load/Launcher/default_icon/folder.svg"
+      [txt, docx, doc] : "./load/Launcher/default_icon/txt.svg"
+      [config, yaml, yml, json] : "./load/Launcher/default_icon/config.svg"
+      [pdf] : "./load/Launcher/default_icon/pdf.svg"
+      [pptx] : "./load/Launcher/default_icon/ppt.svg"
+      [xlsx, csv] : "./load/Launcher/default_icon/xls.svg"
+      [jpg] : "./load/Launcher/default_icon/jpg.svg"
+      [pkl, pt, pth, safetensor] : "./load/Launcher/default_icon/png.svg"
   input_box:
     font: 
       main: {Family: *yahei, PixelSize: 40}
@@ -108,6 +117,10 @@ Launcher:
       default_button_icon: &default_button_icon './load/Launcher/shortcut_setting/default/default_button_icon.svg'
       icon_list: './load/Launcher/assoicate_list/iocns/*'
       default_icon: './load/Launcher/assoicate_list/default_icon.svg'
+      download_save_dir: './load/Launcher/assoicate_list/download'
+    max_exe_num: 10
+    max_dir_num: 128
+    max_length: 600
   
   shortcut_button:
     font:
