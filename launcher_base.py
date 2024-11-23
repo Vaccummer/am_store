@@ -117,7 +117,7 @@ class BaseLauncher(QMainWindow):
         self.ass_xlsx_path = self.config.get("settings_xlsx", "Launcher", widget="path", obj=None)
         self.ass_num = self.config.get("max_ass_num", "Common", None, None)
         self.ass_df = excel_to_df(self.ass_xlsx_path, region='A:D', sheet_name_f='all')
-        self.ass = Associate(self.config)
+        # self.ass = Associate(self.config)
     
     def _mainwindow_set(self):
         self.setWindowFlags(self.windowFlags() | Qt.FramelessWindowHint)

@@ -1,4 +1,3 @@
-# words match method
 import os
 import sys
 from toolbox import *
@@ -10,6 +9,20 @@ from functools import partial
 import shutil
 import pandas
 import pathlib
+import aiofiles
+import asyncio
+import asyncssh
+
+
+async def copy_file_chunk(src:str, dst:str, chunk_size:int, bar:QProgressBar):
+    async with aiofiles.open(src, 'rb') as fsrc, aiofiles.open(dst, 'wb') as fdst:
+        while True:
+            chunk = await fsrc.read(chunk_size)
+            if not chunk:
+                break  
+            await fdst.write(chunk)
+            # update progress bar here 
+
 
 class Associate:
     def __init__(self, nums:Config_Manager, 
@@ -32,8 +45,14 @@ class Associate:
             return []
         # prompt is a directory
         if os.path.exists(prompt_f):
-            return os.listdir(prompt_f)
-        # prompt is a unfilled diretory
+            list_1 = os.listdir(prompt_f)
+            list_2 = []
+            for name_i in list_1:
+                if os.path.isdir(os.path.join(prompt_f, name_i)):
+                    list_2.append('dir')
+                else:
+                    list_2.append('file')
+            return list_1, list_2
         sup_path = path_f.parent
         dir_name_n = path_f.name
         if not sup_path.exists():
@@ -41,7 +60,14 @@ class Associate:
         else:
             list_1f = sorted([dir_if for dir_if in os.listdir(sup_path) if dir_name_n in dir_if], key=lambda x:x.index(dir_name_n))
             list_2f = sorted([dir_if for dir_if in os.listdir(sup_path) if dir_name_n.lower() in dir_if.lower()], key=lambda x:(x.lower()).index(dir_name_n.lower()))
-            return rm_dp_list_elem(list_1f+list_2f, reverse=False)
+            list_1 = rm_dp_list_elem(list_1f+list_2f, reverse=False)
+            list_2 = []
+            for name_i in list_1:
+                if os.path.isdir(os.path.join(prompt_f, name_i)):
+                    list_2.append('dir')
+                else:
+                    list_2.append('file')
+            return list_1, list_2
     
     # To associate a programme name of prompt
     def name(self, prompt_f):
@@ -52,7 +78,7 @@ class Associate:
         output_des = [self.names[self.description.index(dsp_name_i)] for dsp_name_i in self.description if prompt_f.lower() in dsp_name_i.lower()]
         output_chname_t = [i for i in output_chname if self.names[self.ch_names.index(i)] not in output_name]
         output_des_t = [i for i in output_des if self.ch_names[self.names.index(i)] not in output_chname]
-        return rm_dp_list_elem(output_name+output_chname_t+output_des_t, reverse=False)[0:self.num]
+        return rm_dp_list_elem(output_name+output_chname_t+output_des_t, reverse=False)[0:self.num], ['app']*len(output_name)+['ch_name']*len(output_chname_t)+['description']*len(output_des_t)
     
     # To associate programmes with multiple prompts
     def multi_pro_name(self, prompt_list_f):
@@ -128,31 +154,37 @@ class AssociateList(QListWidget):
     def _load(self):
         self.launcher_df = LauncherPathManager(self.config).df
         self.ass = Associate(self.num, self.launcher_df)
+        
         self.config.group_chose(mode="Launcher", widget=self.name, obj=None)
+
+        self.local_min_chunck = int(self.config.get('local_min_chunck')*1024*1024)
+        self.remote_min_chunck = int(self.config.get('remote_min_chunck')*1024*1024)
+        self.local_max_chunck = int(self.config.get('local_max_chunck')*1024*1024)
+        self.remote_max_chunck = int(self.config.get('remote_max_chunck')*1024*1024)
+        
         self.download_dir = self.config.get("download_save_dir", obj="path")
-        self.max_length = self.config.get("max_length", )
+        self.max_length = self.config.get("max_length")
         self.num = self.config.get("max_exe_num", )
         self.max_num = self.config.get("max_dir_num", )
         self.font_a = self.config.get('main', obj='font')
-        self.setFont(self.font_a)
-
         
         self.default_icon = self._load_default_icons()
         self.remote_server:SshManager=None
 
-    def _load_default_icons(self):
-        self.default_icon_d = {}
-        names_path_d = self.config.get("default_icon", mode="Launcher", widget=None, obj="path")
-        for keys, path_i in names_path_d.items():
-            if not os.path.exists(path_i):
-                continue
-            for key_i in keys:
-                self.default_icon_d[key_i] = QIcon(path_i)
+    def _load_default_icons(self) -> dict:
+        self.default_icon_folder = self.config.get('default_icon_folder', mode="Launcher", widget=self.name, obj="path")
+        self.app_icon_folder = self.config.get('app_icon_folder', mode="Launcher", widget=self.name, obj="path")
+        self.default_app_icon = QIcon(self.config.get('default_app_icon', mode="Launcher", widget=self.name, obj="path"))
+        default_icon_d = {}
+        for name_i in os.listdir(self.default_icon_folder):
+            name, ext = os.path.splitext(name_i)
+            default_icon_d[name] = QIcon(os.path.join(self.default_icon_folder, name_i))
+        return default_icon_d
     
     def _setStyle(self):
-        self.setFont(self.config.get("main", obj="font"))
-        associate_list_set = tuple(self.config.get(self.name, widget="Size", obj=None))
-        self.setGeometry(*associate_list_set)
+        self.setFont(self.font_a)
+        #associate_list_set = tuple(self.config.get(self.name, widget="Size", obj=None))
+        self.setSizeAdjustPolicy(QListWidget.AdjustToContents)
         self.setStyleSheet("""
         QListWidget {
                 border: 3px solid black; /* 设置边框 */
@@ -212,6 +244,12 @@ class AssociateList(QListWidget):
     def _get_default_icon(self):
         pass
     
+    def cal_chunck_size(self, size_f:int, hosttype:Literal['local', 'remote']):
+        if hosttype == 'local':
+            return min(max(self.local_min_chunck, size_f//48), self.local_max_chunck)
+        else:
+            return min(max(self.remote_min_chunck, size_f//48), self.remote_max_chunck)
+
     def _changeicon(self, index_i):
         app_name = self.labels[index_i].text
         options = QFileDialog.Options()
@@ -257,17 +295,55 @@ class AssociateList(QListWidget):
             self.label_l.append(label_i)
             button_i.clicked.connect(partial(self._changeicon, index_i=i))
     
-    def _geticon(self, name:str):
+    def _geticon(self, name:str, sign:Literal['name', "path"], type_f:str):
+        match sign:
+            case "name":
+                index_i = self.launcher_df.loc[self.launcher_df['A'] == name].index[0]
+                icon_l = glob(os.path.join(self.app_icon_folder, name+".*"))
+                if icon_l:
+                    return QIcon(icon_l[0])
+                else:
+                    if self.launcher_df.loc[index_i, 'Exe Path'].endswith('.exe'):
+                        return self.default_app_icon
+            case _:
+                pass
+            
         if name in self.ass_icon_name:
             return QIcon(self.ass_icon_list[self.ass_icon_name.index(name)])
         else:
             return QIcon(self.ass_icon_default)
     
-    def _gettext(self, item:QListWidgetItem):
+    def _get_item_text(self, item:QListWidgetItem):
         index_f = item.data(Qt.UserRole)
         return self.label_l[index_f].text()
     
-    def _getbutton(self, item:QListWidgetItem):
+    def _get_input_text(self):
+        match self.up.host:
+            case "wsl":
+                return self.wsl_location+self.input_box.text().strip()
+            case _:
+                return self.input_box.text().strip()
+
+    def _check_path(self, path_t:str):
+        match self.up.host:
+            case "remote":
+                check_r = self.remote_server.check_exist(path_t)
+                match check_r:
+                    case "file":
+                        return 0
+                    case "directory":
+                        return 1
+                    case _:
+                        return -1
+            case _:
+                if os.path.isfile(path_t):
+                    return 0
+                elif os.path.isdir(path_t):
+                    return 1
+                else:
+                    return -1
+
+    def _getbutton(self, item:QListWidgetItem) -> QPushButton:
         index_f = item.data(Qt.UserRole)
         return self.button_l[index_f]
     
@@ -292,8 +368,18 @@ class AssociateList(QListWidget):
         context_menu.addAction(downdir_action)
         context_menu.exec_(self.list_widget.mapToGlobal(pos))
     
-    def _upload(self, src:List[str]):
-        pass
+    def _upload(self, src:str):
+        prompt_text = self._get_input_text()
+        dst = prompt_text if self._check_path(prompt_text) == 1 else os.path.dirname(prompt_text)
+        if self._check_path(dst) != 1:
+            return
+        match self.up.host:
+            case "local"| "wsl":
+                self._local_transfer(src, dst)
+            case "remote":
+                tasks = self.src_dst_parsing(src, dst, 'local', 'remote')
+                size_a = sum([i[2] for i in tasks])
+                asyncio.run(self.transfer_multiple_files(tasks, 'put'))
     
     def _download(self, item, ask_save_dir:bool):
         if ask_save_dir:
@@ -302,36 +388,52 @@ class AssociateList(QListWidget):
                 return
         else:
             dir_path = self.download_dir
-        match self.up.host:
-            case "local":
-                self._local_download(item, dir_path)
-            case _:
-                self._remote_download(item, dir_path)
-    def _local_download(self, item, dir_path):
-        self.up.download_progress_bar
-        prompt_f = self.up.input_box.text()
-        src = os.path.join(prompt_f, self._gettext(item))
-        if os.path.exists(src):
-            pass
-        else:
-            src = os.path.join(os.path.dirname(prompt_f), self._gettext(item))
-            if os.path.exists(src):
-                pass
-            else:
+        item_text = self._get_item_text(item)
+        prompt_f = self._get_input_text()
+        src = os.path.join(prompt_f, item_text)
+        if self._check_path(src) == -1:
+            src = os.path.join(os.path.dirname(prompt_f), item_text)
+            src_check = self._check_path(src)
+            if src_check == -1:
                 return
-        if os.path.isdir(src):
-            files = [src]
+        match self.up.host:
+            case "local"|"wsl":
+                self._local_transfer(src, dir_path)
+            case _:
+                if src_check == 0:
+                    self._remote_transfer(src, dir_path)
+                else:
+                    dst = os.path.join(dir_path, os.path.basename(src))
+                    size = self.remote_server.getsize(src)
+                    if size != 0:
+                        asyncio.run(self.transfer_single_file(src, dst, size, 'get'))
+    
+    def _local_transfer(self, src:str, dst:str):
+        bar = self.up.download_progress_bar
+        if os.path.isfile(src):
+            size_f = os.path.getsize(src)
+            asyncio.run(self.copy_directory([(src, dst, size_f)], self.local_chunck_size, bar))
+        elif os.path.isdir(src):
+            tasks_f = self.src_dst_parsing(src, dst)
+            size_f = sum([i[2] for i in tasks_f])
+            asyncio.run(self.copy_directory(tasks_f, self.local_chunck_size, bar))
         else:
-            files = glob(os.path.join(src, "*"), recursive=True)
-        
-    def _remote_download(self, item, dir_path):
-        pass
+            return
 
-        pass
+    def _remote_transfer(self, src:str, dst:str, type_f:Literal['put', 'get']):
+        bar = self.up.download_progress_bar
+        if type_f == "put":
+            tasks = self.src_dst_parsing(src, dst, 'local', 'remote')
+            size_a = sum([i[2] for i in tasks])
+            asyncio.run(self.transfer_multiple_files(tasks, type_f))
+        else:
+            tasks = self.src_dst_parsing(src, dst, 'remote', 'local')
+            size_a = sum([i[2] for i in tasks])
+            asyncio.run(self.transfer_multiple_files(tasks, type_f))
+    
     def _cg_default_icon(self, item):
         pass
     
-    # to update associate_words
     def update_associated_words(self):
         if self.up.mode != "Launcher":
             return
@@ -348,23 +450,24 @@ class AssociateList(QListWidget):
         if is_path(current_text):
             num_n = self.max_num
             sign_n = "local"
-            matching_words = ['..']+self.ass.path(current_text)
+            matching_words, type_l = self.ass.path(current_text)
+            matching_words = ['..'] + matching_words
+            type_l = ['parent'] + type_l
         else:
-            if ';' not in current_text:
-                matching_words = self.ass.name(current_text)
-            else:
-                matching_words = self.ass.multi_pro_name(current_text.split(';'))
+            # if ';' not in current_text:
+            matching_words, type_l = self.ass.name(current_text)
+            # else:
+            #     matching_words = self.ass.multi_pro_name(current_text.split(';'))
 
         for i in range(num_n):
             if i >= len(matching_words):
                 self.item_l[i].setHidden(True)
                 continue
             text_i = matching_words[i]
-            icon_i = self._geticon(text_i, sign_n)
+            icon_i = self._geticon(text_i, sign_n, type_l[i])
             self.labels[i].setText(text_i)
             self.buttons[i].setIcon(icon_i)
-        
-
+    
         font_metrics = QFontMetrics(self.font())
         width_f = max([font_metrics.boundingRect(' '+word).width() + 60 for word in matching_words])
         width_f = min(width_f, self.max_length)
@@ -398,6 +501,75 @@ class AssociateList(QListWidget):
             icon_i = self._geticon(text_i, "remote")
             self.labels[i].setText(text_i)
             self.buttons[i].setIcon(icon_i)
+
+    def src_dst_parsing(self, src:str, dst:str, src_type:Literal['local', 'remote'], dst_type:Literal['local', 'remote']):
+        copy_paths = []  
+        if src_type == 'local':
+            for dirpath, dirnames, filenames in os.walk(src):
+                relative_path = os.path.relpath(dirpath, src)
+                target_dir = os.path.join(dst, relative_path)  
+                if dst_type == 'local':
+                    if not os.path.exists(target_dir):
+                        os.makedirs(target_dir)
+                else:
+                    try:
+                        self.remote_server.mkdir(target_dir)
+                    except Exception as e:
+                        pass
+                for filename in filenames:
+                    src_file = os.path.join(dirpath, filename)  
+                    dst_file = os.path.join(target_dir, filename)  
+                    file_size = os.path.getsize(src_file)
+                    copy_paths.append((src_file, dst_file, file_size))
+        else:
+            walk_out = self.remote_server.walk(src)
+            if not walk_out:
+                return []
+            for relpath, type, size_f in walk_out:
+                if type == 'directory':
+                    target_dir = os.path.join(dst, relpath)
+                    os.makedirs(target_dir, exist_ok=True)
+                else:
+                    src_file = os.path.join(src, relpath)
+                    dst_file = os.path.join(dst, os.path.basename(src), relpath)
+                    copy_paths.append((src_file, dst_file, size_f))
+        return copy_paths
+    
+    @staticmethod
+    async def copy_directory(task_i:tuple, min_chunck_size:int, bar:QProgressBar):
+        tasks = []  
+        for src_i, dst_i, size_i in task_i:
+            chunck_size = max(min_chunck_size, size_i//100)
+            tasks.append(copy_file_chunk(src_i, dst_i, chunck_size, bar))
+        await asyncio.gather(*tasks) 
+    
+    def progress_handler(self, current, total):
+        print(f"上传进度：{current}/{total} bytes ({(current / total) * 100:.2f}%)")
+    
+    async def transfer_single_file(self, src, dst, size_f, sftp, type_f:Literal['get', 'put']):
+        block_size = self.cal_chunck_size(size_f)
+        if type_f == 'get':
+            await sftp.get(src, dst, progress_handler=self.progress_handler, block_size= block_size)
+        else:
+            await sftp.put(src, dst, progress_handler=self.progress_handler, block_size= block_size)
+
+    async def transfer_multiple_files(self, tasks:List[tuple[str, str]], type_f:Literal['get', 'put']):
+        host_d = self.remote_server.host
+        try:
+            async with asyncssh.connect(host_d['HostName'], 
+                                        username=host_d.get('User', os.getlogin()), 
+                                        password=host_d.get(('Password', '')),
+                                        port=int(self.host.get('Port', 22))) as conn:
+                async with conn.start_sftp_client() as sftp:
+                    tasks = []  
+                    for src, dst, size_f in tasks:
+                        tasks.append(self.transfer_single_file(src, dst, sftp, type_f))
+                    await asyncio.gather(*tasks)
+                    return True
+        except Exception as e:
+            print(f"文件传输失败: {e}")
+            return False
+
 
 class SwitchButton(QComboBox):
     def __init__(self, parent: QMainWindow, config:Config_Manager) -> None:

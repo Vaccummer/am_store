@@ -16,6 +16,10 @@ from sympy import symbols, sympify
 from am_store.common_tools import yml, AMPATH
 import paramiko
 import stat
+import asyncssh
+import aiofiles
+import asyncio
+
 
 def is_path(string_f, exist_check:bool=False):
     # To judge whether a variable is Path or not
@@ -508,7 +512,7 @@ class LauncherPathManager(object):
     def __init__(self, config:Config_Manager):
         self.config = config
         self.data_path = AMPATH(self.config.get("settings_xlsx", mode="Launcher", widget="path", obj=None))
-        self.col_names= ['Name', 'Chinese Name', 'Description', 'EXE Path', "Icon_Path", 'ID', 'Group']
+        self.col_names= ['Name', 'Chinese Name', 'Description', 'EXE Path', 'Group']
         self._read_xlsx()
         self.check()
     def _read_xlsx(self):
@@ -551,7 +555,10 @@ class SshManager(object):
         self.config = config
         self.host_config_path = self.config.get("ssh_config", "Launcher", None, "path")
         self.server=None
+        self.sftp = None
         self.hostname_n = None
+        self.host = []
+    
     def _read_ssh_config(self):
         self.hosts = parse_ssh_config(self.host_config_path)
         self.hostnames = list(self.hosts.keys())
@@ -559,14 +566,14 @@ class SshManager(object):
     def connect(self, host_name:str):
         try:
             assert host_name in self.hosts.keys(), f"Host name {host_name} not found in config file"
-            host = self.hosts[host_name]
+            self.host = self.hosts[host_name]
             self.server = paramiko.SSHClient()
             self.server.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            self.server.connect(host['HostName'], 
-                                port=int(host.get('Port', 22)), 
-                                username=host.get('User', os.getlogin()), 
-                                password=host.get('Password', None))
-            self.sftp = self.server.open_sftp()
+            self.server.connect(self.host['HostName'], 
+                                port=int(self.host.get('Port', 22)), 
+                                username=self.host.get('User', os.getlogin()), 
+                                password=self.host.get('Password', ''))
+            self.stfp = self.server.open_sftp()
             self.hostname_n = host_name
             return True
         except Exception as e:
@@ -577,7 +584,6 @@ class SshManager(object):
             # 执行简单命令（例如 uptime）来检测连接
             stdin, stdout, stderr = self.server.exec_command("uptime")
             output = stdout.read().decode('utf-8')
-            
             if output:
                 return True
             else:
@@ -609,4 +615,29 @@ class SshManager(object):
                 return 'file'
         except Exception:
             return False
+    
+    def walk(self, src:str):
+        file_info = []
+        def list_files(path):
+            try:
+                dir_contents = self.sftp.listdir_attr(path)
+                for entry in dir_contents:
+                    relative_path = os.path.relpath(path + '/' + entry.filename, start=src)
+                    if entry.st_mode & 0o170000 == 0o040000:  # 判断是否是目录
+                        file_info.append((relative_path, 'directory', 0))
+                        list_files(path + '/' + entry.filename)
+                    else:
+                        file_info.append((relative_path, 'file', entry.st_size))
+            except Exception as e:
+                print(f"Error accessing path {path}: {e}")
+
+        # 从 src 目录开始递归遍历
+        list_files(src)
+        return file_info
+    
+    def getsize(self, src:str):
+        try:
+            return self.sftp.stat(src).st_size
+        except Exception as e:
+            return 0
         
