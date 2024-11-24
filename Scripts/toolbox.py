@@ -5,11 +5,12 @@ import openpyxl
 import subprocess
 import os
 import copy
-from typing import Literal, Optional, Tuple, Union
+from typing import Literal, Optional, Tuple, Union, List, OrderedDict
 import re
 from PySide2.QtGui import QScreen
-from PySide2.QtWidgets import QApplication
+from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget
 from PySide2.QtGui import QFont
+from PySide2.QtCore import QSize, Qt
 import warnings
 import math
 from sympy import symbols, sympify
@@ -19,6 +20,7 @@ import stat
 import asyncssh
 import aiofiles
 import asyncio
+import pathlib
 
 
 def is_path(string_f, exist_check:bool=False):
@@ -318,33 +320,95 @@ def font_get(para_dict_f={"Family":None,
             exec(f'font_f.set{key}(value)', dict_f)
     return font_f
 
-def parse_ssh_config(file_path):
+def parse_ssh_config(file_path, fliter:Literal['all'] | None | List[str]):
     hosts = {}
-    with open(file_path, 'r') as file:
-        current_host = None
-        host_config = {}
+    try:
+        with open(file_path, 'r') as file:
+            current_host = None
+            host_config = {}
+            for line in file:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                if line.lower().startswith('host '):
+                    if current_host:
+                        hosts[current_host] = host_config
+                    current_host = line.split()[1]
+                    host_config = {}
+                    continue
+                match = re.match(r'(\w+)\s+(.+)', line)
+                if match:
+                    key, value = match.groups()
+                    host_config[key] = value
+            if current_host:
+                hosts[current_host] = host_config
+        if fliter == 'all':
+            return hosts
+        elif fliter is None:
+            return {}
+        else:
+            dict_t = {}
+            for name_i in fliter:
+                host_i = hosts.get(name_i, None)
+                if host_i is not None:
+                    dict_t[name_i] = host_i
+            return dict_t
+    except Exception as e:
+        return {}
 
-        for line in file:
-            line = line.strip()
+def amlayoutH(align_h:Literal['l','r','c']=None, align_v:Literal['t','b','c']=None, spacing:int=None)->QHBoxLayout:
+    lo = QHBoxLayout()
+    match align_h:
+        case 'l':
+            lo.setAlignment(Qt.AlignLeft)
+        case "c":
+            lo.setAlignment(Qt.AlignHCenter)
+        case "r":
+            lo.setAlignment(Qt.AlignRight)
+        case _:
+            pass
+    match align_v:
+        case "t":
+            lo.setAlignment(Qt.AlignTop)
+        case "b":
+            lo.setAlignment(Qt.AlignBottom)
+        case "c":
+            lo.setAlignment(Qt.AlignVCenter)
+    if spacing:
+        lo.setSpacing(int(spacing))
+    return lo
+def amlayoutV(align_h:Literal['l','r','c']=None, align_v:Literal['t','b','c']=None, spacing:int=None)->QVBoxLayout:
+    lo = QVBoxLayout()
+    match align_h:
+        case 'l':
+            lo.setAlignment(Qt.AlignLeft)
+        case "c":
+            lo.setAlignment(Qt.AlignHCenter)
+        case "r":
+            lo.setAlignment(Qt.AlignRight)
+        case _:
+            pass
+    match align_v:
+        case "t":
+            lo.setAlignment(Qt.AlignTop)
+        case "b":
+            lo.setAlignment(Qt.AlignBottom)
+        case "c":
+            lo.setAlignment(Qt.AlignVCenter)
+    if spacing:
+        lo.setSpacing(int(spacing))
+    return lo
 
-            if not line or line.startswith('#'):
-                continue
+def add_obj(*args, parent_f:Union[QHBoxLayout, QVBoxLayout]):
+    for arg_i in args:
+        if isinstance(arg_i, QWidget):
+            parent_f.addWidget(arg_i)
+        elif isinstance(arg_i, QHBoxLayout):
+            parent_f.addLayout(arg_i)
+        elif isinstance(arg_i, QVBoxLayout):
+            parent_f.addLayout(arg_i)
+    return parent_f
 
-            if line.lower().startswith('host '):
-                if current_host:
-                    hosts[current_host] = host_config
-                current_host = line.split()[1]
-                host_config = {}
-                continue
-
-            match = re.match(r'(\w+)\s+(.+)', line)
-            if match:
-                key, value = match.groups()
-                host_config[key] = value
-        if current_host:
-            hosts[current_host] = host_config
-
-    return hosts
 
 class dicta:
     @staticmethod
@@ -361,7 +425,7 @@ class dicta:
                     items.append((new_key, v))
             return dict(items)
         dict_ori = flatten_dict_core(dict_f)
-        dict_out = {}
+        dict_out = OrderedDict()
         for key, value in dict_ori.items():
             key_list = key.split(sep_f)
             dict_out[tuple(key_list)] = value
@@ -420,7 +484,8 @@ class Config_Manager(object):
     @classmethod
     def set_shared_config(cls, config:dict):
         if not hasattr(cls, 'config'):
-            cls.config = config  
+            cls.config = dicta.flatten_dict(config)
+    
     def __init__(self, 
                  wkdir:str,
                  config:dict=None, 
@@ -429,13 +494,13 @@ class Config_Manager(object):
                  obj_name:str=None,
                  copy:bool=False):
         self.wkdr = wkdir
-        if not hasattr(self, 'config'):
-            self.config = config
+        self.set_shared_config(config)
         self.mode = mode_name
         self.widget = widget_name
         self.obj = obj_name
         if not copy:
             self._calculate_size()
+    
     def deepcopy(self):
         new_copy = Config_Manager(self.wkdr, self.config, None, None, None, True)
         return new_copy
@@ -444,22 +509,18 @@ class Config_Manager(object):
         self.scr_x, self.scr_y = get_screen_size('pixel')
         res_x = math.sqrt(self.scr_x*self.scr_y/(2560*1600))
         res_y = res_x
-        
         # resize 
         targets = ['win_x', "win_y", "gap", "het", "srh_r"]
         for target_i in targets:
-            value_i = self.config['Common']['Size'][target_i]
+            value_i = self.config[('Common','Size',target_i)]
             value_f = int(res_x*value_i)
-            self.config['Common']['Size'][target_i] = value_f
+            self.config[('Common','Size',target_i)] = value_f
             setattr(self, target_i, value_f)
         
-        modes = ["MainWindow", "Launcher", "Searcher", "GPT"]
-        for mode_i in modes:
-            for key_i, value_i in self.config[mode_i]['Size'].items():
-                ori = self.config[mode_i]['Size'][key_i]
-                if not ori:
-                    continue
-                self.config[mode_i]['Size'][key_i] = self._str2int(ori)
+        for key_i, value_i in self.config.items():
+            if "Size" in key_i:
+                self.config[key_i] = self._str2int(value_i)
+
     
     def _str2int(self, input_f:Union[list, str]):
         scr_x, scr_y, win_x, win_y, gap, het, srh_r= symbols('scr_x scr_y win_x win_y gap het srh_r')
@@ -472,8 +533,13 @@ class Config_Manager(object):
                 het: self.het,
                 srh_r:self.srh_r,
                 }
-        results = [int(sympify(expr).evalf(subs=values)) for expr in input_f]
-        return results
+        if isinstance(input_f, list):
+            results = [int(sympify(expr).evalf(subs=values)) for expr in input_f]
+            return results
+        elif isinstance(input_f, str):
+            return int(sympify(input_f).evalf(subs=values))
+        else:
+            return input_f
     
     def group_chose(self, mode="_", widget="_", obj="_"):
         self.mode = mode if mode != "_" else self.mode
@@ -481,32 +547,38 @@ class Config_Manager(object):
         self.obj = obj if obj!="_" else self.obj
         return self
         
-    def get(self, name_f, mode:str="_", widget:str="_", obj:str="_"):
+    def get(self, name_f:str, mode:str="_", widget:str="_", obj:str="_", default_v='^default_for_get_func$'):
         mode = mode if mode!="_" else self.mode
         widget = widget if widget!="_" else self.widget
         obj = obj if obj!="_" else self.obj
-        dict_f = self.config
-        for i in [mode, widget, obj, name_f]:
-            if i != None:
-                dict_f = dict_f.get(i, None)
-                if not dict_f:
-                    return None
-        index_l = [name_f, mode, widget, obj]
-        if "path" in index_l:
-            dict_f = glob(os.path.abspath(dict_f))
-            if len(dict_f) == 0:
-                return None
-            elif len(dict_f) == 1:
-                return dict_f[0]
-            else:
-                return dict_f      
-        elif "font" in index_l:
-            return font_get(dict_f)
+        args_a = [i for i in [mode, widget, obj, name_f] if i is not None]
+        if default_v != '^default_for_get_func$':
+            out_a = self.config.get(tuple(args_a), default_v)
         else:
-            return dict_f
+            out_a = self.config.get(tuple(args_a), None)
+            if out_a is None:
+                return out_a
+        return self.after_process(args_a, out_a)
     
     def __getitem__(self, key):
-        return self.get(key)
+        if isinstance(key, tuple):
+            out_a = self.config.get(key, None)
+            if out_a is None:
+                return out_a 
+            else:
+                return self.after_process(key, out_a)
+        else:
+            return self.get(key)
+
+    def after_process(self, args_a:tuple, target_f):
+        if "path" in args_a:
+           return str((pathlib.Path(self.wkdr)/pathlib.Path(target_f)).resolve())
+        elif "font" in args_a:
+            font_dict = {i[0]:i[1] for i in target_f}
+            return font_get(font_dict)
+        else:
+            return target_f
+
 
 class LauncherPathManager(object):
     def __init__(self, config:Config_Manager):
@@ -533,7 +605,6 @@ class LauncherPathManager(object):
                 self.df[self.df['Group']==gropu_i].to_excel(writer, sheet_name=gropu_i, index=False)
     def check(self):
         self.df['EXE Path'] = self.df['EXE Path'].apply(lambda x: x if os.path.exists(x) else "")
-        self.df['Icon Path'] = self.df['Icon Path'].apply(lambda x: x if os.path.exists(x) else "")
 
 class ShortcutsPathManager(object):
     def __init__(self, config:Config_Manager):

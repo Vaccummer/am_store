@@ -31,13 +31,17 @@ class YohoPushButton(QPushButton):
             pass
         elif isinstance(size_f, list):
             size_f = QSize(*size_f)
-        self.size_f = size_f 
+        # if isinstance(size_f, Asize):
+        #     #size_t = 1.1*size_f
+        #     self.size_f = size_f.q()
+        # else:
+        self.size_f = size_f
+            #size_t = QSize(size_f.width(), size_f.height())
         self.setIconSize(self.size_f)
-        self.setFixedSize(int(1.5*self.iconSize().width()), int(1.5*self.iconSize().width()))
+        self.setFixedSize(self.size_f)
         self.an_time = an_time
         self.change_size = change_size
         self.change_period = change_period
-        # 设置按钮背景透明
         self.setStyleSheet("""
             QPushButton {
                 border: none;
@@ -55,7 +59,7 @@ class YohoPushButton(QPushButton):
         self.animation = QPropertyAnimation(self, b"geometry")
         start_rect = self.geometry()
         self.animation.setDuration(self.an_time)
-        self.animation.setStartValue(0, QRect(start_rect))
+        self.animation.setStartValue(QRect(start_rect))
         self.animation.setKeyValueAt(0.2, QRect(start_rect.x() - 5, start_rect.y(), start_rect.width(), start_rect.height()))
         self.animation.setKeyValueAt(0.4, QRect(start_rect.x() + 5, start_rect.y(), start_rect.width(), start_rect.height()))
         self.animation.setKeyValueAt(0.6, QRect(start_rect.x() - 5, start_rect.y(), start_rect.width(), start_rect.height()))
@@ -69,8 +73,7 @@ class YohoPushButton(QPushButton):
         size_n = QSize(int(self.change_size*self.size_f.width()), int(self.change_size*self.size_f.height()))
         self.animation.setStartValue(self.size_f)
         self.animation.setKeyValueAt(self.change_period, size_n)  
-        self.animation.setEndValue(self.size_f)  
-        print(self.size_f)
+        self.animation.setEndValue(self.size_f.q() if isinstance(self.size_f, Asize) else self.size_f)  
         self.animation.start()
 
 class ColorfulButton(QPushButton):
@@ -245,9 +248,10 @@ class ProgressBar(QProgressBar):
         self.background_color = background_color
         self.color_gradient = color_gradient
         self.position_gradient = position_gradient
-        self.setRange(0, )  
+        self.setRange(0, max_value)  
         self.setValue(0)  
         self.progress=0
+        self.custom_ui()
         self.setTextVisible(show_text)  
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_progress)

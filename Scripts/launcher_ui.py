@@ -12,7 +12,7 @@ import pathlib
 import aiofiles
 import asyncio
 import asyncssh
-
+from typing import List, Literal, Union, OrderedDict
 
 async def copy_file_chunk(src:str, dst:str, chunk_size:int, bar:QProgressBar):
     async with aiofiles.open(src, 'rb') as fsrc, aiofiles.open(dst, 'wb') as fdst:
@@ -118,11 +118,12 @@ class Associate:
 
 
 class AssociateList(QListWidget):
-    def __init__(self, config:Config_Manager, parent:Union[QMainWindow, QWidget]):  
+    def __init__(self, config:Config_Manager, parent:Union[QMainWindow, QWidget],manager:LauncherPathManager):  
         super(AssociateList, self).__init__(parent)
         self.up = parent
         self.name = "associate_list"
         self.config = config.deepcopy()
+        self.manager = manager
         # set Data
         self._load()
         # init
@@ -152,7 +153,10 @@ class AssociateList(QListWidget):
             event.acceptProposedAction()  
     
     def _load(self):
-        self.launcher_df = LauncherPathManager(self.config).df
+        self.config.group_chose("Launcher", self.name)
+        self.num = self.config.get("max_exe_num", )
+        self.max_num = self.config.get("max_dir_num", )
+        self.launcher_df = self.manager.df
         self.ass = Associate(self.num, self.launcher_df)
         
         self.config.group_chose(mode="Launcher", widget=self.name, obj=None)
@@ -163,23 +167,35 @@ class AssociateList(QListWidget):
         self.remote_max_chunck = int(self.config.get('remote_max_chunck')*1024*1024)
         
         self.download_dir = self.config.get("download_save_dir", obj="path")
+        self.exe_icon_getter = self.config.get('exe_icon_getter', obj='path')
+        self.file_icon_getter = self.config.get('file_icon_getter', obj='path')
         self.max_length = self.config.get("max_length")
-        self.num = self.config.get("max_exe_num", )
-        self.max_num = self.config.get("max_dir_num", )
+
         self.font_a = self.config.get('main', obj='font')
         
-        self.default_icon = self._load_default_icons()
+        
+        self._load_default_icons()
         self.remote_server:SshManager=None
 
     def _load_default_icons(self) -> dict:
-        self.default_icon_folder = self.config.get('default_icon_folder', mode="Launcher", widget=self.name, obj="path")
+        self.file_icon_folder = self.config.get('file_icon_folder', mode="Launcher", widget=self.name, obj="path")
         self.app_icon_folder = self.config.get('app_icon_folder', mode="Launcher", widget=self.name, obj="path")
-        self.default_app_icon = QIcon(self.config.get('default_app_icon', mode="Launcher", widget=self.name, obj="path"))
-        default_icon_d = {}
-        for name_i in os.listdir(self.default_icon_folder):
+        self.app_icon_d = {}
+        for name_i in os.listdir(self.app_icon_folder):
+            path_i = os.path.isfile(os.path.join(self.app_icon_folder, name_i))
+            if os.path.isfile(path_i):
+                app_name, ext = os.path.splitext(name_i)
+                self.app_icon_d[app_name] = path_i
+            
+        self.file_icon_d = {}
+        for name_i in os.listdir(self.file_icon_folder):
             name, ext = os.path.splitext(name_i)
-            default_icon_d[name] = QIcon(os.path.join(self.default_icon_folder, name_i))
-        return default_icon_d
+            self.file_icon_d[name] = QIcon(os.path.join(self.file_icon_folder, name_i))
+        
+        default_app_icon = QIcon(self.config.get('default_app_icon', mode="Launcher", widget=self.name, obj="path"))
+        default_folder_icon = QIcon(self.config.get('default_folder_icon', mode="Launcher", widget=self.name, obj="path"))
+        default_file_icon = QIcon(self.config.get('default_file_icon', mode="Launcher", widget=self.name, obj="path"))
+        self.default_icon_d = {'app':default_app_icon, 'dir':default_folder_icon, 'file':default_file_icon}
     
     def _setStyle(self):
         self.setFont(self.font_a)
@@ -241,10 +257,7 @@ class AssociateList(QListWidget):
         self.setSpacing(1)  # 设置 item 之间的间距为 10 像素
         self.setAttribute(Qt.WA_TranslucentBackground) 
     
-    def _get_default_icon(self):
-        pass
-    
-    def cal_chunck_size(self, size_f:int, hosttype:Literal['local', 'remote']):
+    def cal_chunck_size(self, size_f:int, hosttype:Literal['local', 'remote'])->int:
         if hosttype == 'local':
             return min(max(self.local_min_chunck, size_f//48), self.local_max_chunck)
         else:
@@ -270,7 +283,7 @@ class AssociateList(QListWidget):
         label_font = self.font() if label_font is None else label_font
         item_i = QListWidgetItem()
         item_i.setData(Qt.UserRole, int(index_f))
-        button_i = YohoPushButton(self.ass_icon_default, button_size, an_type="shake")
+        button_i = YohoPushButton(self.default_icon_d['app'], button_size, an_type="shake")
         label_i = AutoLabel(text="Default", font=label_font)
         widget_i = QWidget()
         layout_i = QHBoxLayout()
@@ -295,37 +308,50 @@ class AssociateList(QListWidget):
             self.label_l.append(label_i)
             button_i.clicked.connect(partial(self._changeicon, index_i=i))
     
-    def _geticon(self, name:str, sign:Literal['name', "path"], type_f:str):
+    def _geticon(self, name:str, sign:Literal['name', "path"], type_f:Literal["dir", 'file'])->QIcon:
         match sign:
             case "name":
                 index_i = self.launcher_df.loc[self.launcher_df['A'] == name].index[0]
-                icon_l = glob(os.path.join(self.app_icon_folder, name+".*"))
+                icon_l = self.app_icon_d.get(name, "")
                 if icon_l:
-                    return QIcon(icon_l[0])
+                    return QIcon(icon_l)
                 else:
-                    if self.launcher_df.loc[index_i, 'Exe Path'].endswith('.exe'):
-                        return self.default_app_icon
+                    exe_t = self.launcher_df.loc[index_i, 'Exe Path']
+                    target_icon_path = os.path.join(self.app_icon_folder, name)
+                    if exe_t.endswith('.exe'):
+                        commands_f = [rf'{self.exe_icon_getter}', rf'{exe_t}', rf'{target_icon_path}.png']
+                        result = subprocess.run(commands_f, cwd=self.up.WKDR, capture_output=True, text=True)
+                        out_f = result.stdout
+                        if out_f and "图标已保存为" in out_f.decode('gbk'):
+                            return QIcon(target_icon_path+'.png')
+                        else:
+                            return self.default_icon_d['app']    
+                    else:
+                        return self.default_icon_d['app']
             case _:
-                pass
-            
-        if name in self.ass_icon_name:
-            return QIcon(self.ass_icon_list[self.ass_icon_name.index(name)])
-        else:
-            return QIcon(self.ass_icon_default)
+                if type_f == 'dir':
+                    return self.default_icon_d['folder']
+                else:
+                    name_i, ext = os.path.splitext(name) 
+                    icon = self.file_icon_d.get(ext.lstrip('.'), None)
+                    if icon:
+                        return icon
+                    else:
+                        return self.default_icon_d['file']
     
-    def _get_item_text(self, item:QListWidgetItem):
+    def _get_item_text(self, item:QListWidgetItem)->str:
         index_f = item.data(Qt.UserRole)
         return self.label_l[index_f].text()
     
-    def _get_input_text(self):
-        match self.up.host:
+    def _get_input_text(self)->str:
+        match self.up.HOST:
             case "wsl":
                 return self.wsl_location+self.input_box.text().strip()
             case _:
                 return self.input_box.text().strip()
 
     def _check_path(self, path_t:str):
-        match self.up.host:
+        match self.up.HOST:
             case "remote":
                 check_r = self.remote_server.check_exist(path_t)
                 match check_r:
@@ -352,7 +378,7 @@ class AssociateList(QListWidget):
         pass
     
     def right_click(self, pos):
-        prompt_f = self.up.inputbos.text() 
+        prompt_f = self.up.input_box.text() 
         item = self.list_widget.itemAt(pos)
         if (("\\" not in prompt_f) and ('/' not in prompt_f)) or not item:
             return
@@ -373,7 +399,7 @@ class AssociateList(QListWidget):
         dst = prompt_text if self._check_path(prompt_text) == 1 else os.path.dirname(prompt_text)
         if self._check_path(dst) != 1:
             return
-        match self.up.host:
+        match self.up.HOST:
             case "local"| "wsl":
                 self._local_transfer(src, dst)
             case "remote":
@@ -396,7 +422,7 @@ class AssociateList(QListWidget):
             src_check = self._check_path(src)
             if src_check == -1:
                 return
-        match self.up.host:
+        match self.up.HOST:
             case "local"|"wsl":
                 self._local_transfer(src, dir_path)
             case _:
@@ -412,11 +438,11 @@ class AssociateList(QListWidget):
         bar = self.up.download_progress_bar
         if os.path.isfile(src):
             size_f = os.path.getsize(src)
-            asyncio.run(self.copy_directory([(src, dst, size_f)], self.local_chunck_size, bar))
+            asyncio.run(self.copy_directory([(src, dst, size_f)], bar))
         elif os.path.isdir(src):
-            tasks_f = self.src_dst_parsing(src, dst)
+            tasks_f = self.src_dst_parsing(src, dst, 'local')
             size_f = sum([i[2] for i in tasks_f])
-            asyncio.run(self.copy_directory(tasks_f, self.local_chunck_size, bar))
+            asyncio.run(self.copy_directory(tasks_f, bar))
         else:
             return
 
@@ -431,14 +457,11 @@ class AssociateList(QListWidget):
             size_a = sum([i[2] for i in tasks])
             asyncio.run(self.transfer_multiple_files(tasks, type_f))
     
-    def _cg_default_icon(self, item):
-        pass
-    
     def update_associated_words(self):
-        if self.up.mode != "Launcher":
+        if self.up.MODE != "Launcher":
             return
         current_text:str = self.up.get_input()
-        match self.up.host:
+        match self.up.HOST:
             case "local":
                 self._local_update(current_text)
             case _:
@@ -502,7 +525,7 @@ class AssociateList(QListWidget):
             self.labels[i].setText(text_i)
             self.buttons[i].setIcon(icon_i)
 
-    def src_dst_parsing(self, src:str, dst:str, src_type:Literal['local', 'remote'], dst_type:Literal['local', 'remote']):
+    def src_dst_parsing(self, src:str, dst:str, src_type:Literal['local', 'remote'], dst_type:Literal['local', 'remote'])->list:
         copy_paths = []  
         if src_type == 'local':
             for dirpath, dirnames, filenames in os.walk(src):
@@ -534,12 +557,11 @@ class AssociateList(QListWidget):
                     dst_file = os.path.join(dst, os.path.basename(src), relpath)
                     copy_paths.append((src_file, dst_file, size_f))
         return copy_paths
-    
-    @staticmethod
-    async def copy_directory(task_i:tuple, min_chunck_size:int, bar:QProgressBar):
+     
+    async def copy_directory(self, task_i:tuple, bar:QProgressBar):
         tasks = []  
         for src_i, dst_i, size_i in task_i:
-            chunck_size = max(min_chunck_size, size_i//100)
+            chunck_size = self.cal_chunck_size(size_i, hosttype='local')
             tasks.append(copy_file_chunk(src_i, dst_i, chunck_size, bar))
         await asyncio.gather(*tasks) 
     
@@ -580,18 +602,20 @@ class SwitchButton(QComboBox):
         self.config.group_chose(mode="MainWindow", widget=self.name)
         self.mode_list = self.config.get("mode_list", mode="Common", widget=None, obj=None)
         self.gem = self.config.get(self.name, widget=None, obj="Size")
-        self.currentIndexChanged.connect(self._change_length)  # 连接信号槽
+        self.currentIndexChanged.connect(self._index_change)  
         self._initUI()
+    
     def _initUI(self):
         font_f = self.config.get("font", obj=None)
         self.setFont(font_f)
         for model_if in self.mode_list:
             self.addItem(model_if)
-        self.setCurrentIndex(self.mode_list.index(self.up.mode))
+        self.setCurrentIndex(self.mode_list.index(self.up.MODE))
 
         font_metrics = QFontMetrics(self.font())
-        w_f = font_metrics.boundingRect(self.up.mode).width() + 30  
-        self.setFixedSize(w_f, self.gem[-1])
+        w_f = font_metrics.boundingRect(self.up.MODE).width() + 30  
+        #self.setFixedSize(w_f, self.gem[-1])
+        self.setMaximumWidth(self.gem[-1])
         button_style = """
         QComboBox {
             background-color: rgba(255, 255, 255, 50);
@@ -617,32 +641,49 @@ class SwitchButton(QComboBox):
         
         """
         self.setStyleSheet(button_style)
-    def _change_length(self):
+    
+    def _index_change(self):
         mode_n = self.currentText()
+        self.up.MODE = mode_n
         font_metrics = QFontMetrics(self.font())
         w_f = font_metrics.boundingRect(mode_n).width() + 30  
         self.setFixedSize(w_f, self.gem[-1])
 
 class PathModeSwitch(QComboBox):
-    def __init__(self, parent:QMainWindow, config:Config_Manager, mode_list:List[str]) -> None:
+    def __init__(self, parent:QMainWindow, config:Config_Manager) -> None:
         super().__init__(parent)
         self.up = parent
         self.name = "path_mode_switch"
         self.config = config.deepcopy()
         self.config.group_chose(mode="Launcher", widget=self.name, obj=None)
-        self.setFont(self.config.get("font"))
-        self.gem = self.config.get(self.name, widget=None, obj="Size")
-        self.currentIndexChanged.connect(self._change_length)
-        self.mode_list = mode_list
+        self._load()
         self._initUI()
+        self.currentIndexChanged.connect(self._index_change)
+    
+    def _load(self):
+        self.ssh_config_path = self.config.get('ssh_config', mode='Launcher', widget=None, obj='path')
+        self.host_fliter = self.config.get('hostname')
+        self.host_d = OrderedDict(parse_ssh_config(self.ssh_config_path, fliter=self.host_fliter))
+        self.host_types = {key:"Remote" for key in self.host_d.keys()}
+        self.wsl_d = self.config.get('wsl', mode='Launcher', widget=None, obj='path')
+        
+        self.host_d = OrderedDict({'Local':''}) | self.host_d
+        self.host_types = {'Local':'Local'}| self.host_types
+        if self.wsl_d:
+            print(self.wsl_d)
+            self.host_types = self.host_types | {key:"Local" for key in self.wsl_d.keys()}
+            self.host_d = self.host_d | self.wsl_d
+        self.mode_list = list(self.host_d.keys())
+    
     def _initUI(self):
+        self.gem = self.config.get(self.name, widget=None, obj="Size")
         font_f = self.config.get("font", obj=None)
         self.setFont(font_f)
         for model_if in self.mode_list:
             self.addItem(model_if)
-        self.setCurrentIndex(self.mode_list.index("Local"))
+        self.setCurrentIndex(self.mode_list.index(self.up.HOST))
         font_metrics = QFontMetrics(self.font())
-        w_f = font_metrics.boundingRect(self.up.mode).width() + 30  
+        w_f = font_metrics.boundingRect(self.up.MODE).width() + 30  
         self.setFixedSize(w_f, self.gem[-1])
         button_style = """
         QComboBox {
@@ -665,12 +706,15 @@ class PathModeSwitch(QComboBox):
         }
         """
         self.setStyleSheet(button_style)
-    def _change_length(self):
+    
+    def _index_change(self):
         mode_n = self.currentText()
+        self.up.HOST = mode_n
+        self.up.HOST_TYPE = self.host_types[mode_n]
         font_metrics = QFontMetrics(self.font())
-        w_f = font_metrics.boundingRect(mode_n).width() + 30  # 加上一些额外空间，你可以根据需要修改
+        w_f = font_metrics.boundingRect(mode_n).width() + 30  
         self.setFixedSize(w_f, self.gem[-1])
-
+    
 class TopButton(QWidget):
     def __init__(self, parent: QMainWindow, config:Config_Manager) -> None:
         super().__init__(parent)
@@ -679,31 +723,23 @@ class TopButton(QWidget):
         self.config = config.deepcopy()
         self.config.group_chose(mode="MainWindow", widget=self.name)
         self.geom = self.config.get(self.name, widget=None, obj="Size")
+        self.setFixedHeight(int(1.2*self.geom[-1]))
         self.max_state = False
-        self.layout_1 = QHBoxLayout()
-        self.layout_1.setAlignment(Qt.AlignRight | Qt.AlignCenter)
-
-        self._initbuttons()
-        self.setLayout(self.layout_1)
-        self.setFixedSize(QSize(self.geom[-2], self.geom[-1]))
         
-
+        
     def _initbuttons(self):
-        size_i = QSize(self.up.het, self.up.het)
+        size_i = Asize(self.geom[-1], self.geom[-1])
         self.max_path = self.config.get('maximum', obj="path")
         self.min_path = self.config.get('minimum', obj="path")
         self.middle_path = self.config.get('middle', obj="path")
         self.close_path = self.config.get('close', obj="path")
 
-        self.max_button = YohoPushButton(QIcon(self.max_path), size_i, 'resize')
+        self.max_button = YohoPushButton(QIcon(self.max_path), size_i, 'shake')
         self.max_button.clicked.connect(self.max_click)
-        self.min_button = YohoPushButton(QIcon(self.min_path), size_i, 'resize')
-        self.close_button = YohoPushButton(QIcon(self.close_path), size_i, 'resize')
-        self.layout_1.addWidget(self.min_button)
-        self.layout_1.addWidget(self.max_button)
-        self.layout_1.addWidget(self.close_button)
+        self.min_button = YohoPushButton(QIcon(self.min_path), size_i, 'shake')
+        self.close_button = YohoPushButton(QIcon(self.close_path), size_i, 'shake')
+        return [self.min_button, self.max_button, self.close_button]
 
-    
     def max_click(self):
         if self.max_state:
             self.max_button.setIcon(QIcon(self.middle_path))
@@ -721,7 +757,7 @@ class InputBox(QLineEdit):
         self._initUI()
         self.returnPressed.connect(self.clear)
     def _initUI(self):
-        self.config.group_chose(mode=self.up.mode, widget="input_box")
+        self.config.group_chose(mode=self.up.MODE, widget="input_box")
         self.setStyleSheet("border-radius: 20px; padding-left: 20px;padding-right: 15px")  # smooth four angle
         # self.up.input_box.textChanged.connect(self.up.update_associated_words)
         # self.up.input_box.returnPressed.connect(self.up.confirm_action)
@@ -793,7 +829,7 @@ class ShortcutEntry(YohoPushButton):
         self.config.group_chose(mode="Launcher", widget=self.name)
         icon_p = self.config.get("icon", obj="path")
 
-        super().__init__(icon_p, int(1.3*self.up.het), "resize")
+        super().__init__(icon_p, int(1.2*self.up.het), "resize")
         self.setParent(parent)
 
 class ShortcutButton(QWidget):
@@ -806,7 +842,7 @@ class ShortcutButton(QWidget):
         self.setLayout(self.layout_0)
         self._initpara()
         self._initUI()
-        self.setFixedSize(*self.config.get(None, widget="Size", obj=self.name)[-2:], )
+        #self.setFixedSize(*self.config.get(None, widget="Size", obj=self.name)[-2:], )
 
     def _initpara(self):
         self.v_num = self.config.get('vertical_button_num', mode="Common", widget=None, obj=None)
@@ -1210,11 +1246,77 @@ class ShortcutSetting(QWidget):
         button_layout.addWidget(cancel_button)
         self.layout_0.addLayout(button_layout)
 
+class Terminal(QTextEdit):
+    def __init__(self, config:Config_Manager, parent:QMainWindow):
+        super().__init__(parent)
+        self.name = 'Terminal'
+        self.config=config
+        self.config.group_chose(mode='Terminal', widget=None)
+        self._setstyle()
+    def _setstyle(self):
+        self.setReadOnly(True)
+        self.setFont(self.config.get('main', obj="font"))
+        
+        self.main_style_sheet = f'''
+            QTextEdit {{
+                color: {self.config.get('text', obj='color')};
+                background-color: {self.config.get('background', obj='color')};
+                border: 0px solid #1E1F22;
+                border-radius: 20px}}
+        '''
+        self.setStyleSheet(self.main_style_sheet)
+        self.bar_style = f'''
+        QScrollBar:vertical {{
+            background: transparent;
+            width: 10px;
+            margin: 0px;
+        }}
 
+        QScrollBar::handle:vertical {{
+            background: {self.config.get('scroll_bar', obj='color')} ;
+            min-height: 20px;
+            border-radius: 5px;
+        }}
 
+        QScrollBar::sub-line:vertical,
+        QScrollBar::add-line:vertical,
+        QScrollBar::sub-page:vertical,
+        QScrollBar::add-page:vertical {{
+            background: none;
+            }}
+        '''
+        self.verticalScrollBar().setStyleSheet(self.bar_style)
+    
+    def add_text(self, text_f:str, color:str):
+        pass
+    
+    def add_command(self, text_f:str):
+        pass
+    
+    def add_error(self, text_f:str):
+        pass
 
-
-
+class TransferProgress(ProgressBar):
+    def __init__(self, parent, max_value, height):
+        self.up = parent
+        super().__init__(parent, max_value, height)
+        
+class LauncherSetting(QWidget):
+    def __init__(self, config:Config_Manager, parent:QMainWindow, manager:LauncherPathManager):
+        super().__init__(parent)
+        self.up = parent
+        self.manager = manager
+        self.config = config
+        self.name = 'LauncherSetting'
+        self.config.group_chose(mode='Setting', widget=self.name)
+    
+    def _layout_set(self):
+        self.layout_0 = amlayoutV(align_h='c', spacing=15)
+        self.setLayout(self.layout_0)
+    def _init_tiles(self):
+        pass
+    def _init_single_line(self):
+        pass
 
 
     

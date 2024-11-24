@@ -61,11 +61,11 @@ Common:
   
 MainWindow:
   Size:
-    switch_button: [gap,gap,0,1.3*het]
-    top_button: [win_x-0.5*gap-8*het, 0.5*gap, 8*het, 1.8*het]
+    switch_button: [gap,gap,0,1.2*het]
+    top_button: [win_x-0.5*gap-8*het, 0.5*gap, 8*het, 1.2*het]
 
   switch_button:
-    font: {Family: *jetbrains, PixelSize: 35}
+    font: [[Family, *jetbrains], [PixelSize, 35]]
   top_button:
     path:
       maximum: "./load/MainWindow/maximum.svg"
@@ -94,19 +94,26 @@ Launcher:
   path:
     settings_xlsx: "./load/Launcher/launcher_set.xlsx"
     ssh_config: "C:\\Users\\am\\.ssh\\config"
+    wsl:
+      "ubuntu-24.04": "\\\\wsl.localhost\\Ubuntu-24.04"
   input_box:
     font: 
-      main: {Family: *yahei, PixelSize: 40}
+      main: [[Family, *yahei], [PixelSize, 40]]
   path_mode_switch:
-    font: {Family: *yahei, PixelSize: 40}
+    font: [[Family, *yahei], [PixelSize, 40]]
+    hostname: "all" # fliter hosts in config, if is "all", include all, if is null, exclude all. Use list format to assign multi host
   associate_list:
     font: 
-      main: {Family: *yahei, PixelSize: 50}
+      main: [[Family, *yahei], [PixelSize, 50]]
     path:
-      default_icon_folder: './load/Launcher/assoicate_list/default_icon_folder'
+      file_icon_folder: './load/Launcher/assoicate_list/default_icon_folder'
       app_icon_folder: './load/Launcher/assoicate_list/app_icon_folder'
       default_button_icon: &default_button_icon './load/Launcher/shortcut_setting/default/default_button_icon.svg'
+      default_folder_icon: &default_folder_icon './load/Launcher/shortcut_setting/default/default_button_icon.svg'
+      default_file_icon: &default_file_icon './load/Launcher/shortcut_setting/default/default_button_icon.svg'
       download_save_dir: './load/Launcher/assoicate_list/download'
+      exe_icon_getter: './3rdparty/get_exe_icon/main.exe'
+      file_icon_getter: "./3rdparty/get_file_icon/main.exe"
     max_exe_num: 10
     max_dir_num: 128
     max_length: 600
@@ -116,13 +123,10 @@ Launcher:
 
     remote_min_chunck: 4 # in MB
     remote_max_chunck: 100 # in MB
-    wsl:
-      - "ubuntu-24.04": "\\\\wsl.localhost\\Ubuntu-24.04"
-
   
   shortcut_button:
     font:
-      button_title: {Family: *jetbrains, PixelSize: 40, Weight: 60}
+      button_title: [[Family, *jetbrains], [PixelSize, 40], [Weight, 60]]
     path:
       button_icons: &shortcut_button_icons './load/Launcher/shortcut_botton/button_icons/*'
       setting_xlsx: &shortcut_setting_xlsx './load/Launcher/shortcut_setting/shortcut_set.xlsx'
@@ -136,11 +140,11 @@ Launcher:
   
   shortcut_setting:
     font: 
-      window_title: {Family: *yahei, PixelSize: 60, Weight: 70}
-      coordinate_label: {Family: *jetbrains, PixelSize: 60, Weight: 70}
-      app_name_label: {Family: *jetbrains, PixelSize: 60, Weight: 70}
-      exe_lineedit: {Family: *yahei, PixelSize: 60, Weight: 70}
-      option_button: {Family: *jetbrains, PixelSize: 60, Weight: 70}
+      window_title: [[Family, *yahei], [PixelSize, 60], [Weight, 70]]
+      coordinate_label: [[Family, *jetbrains], [PixelSize, 60], [Weight, 70]]
+      app_name_label: [[Family, *jetbrains], [PixelSize, 60], [Weight, 70]]
+      exe_lineedit: [[Family, *yahei], [PixelSize, 60], [Weight, 70]]
+      option_button: [[Family, *jetbrains], [PixelSize, 60], [Weight, 70]]
     path:
       setting_xlsx: *shortcut_setting_xlsx
       taskbar_icon: './load/Launcher/shortcut_setting/taskbar_icon.svg'
@@ -187,34 +191,45 @@ Launcher:
       - "./load/MainWindow/middle.svg"
     sign: '^{sign_for_exchange}$'
 
-Searcher:
-  Size:
-      main_window: [scr_x/2-win_x/2,scr_y/2-win_y/2,win_x,win_y]
-      srh_icon: [win_x/2-srh_r/2,win_y/2-srh_r/2-3.6*gap,srh_r,srh_r]
-      input_box: [gap,win_y/2,win_x-2*gap,het]
-      opto_icon: null
-      shortcut_entry: null
-      shortcut_button: null
-      associate_list: null
-      gpt_box: null
-      opto_box: null
-      opto_settings: null
-  input_box:
-  searcher_button:
-    path:
-      main: './load/Searcher/srh_icons/*'
+Terminal:
+  font: 
+    main: [[Family, *jetbrains], [PointSize, 60], [Weight, 70]]
+  color:
+    text: "#C2BEB9"
+    background: "#1E1F22"
+    scroll_bar: "#1E1F22"
 
-GPT:
-  Size:
-    main_window: [scr_x/2-win_x/2,scr_y/2-win_y/2,win_x,win_y]
-    srh_icon: null
-    input_box: [gap,1.5*gap+het,win_x-2*gap,het]
-    opto_icon: null
-    shortcut_entry: null
-    shortcut_button: null
-    associate_list: null
-    gpt_box: [gap,1.8*gap+2*het,win_x-2*gap,win_y-2.8*gap-2*het]
-    opto_box: null
-    opto_settings: null
+Settings:
+  LauncherSetting:
+    a:1
+# Searcher:
+#   Size:
+#       main_window: [scr_x/2-win_x/2,scr_y/2-win_y/2,win_x,win_y]
+#       srh_icon: [win_x/2-srh_r/2,win_y/2-srh_r/2-3.6*gap,srh_r,srh_r]
+#       input_box: [gap,win_y/2,win_x-2*gap,het]
+#       opto_icon: null
+#       shortcut_entry: null
+#       shortcut_button: null
+#       associate_list: null
+#       gpt_box: null
+#       opto_box: null
+#       opto_settings: null
+#   input_box:
+#   searcher_button:
+#     path:
+#       main: './load/Searcher/srh_icons/*'
+
+# GPT:
+#   Size:
+#     main_window: [scr_x/2-win_x/2,scr_y/2-win_y/2,win_x,win_y]
+#     srh_icon: null
+#     input_box: [gap,1.5*gap+het,win_x-2*gap,het]
+#     opto_icon: null
+#     shortcut_entry: null
+#     shortcut_button: null
+#     associate_list: null
+#     gpt_box: [gap,1.8*gap+2*het,win_x-2*gap,win_y-2.8*gap-2*het]
+#     opto_box: null
+#     opto_settings: null
   
 

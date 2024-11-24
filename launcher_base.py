@@ -10,6 +10,9 @@ from am_store.common_tools import *
 from Scripts.launcher_ui import *
 
 class BaseLauncher(QMainWindow):
+    MODE = "Launcher"
+    HOST = 'Local'
+    HOST_TYPE = "Local"
     def __init__(self, config:dict, app:QApplication):
         super().__init__()
         self.wkdir = os.getcwd()
@@ -22,6 +25,7 @@ class BaseLauncher(QMainWindow):
         self._init_para()
         self.createTrayIcon()
         self._mainwindow_set()
+    
     # For mouse control
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -106,7 +110,7 @@ class BaseLauncher(QMainWindow):
         self.edge_drag = None
         self.edge_threshold = 5
 
-        self.mode = "Launcher"
+        # init state variable
         self.het = self.config.get("het", mode='Common', widget=None, obj="Size")
         self.gap = self.config.get("gap", mode='Common', widget=None, obj="Size")
         self.win_x = self.config.get("win_x", mode='Common', widget=None, obj="Size")
