@@ -274,7 +274,7 @@ class AssociateList(QListWidget):
         label_font = self.font() if label_font is None else label_font
         item_i = QListWidgetItem()
         item_i.setData(Qt.UserRole, int(index_f))
-        button_i = YohoPushButton(self.default_icon_d['app'], button_size, an_type="shake")
+        button_i = YohoPushButton(self.default_icon_d['dir'], button_size, an_type="shake")
         label_i = AutoLabel(text="Default", font=label_font)
         widget_i = QWidget()
         layout_i = QHBoxLayout()
@@ -1284,37 +1284,78 @@ class TransferProgress(ProgressBar):
         self.up = parent
         super().__init__(parent, max_value, height)
 
-class ExePathLine(InputLine):
+class ExePathLine(QLineEdit):
     def __init__(self, height_f:int, 
                  place_holder:str,
                  font:QFont,
-                 scrollbar_color = "#C3C3C3", 
-                 scrollbar_color_hover = "#6B6B6B", 
-                 scrollbar_color_pressed = "#1F1F1F"):
-        super().__init__(height_f, scrollbar_color, scrollbar_color_hover, scrollbar_color_pressed)
+                 colors:List[str] = ["#F7F7F7", "#F0F411","#EE1515"]):
+        # super().__init__(height_f, scrollbar_color, scrollbar_color_hover, scrollbar_color_pressed)
+        super().__init__()
+        self.background_color, self.warning_color, self.error_color = colors
+        self.setMaximumHeight(height_f)
         self.setPlaceholderText(place_holder)
         self.font_f = font
         self._setstyle()
+        self.textChanged.connect(self._text_change)
     
     def _setstyle(self):
         self.setFont(self.font_f)
+        self.setToolTip("sadasdad"+self.text())  # 鼠标悬停时显示完整文本
         self.style_sheet = f'''
-        background-color: transparent;
+        QLineEdit{{
+        background-color: {self.background_color};  
+        border-radius: 10px;
+        }}
+        QToolTip {{
+        background-color: {self.background_color};  
+        color: #161616;           
+        font-family:: Consolas;
+        font-size: 40px;         
+        border-radius: 6px;      
+        padding: 8px;            
+        }}
         '''
+        self.setStyleSheet(self.style_sheet)
 
-class NameLabel(QLabel):
-    def __init__(self, text_f:str, font:QFont, 
-                 background_f:str="transparent",
-                 border_color:str="#6B6B6B"):
+    def _text_change(self, text):
+        self.setToolTip(text)
+        if os.path.exists(text) or (not text):
+            color_n = self.background_color
+        elif os.path.isabs(text):
+            color_n = self.warning_color
+        else:
+            color_n = self.error_color
+        self.style_sheet = f'''
+        QLineEdit{{
+        background-color: {color_n};  
+        border-radius: 10px;
+        }}
+        QToolTip {{
+        background-color: {self.background_color};  
+        color: #161616;           
+        font-family:: Consolas;
+        font-size: 40px;         
+        border-radius: 6px;      
+        padding: 8px;            
+        }}
+        '''
+        self.setStyleSheet(self.style_sheet)
+
+        
+
+class NameEdit(QLineEdit):
+    def __init__(self, text_f:str, font:QFont, height:int,
+                 background_f:str="#F7F7F7",):
         super().__init__()
         self.setText(text_f)
         self.setFont(font)
+        self.setFixedHeight(height)
         style_sheet = f'''
-            QLabel {{
-                background-color: {background_f};  /* 背景颜色 */
-                border: 2px solid {border_color};  /* 边框颜色 */
-                border-radius: 10px;        /* 四角圆弧 */
-                padding: 10px;              /* 控件内边距 */
+            QLineEdit {{
+                background-color: {background_f};  
+                border: none; 
+                border-radius: 10px;        
+                padding: 10px;              
             }}
         '''
         self.setStyleSheet(style_sheet)
@@ -1326,61 +1367,87 @@ class LauncherSetting(QWidget):
         self.manager = manager
         self.config = config
         self.name = 'LauncherSetting'
-        self.config.group_chose(mode='Setting', widget=self.name)
+        self.config.group_chose(mode='Settings', widget=self.name)
         self._layout_set()
         self._load()
+        self._init_tiles()
+        self._init_layout()
         self._init_multi_line()
+        self._init_add_line()
+        add_obj(self.add_button, parent_f=self.obj_layout)
+        add_obj(self.title_layout, self.scroll_area,parent_f=self.layout_0)
     
     def _layout_set(self):
-        self.layout_0 = amlayoutV(align_h='c', spacing=15)
+        self.layout_0 = amlayoutV(align_h='c', spacing=5)
         self.setLayout(self.layout_0)
         self.objs = {'icon':[], 'name':[], "chname":[], 'exe':[], 'search':[]}
     
     def _load(self):
-        self.df = self.manager.dfs
+        self.df = self.manager.df
         self.name_font = self.config.get('name', obj='font')
         self.chname_font = self.config.get('chname', obj='font')
         self.exe_font = self.config.get('exe', obj='font')
         self.line_height = self.config.get('line_height', obj='Size')
         self.searcher_icon = QIcon(self.config.get('searcher_icon', obj='path'))
+        self.col_margin = self.config.get('col_margin', obj='Size')
         self.num = int(self.config.get('ori_line_num', obj=None))
-
+        self.nameedit_length = self.config.get('namedit_max_length', obj='Size')
+        self.nameedit_color = self.config.get('nameedit_background', obj='color')
+        self.exeedit_min_length = self.config.get('exeedit_min_ledngth', obj='Size')
+        self.exeedit_color = self.config.get('exeedit_background', obj='color')
         self.objs_l = {}
+        self.widget_l = []
     
     def _init_tiles(self):
         self.title_layout = amlayoutH()
-        self.titles = ['icon_col', 'name_col', 'chname_col','exe_col','search_col']
-        for title_i in self.titles:
+        self.title_layout.setContentsMargins(self.col_margin[0], 0, self.col_margin[1], 0)
+        self.titles = ['number_col', 'icon_col', 'name_col', 'chname_col','exe_col', 'searcher']
+        width_l = [self.line_height, self.line_height, self.nameedit_length, self.nameedit_length, self.exeedit_min_length, self.line_height]
+        for i, title_i in enumerate(self.titles):
             col_i = QLabel(self)
             col_style_sheet = f'''
-            "background: {self.config.get('col_background', obj='color')};"
+            background: {self.config.get('col_background', obj='color')};
+            text_align
             '''
             col_i.setStyleSheet(col_style_sheet)
             icon_i = QPixmap(self.config.get(f'{title_i}_icon',obj='path'))
-            size_i = self.config.get('col_icon_size', obj='Size')
-            col_i.setPixmap(icon_i.scaled(QSize(size_i, size_i)))
+            # size_i = self.config.get('col_icon_size', obj='Size')
+            col_i.setPixmap(icon_i.scaled(QSize(self.line_height, self.line_height)))
+            if self.titles[i] != 'exe_col':
+                col_i.setFixedWidth(width_l[i])
+            col_i.setAlignment(Qt.AlignCenter)
             setattr(self, title_i, col_i)
             self.title_layout.addWidget(getattr(self, title_i))
-        self.layout_0.addLayout(self.title_layout)
 
     def _init_layout(self):
-        self.obj_layout = amlayoutV()
+        self.obj_layout = amlayoutV(spacing=self.config.get('line_spacing', obj='Size'))
         # Create a scroll area and add the content layout to it
         self.scroll_content = QWidget()  # Create a widget to contain the layout
         self.scroll_content.setLayout(self.obj_layout)
-        
         self.frame = QFrame()  # Create a frame to contain the scroll area
         self.frame_layout = QVBoxLayout()
         self.frame_layout.addWidget(self.scroll_content)
         self.frame_layout.setContentsMargins(0, 0, 0, 0)
         self.frame.setLayout(self.frame_layout)
-        self.frame.setStyleSheet("background: transparent;border-radius: 10px; border: 1px solid gray; background-color: transparent;")  # Set border to the frame
-        
+        self.frame.setObjectName("OuterFrame")
+        self.frame.setStyleSheet("""
+                        QFrame#OuterFrame {
+                            background: transparent;
+                            border-radius: 10px;
+                            border: 1px solid gray;
+                            background-color: transparent;
+                        }
+                    """)  # Set border to the frame
         self.scroll_area = QScrollArea()
+        self.scroll_area.setObjectName("myScrollArea")
         self.scroll_area.setWidget(self.frame)  # Set the frame as the widget of the scroll area
         self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setStyleSheet("background: transparent; border: none;")  # Set background to transparent and no border to the scroll area
-        self.layout_0.addWidget(self.scroll_area)
+        self.scroll_area.setStyleSheet("""
+                        QScrollArea#myScrollArea {
+                            background: transparent;
+                            border: none;
+                        }
+                    """)  # Set background to transparent and no border to the scroll area
         
         # Customize scrollbar style
         self.scroll_bar = self.scroll_area.verticalScrollBar()
@@ -1422,7 +1489,8 @@ class LauncherSetting(QWidget):
             icon_i = QIcon(self.config.get('default_button_icon', 'Launcher', 'shortcut_button', 'path'))
             name = 'Launcher'
             chname = '启动器'
-            exe_path = os.getcwd()
+            #exe_path = os.getcwd()
+            exe_path = r'c:\Windows\servicing\InboxFodMetadataCache\metadata\Language.Basic~ar-sa~1.0.mum'
         else:
             name = df.iloc[index_f, 0]
             icon_i = self.manager.get_icon(name)
@@ -1430,39 +1498,84 @@ class LauncherSetting(QWidget):
             exe_path = df.iloc[index_f, 3]
             if os.path.isfile(exe_path):
                 exe_path = os.path.basename(exe_path)
-        icon_w = YohoPushButton(icon_i, self.size_f, 'shake')
+        nummber_w = QLabel(str(index_f))
+        nummber_w.setFont(self.config.get('number', obj='font'))
+        nummber_w.setAlignment(Qt.AlignCenter)
+        nummber_w.setStyleSheet("background-color: transparent; border: none;text-align: center;")
+        nummber_w.setFixedWidth(self.line_height)
+        nummber_w.setFixedHeight(self.line_height)
+        icon_w = YohoPushButton(icon_i, self.line_height, 'shake')
         icon_w.setProperty('index', index_f)
         icon_w.clicked.connect(lambda: self._change_icon(index_f))
-        name_label = NameLabel(name, self.name_font)
-        chname_label = NameLabel(chname, self.chname_font)
-        exe_edit = ExePathLine(self.line_height,exe_path,self.exe_font)
+        name_label = NameEdit(name, self.name_font, self.line_height, self.nameedit_color)
+        name_label.setMaximumWidth(self.nameedit_length)
+        chname_label = NameEdit(chname, self.chname_font, self.line_height, self.nameedit_color)
+        chname_label.setMaximumWidth(self.nameedit_length)
+        exe_edit = ExePathLine(self.line_height,exe_path,self.exe_font,self.exeedit_color)
+        exe_edit.setMinimumWidth(self.exeedit_min_length)
         exe_edit.textChanged.connect(self._edit_change)
-        folder_button = YohoPushButton(self.searcher_icon, QSize(self.line_height,self.line_height))
-        return icon_w, name_label, chname_label, exe_edit, folder_button
+        folder_button = YohoPushButton(self.searcher_icon, self.line_height, an_type='resize')
+        folder_button.clicked.connect(lambda: self._exe_search(index_f))
+        return nummber_w, icon_w, name_label, chname_label, exe_edit, folder_button
     
     def _init_multi_line(self):
-        for i in self.num:
-            icon_w, name_label, chname_label, exe_edit, folder_button = self._init_single_line(i, default=True)
-            self.objs_l[i] = {'icon':icon_w, 'name':name_label, 'chname':chname_label, 'exe':exe_edit, 'search':folder_button}
+        for i in range(self.num):
+            nummber_w, icon_w, name_label, chname_label, exe_edit, folder_button = self._init_single_line(i, default=True)
+            self.objs_l[i] = {'number':nummber_w, 'icon':icon_w, 'name':name_label, 'chname':chname_label, 'exe':exe_edit, 'search':folder_button}
             layout_i = amlayoutH()
+            layout_i.setMargin(0)
             widget_i = QWidget()
             widget_i.setLayout(layout_i)
-            add_obj(icon_w, name_label, chname_label, exe_edit, folder_button, parent_f=layout_i)
-            self.layout_0.addWidget(widget_i)
+            add_obj(nummber_w, icon_w, name_label, chname_label, exe_edit, folder_button, parent_f=layout_i)
+            self.obj_layout.addWidget(widget_i)
+            self.widget_l.append(widget_i)
 
     def _init_add_line(self):
-        pass
+        color_l = self.config.get('add_button', obj='color')
+        self.add_style_sheet = f'''
+            QPushButton {{
+                border: none;
+                border-radius: 10px;
+                background-color: {color_l[0]};
+                text-align: center; 
+            }}
+            QPushButton:hover {{
+                background-color: {color_l[1]};  
+            }}
+            QPushButton:pressed {{
+                background-color: {color_l[2]};                   
+            }}
+        '''
+        self.add_button = YohoPushButton(QIcon(self.config.get('add_button_icon',obj='path')), self.line_height, an_type='resize', style_assign=self.add_style_sheet)
+        # self.add_button = QPushButton()
+        # self.add_button.setIcon(QIcon(self.config.get('add_button_icon',obj='path')))
+        self.add_button.setIconSize(QSize(self.line_height, self.line_height))
+        self.add_button.setFixedHeight(self.config.get('add_line_height', obj='Size'))
+        self.add_button.setMaximumWidth(11111)
+        self.add_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.add_button.clicked.connect(self._insert_line)
     
-    def _add_line(self):
+    def _bottom_control(self):
         pass
 
+
+    def _insert_line(self):
+        layout_i = amlayoutH()
+        layout_i.setMargin(0)
+        widget_i = QWidget()
+        widget_i.setLayout(layout_i)
+        add_obj(*self._init_single_line(index_f=len(self.widget_l),default=True), parent_f=layout_i)
+        self.obj_layout.insertWidget(self.obj_layout.count()-1, widget_i)
+        self.widget_l.append(widget_i)
 
     def _change_icon(self, index_f:int):
         pass
+    
     def _edit_change(self):
         pass
 
-
+    def _exe_search(self, index_f:int):
+        pass
     
 
 

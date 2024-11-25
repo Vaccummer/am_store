@@ -1,84 +1,58 @@
-import sys
-from PySide2.QtWidgets import QApplication, QWidget, QTextEdit, QVBoxLayout
+from PySide2.QtWidgets import QApplication, QLineEdit, QVBoxLayout, QWidget
 from PySide2.QtCore import Qt
-from PySide2.QtCore import *
-from PySide2.QtGui import *
-from PySide2.QtWidgets import *
 
-class MyWindow(QWidget):
+
+class LineEditWithProgress(QWidget):
     def __init__(self):
         super().__init__()
 
-        # 创建 QTextEdit
-        text_edit = QTextEdit(self)
+        # 创建 QLineEdit
+        self.line_edit = QLineEdit()
+        self.line_edit.setPlaceholderText("输入文本以更新进度...")
+        self.line_edit.setAlignment(Qt.AlignLeft)
 
-        # 设置文本框为单行模式，禁用自动换行
-        text_edit.setPlainText("This is a single line text that will not wrap.")  # 设置默认文本
-        text_edit.setWordWrapMode(QTextOption.NoWrap)  # 禁用换行
+        # 初始化布局
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.line_edit)
 
-        # 禁用垂直滚动条
-        text_edit.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-
-        # 设置自定义滚动条样式
-        self.set_scrollbar_style(text_edit)
-
-        # 创建布局并添加控件
-        layout = QVBoxLayout()
-        layout.addWidget(text_edit)
-        self.setLayout(layout)
-
-        # 设置窗口属性
-        self.setWindowTitle("QTextEdit with Disabled Vertical Scrollbar")
-        self.resize(400, 50)  # 设置窗口的大小
-
-    def set_scrollbar_style(self, widget):
-        """设置 QTextEdit 滚动条的样式"""
-        style = """
-        /* 水平滚动条 */
-        QScrollBar:horizontal {
-            height: 16px;
-            background: rgba(255, 255, 255, 255);
-            border: none ;
-        }
-
-        QScrollBar::handle:horizontal {
-            background: #C3C3C3;
-            border-radius: 6px;
-            min-width: 20px;
-        }
-
-        QScrollBar::handle:horizontal:hover {
-            background: #6B6B6B;
-        }
-
-        QScrollBar::handle:horizontal:pressed {
-            background: #1F1F1F;
-        }
-
-        QScrollBar::add-line:horizontal {
-            border: 1px solid transparent;
-            background: transparent;
-        }
-
-        QScrollBar::sub-line:horizontal {
-            border: 1px solid transparent;
-            background: transparent;
-        }
-
-        QScrollBar::up-arrow:horizontal, QScrollBar::down-arrow:horizontal {
-            background: transparent;
-        }
-
-        QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
-            background: transparent;
-        }
-        """
         # 设置样式表
-        widget.setStyleSheet(style)
+        self.line_edit.setStyleSheet("""
+            QLineEdit {
+                border: 2px solid gray;
+                border-radius: 5px;
+                padding: 2px;
+            }
+            QLineEdit::before {
+                content: "";
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 green, stop:1 transparent);
+                height: 100%;
+                border-radius: 5px;
+                z-index: -1;
+            }
+        """)
 
-# 创建应用程序和窗口实例
-app = QApplication(sys.argv)
-window = MyWindow()
-window.show()
+        # 绑定文本事件
+        self.line_edit.textChanged.connect(self.update_style)
 
-sys.exit(app.exec_())
+    def update_style(self):
+        # 动态更新背景颜色进度条
+        max_length = 100
+        current_length = len(self.line_edit.text())
+        progress = min(100, (current_length / max_length) * 100) / 100
+
+        # 更新样式表，动态设置背景
+        self.line_edit.setStyleSheet(f"""
+            QLineEdit {{
+                border: 2px solid gray;
+                border-radius: 5px;
+                padding: 2px;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 green, stop:{progress} green, stop:{progress} transparent);
+            }}
+        """)
+
+
+if __name__ == "__main__":
+    app = QApplication([])
+    window = LineEditWithProgress()
+    window.show()
+    app.exec_()

@@ -235,11 +235,12 @@ class UILauncher(BaseLauncher):
         
         # terminal layer content
         self.terminal = Terminal(config=self.config.deepcopy(), parent=self)
-        self.stack_ass.addWidget(self.terminal)
-        self.stack_ass.addWidget(self.ass_wd1)
+        
 
         self.launcher_settings = LauncherSetting(config=self.config.deepcopy(), parent=self, manager=self.launcher_manager)
         self.stack_ass.addWidget(self.launcher_settings)
+        self.stack_ass.addWidget(self.terminal)
+        self.stack_ass.addWidget(self.ass_wd1)
     
     def resizeEvent(self, event):
         super().resizeEvent(event)

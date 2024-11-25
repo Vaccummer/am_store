@@ -49,10 +49,10 @@ Common:
     jetbrains_family: &jetbrains JetBrains Mono
     arial_family: &arial Arial
   color_family:
-    grey: \#4A4A4A
-    blue: \#2F76D5
-    red: \#EA124F
-    white: \#F1F1F1
+    grey: "#4A4A4A"
+    blue: "#2F76D5"
+    red: "#EA124F"
+    white: "#F1F1F1"
   task_bar_title: Super Launcher      
   max_op_num: 99
   horizontal_button_num: 5
@@ -130,7 +130,7 @@ Launcher:
     path:
       button_icons: &shortcut_button_icons './load/Launcher/shortcut_botton/button_icons/*'
       setting_xlsx: &shortcut_setting_xlsx './load/Launcher/shortcut_setting/shortcut_set.xlsx'
-      default_button_icon: &default_button_icon # 和associate共享默认app_icon
+      default_button_icon: *default_button_icon # 和associate共享默认app_icon
     color:
       button_hover: "#619F99"
   
@@ -202,24 +202,34 @@ Terminal:
 Settings:
   LauncherSetting:
     font:
-      name: [[Family, *arial], [PointSize, 60], [Weight, 70]]
-      chname: [[Family, *yahei], [PointSize, 60], [Weight, 70]]
-      exe: [[Family, *jetbrains], [PointSize, 60], [Weight, 70]]
+      name: [[Family, *arial], [PointSize, 12], [Weight, 70]]
+      chname: [[Family, *yahei], [PointSize, 12], [Weight, 70]]
+      exe: [[Family, *jetbrains], [PointSize, 12], [Weight, 70]]
+      number: [[Family, *yahei], [PointSize, 12], [Weight, 90]]
     Size:
-      col_icon_size: het
-      line_height: het
+      col_margin: [25, 45]
+      line_height: 0.85*het
+      line_spacing: 0.2*het
+      namedit_max_length: 5*gap
+      exeedit_min_ledngth: 2*gap
+      add_line_height: het
     path:
-      icon_col_icon: '.\load\Settings\col_icons\opto_setting_window_icon.svg'
-      name_col_icon: '.\load\Settings\col_icons\opto_setting_window_icon.svg'
-      chname_col_icon: '.\load\Settings\col_icons\opto_setting_window_icon.svg'
-      exe_col_icon: '.\load\Settings\col_icons\opto_setting_window_icon.svg'
-      search_col_icon: '.\load\Settings\col_icons\opto_setting_window_icon.svg'
-      searcher_icon: '.\load\Settings\col_icons\opto_setting_window_icon.svg'
+      number_col_icon: './load/Settings/col_icons/opto_setting_window_icon.svg'
+      icon_col_icon: './load/Settings/col_icons/opto_setting_window_icon.svg'
+      name_col_icon: './load/Settings/col_icons/opto_setting_window_icon.svg'
+      chname_col_icon: './load/Settings/col_icons/opto_setting_window_icon.svg'
+      exe_col_icon: './load/Settings/col_icons/opto_setting_window_icon.svg'
+      search_col_icon: './load/Settings/col_icons/opto_setting_window_icon.svg'
+      searcher_icon: './load/Settings/col_icons/opto_setting_window_icon.svg'
+      add_button_icon: './load/Settings/col_icons/opto_setting_window_icon.svg'
     color:
-      col_background: rgba(255, 255, 255, 255)
+      col_background: transparent
       scrollbar_color: "#C3C3C3"
       scrollbar_color_hove: "#6B6B6B"
       scrollbar_color_pressed: "#1F1F1F"
+      nameedit_background: "#F7F7F7"
+      exeedit_background: ["#F7F7F7", "#FFC300", "#FF5733"] # 包括普通, 警告, 错误三种颜色
+      add_button: ["black", "#9D8383", "#E99393"]  # 包括普通, 悬浮, 点击三种颜色
     ori_line_num: 25
 # Searcher:  
 #   Size:
