@@ -1,47 +1,84 @@
-from PySide2.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton
+import sys
+from PySide2.QtWidgets import QApplication, QWidget, QTextEdit, QVBoxLayout
 from PySide2.QtCore import Qt
+from PySide2.QtCore import *
+from PySide2.QtGui import *
+from PySide2.QtWidgets import *
 
 class MyWindow(QWidget):
     def __init__(self):
         super().__init__()
 
-        # 创建顶层垂直布局
-        outer_layout = QVBoxLayout()
+        # 创建 QTextEdit
+        text_edit = QTextEdit(self)
 
-        # 创建内部布局（另一个垂直布局）
-        inner_layout = QVBoxLayout()
+        # 设置文本框为单行模式，禁用自动换行
+        text_edit.setPlainText("This is a single line text that will not wrap.")  # 设置默认文本
+        text_edit.setWordWrapMode(QTextOption.NoWrap)  # 禁用换行
 
-        # 添加按钮到内部布局
-        button1 = QPushButton("Button 1")
-        button2 = QPushButton("Button 2")
-        button3 = QPushButton("Button 3")
+        # 禁用垂直滚动条
+        text_edit.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
-        # 添加按钮到内部布局
-        inner_layout.addWidget(button1)
-        inner_layout.addWidget(button2)
-        inner_layout.addWidget(button3)
+        # 设置自定义滚动条样式
+        self.set_scrollbar_style(text_edit)
 
-        # 设置内部布局的对齐方式为右对齐
-        inner_layout.setAlignment(Qt.AlignRight)
+        # 创建布局并添加控件
+        layout = QVBoxLayout()
+        layout.addWidget(text_edit)
+        self.setLayout(layout)
 
-        # 创建外部按钮，并添加到外部布局
-        outer_button = QPushButton("Outer Button")
+        # 设置窗口属性
+        self.setWindowTitle("QTextEdit with Disabled Vertical Scrollbar")
+        self.resize(400, 50)  # 设置窗口的大小
 
-        # 将内部布局和外部按钮添加到顶层布局
-        outer_layout.addWidget(outer_button)
-        outer_layout.addLayout(inner_layout)
+    def set_scrollbar_style(self, widget):
+        """设置 QTextEdit 滚动条的样式"""
+        style = """
+        /* 水平滚动条 */
+        QScrollBar:horizontal {
+            height: 16px;
+            background: rgba(255, 255, 255, 255);
+            border: none ;
+        }
 
-        # 设置顶层布局的对齐方式为右对齐
-        outer_layout.setAlignment(Qt.AlignRight)
+        QScrollBar::handle:horizontal {
+            background: #C3C3C3;
+            border-radius: 6px;
+            min-width: 20px;
+        }
 
-        # 设置窗口的布局
-        self.setLayout(outer_layout)
+        QScrollBar::handle:horizontal:hover {
+            background: #6B6B6B;
+        }
 
-        # 设置窗口标题
-        self.setWindowTitle("Right Aligning Widgets in Nested Layouts")
+        QScrollBar::handle:horizontal:pressed {
+            background: #1F1F1F;
+        }
 
-# 创建应用并显示窗口
-app = QApplication([])
+        QScrollBar::add-line:horizontal {
+            border: 1px solid transparent;
+            background: transparent;
+        }
+
+        QScrollBar::sub-line:horizontal {
+            border: 1px solid transparent;
+            background: transparent;
+        }
+
+        QScrollBar::up-arrow:horizontal, QScrollBar::down-arrow:horizontal {
+            background: transparent;
+        }
+
+        QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+            background: transparent;
+        }
+        """
+        # 设置样式表
+        widget.setStyleSheet(style)
+
+# 创建应用程序和窗口实例
+app = QApplication(sys.argv)
 window = MyWindow()
 window.show()
-app.exec_()
+
+sys.exit(app.exec_())

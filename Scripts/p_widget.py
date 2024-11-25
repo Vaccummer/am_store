@@ -35,10 +35,10 @@ class YohoPushButton(QPushButton):
         #     #size_t = 1.1*size_f
         #     self.size_f = size_f.q()
         # else:
-        self.size_f = size_f
+        self.size_f = QSize(int(size_f.width()*0.9), int(size_f.width()*0.9))
             #size_t = QSize(size_f.width(), size_f.height())
         self.setIconSize(self.size_f)
-        self.setFixedSize(self.size_f)
+        self.setFixedSize(size_f)
         self.an_time = an_time
         self.change_size = change_size
         self.change_period = change_period
@@ -283,3 +283,61 @@ class ProgressBar(QProgressBar):
         }}
         '''
         self.setStyleSheet(self.stylesheet)
+
+class InputLine(QTextEdit):
+    def __init__(self, height_f:int, scrollbar_color:str="#C3C3C3", 
+                 scrollbar_color_hover:str="#6B6B6B",
+                 scrollbar_color_pressed:str="#1F1F1F",
+                 ):
+        super().__init__()
+        self.height_f = height_f
+        self.color1 = scrollbar_color
+        self.color2 = scrollbar_color_hover
+        self.color3 = scrollbar_color_pressed
+    def _style_set(self):
+        self.setFixedHeight(self.height_f)  
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)  
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  
+        self.setTextMargins(10, 0, 10, 0)
+        self.setWordWrapMode(QTextOption.NoWrap)
+        self.scroll_bar_style_sheet = f'''
+        /* 水平滚动条 */
+        QScrollBar:horizontal {{
+            height: 16px;
+            background: rgba(255, 255, 255, 255);
+            border: none;
+        }}
+
+        QScrollBar::handle:horizontal {{
+            background: {self.color1};
+            border-radius: 6px;
+            min-width: 20px;
+        }}
+
+        QScrollBar::handle:horizontal:hover {{
+            background: {self.color2};
+        }}
+
+        QScrollBar::handle:horizontal:pressed {{
+            background: {self.color3};
+        }}
+
+        QScrollBar::add-line:horizontal {{
+            border: 1px solid transparent;
+            background: transparent;
+        }}
+
+        QScrollBar::sub-line:horizontal {{
+            border: 1px solid transparent;
+            background: transparent;
+        }}
+
+        QScrollBar::up-arrow:horizontal, QScrollBar::down-arrow:horizontal {{
+            background: transparent;
+        }}
+
+        QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
+            background: transparent;
+        }}
+        '''
+        self.horizontalScrollBar().setStyleSheet(self.scroll_bar_style_sheet)

@@ -116,7 +116,6 @@ class Associate:
         elif len(output_1) == 1:
             return output_1[0]
 
-
 class AssociateList(QListWidget):
     def __init__(self, config:Config_Manager, parent:Union[QMainWindow, QWidget],manager:LauncherPathManager):  
         super(AssociateList, self).__init__(parent)
@@ -179,23 +178,15 @@ class AssociateList(QListWidget):
 
     def _load_default_icons(self) -> dict:
         self.file_icon_folder = self.config.get('file_icon_folder', mode="Launcher", widget=self.name, obj="path")
-        self.app_icon_folder = self.config.get('app_icon_folder', mode="Launcher", widget=self.name, obj="path")
-        self.app_icon_d = {}
-        for name_i in os.listdir(self.app_icon_folder):
-            path_i = os.path.isfile(os.path.join(self.app_icon_folder, name_i))
-            if os.path.isfile(path_i):
-                app_name, ext = os.path.splitext(name_i)
-                self.app_icon_d[app_name] = path_i
-            
+        
         self.file_icon_d = {}
         for name_i in os.listdir(self.file_icon_folder):
             name, ext = os.path.splitext(name_i)
             self.file_icon_d[name] = QIcon(os.path.join(self.file_icon_folder, name_i))
         
-        default_app_icon = QIcon(self.config.get('default_app_icon', mode="Launcher", widget=self.name, obj="path"))
         default_folder_icon = QIcon(self.config.get('default_folder_icon', mode="Launcher", widget=self.name, obj="path"))
         default_file_icon = QIcon(self.config.get('default_file_icon', mode="Launcher", widget=self.name, obj="path"))
-        self.default_icon_d = {'app':default_app_icon, 'dir':default_folder_icon, 'file':default_file_icon}
+        self.default_icon_d = {'dir':default_folder_icon, 'file':default_file_icon}
     
     def _setStyle(self):
         self.setFont(self.font_a)
@@ -311,23 +302,7 @@ class AssociateList(QListWidget):
     def _geticon(self, name:str, sign:Literal['name', "path"], type_f:Literal["dir", 'file'])->QIcon:
         match sign:
             case "name":
-                index_i = self.launcher_df.loc[self.launcher_df['A'] == name].index[0]
-                icon_l = self.app_icon_d.get(name, "")
-                if icon_l:
-                    return QIcon(icon_l)
-                else:
-                    exe_t = self.launcher_df.loc[index_i, 'Exe Path']
-                    target_icon_path = os.path.join(self.app_icon_folder, name)
-                    if exe_t.endswith('.exe'):
-                        commands_f = [rf'{self.exe_icon_getter}', rf'{exe_t}', rf'{target_icon_path}.png']
-                        result = subprocess.run(commands_f, cwd=self.up.WKDR, capture_output=True, text=True)
-                        out_f = result.stdout
-                        if out_f and "图标已保存为" in out_f.decode('gbk'):
-                            return QIcon(target_icon_path+'.png')
-                        else:
-                            return self.default_icon_d['app']    
-                    else:
-                        return self.default_icon_d['app']
+                return self.manager.get_icon(name)
             case _:
                 if type_f == 'dir':
                     return self.default_icon_d['folder']
@@ -592,7 +567,6 @@ class AssociateList(QListWidget):
             print(f"文件传输失败: {e}")
             return False
 
-
 class SwitchButton(QComboBox):
     def __init__(self, parent: QMainWindow, config:Config_Manager) -> None:
         super().__init__(parent)
@@ -689,9 +663,11 @@ class PathModeSwitch(QComboBox):
         QComboBox {
             background-color: rgba(255, 255, 255, 50);
             border: 0px solid #2980b9;
-            border-radius: 10px;
+            border-top-left-radius: 20px;
+            border-bottom-left-radius: 20px;
             padding: 5px;
             color: white;
+            margin: 0px;
         }
         QComboBox::drop-down {
             border: none;  /* 移除下拉箭头的边框 */
@@ -758,7 +734,14 @@ class InputBox(QLineEdit):
         self.returnPressed.connect(self.clear)
     def _initUI(self):
         self.config.group_chose(mode=self.up.MODE, widget="input_box")
-        self.setStyleSheet("border-radius: 20px; padding-left: 20px;padding-right: 15px")  # smooth four angle
+        sty_sheet = f'''
+                border-top-right-radius: 20px;
+                border-bottom-right-radius: 20px;
+                padding-left: 20px;
+                padding-right: 15px;
+                margin: 0px;
+        '''
+        self.setStyleSheet(sty_sheet)  # smooth four angle
         # self.up.input_box.textChanged.connect(self.up.update_associated_words)
         # self.up.input_box.returnPressed.connect(self.up.confirm_action)
         self.setFont(self.config.get("main", obj="font"))
@@ -829,7 +812,7 @@ class ShortcutEntry(YohoPushButton):
         self.config.group_chose(mode="Launcher", widget=self.name)
         icon_p = self.config.get("icon", obj="path")
 
-        super().__init__(icon_p, int(1.2*self.up.het), "resize")
+        super().__init__(icon_p, int(1.2*self.up.het), "shake")
         self.setParent(parent)
 
 class ShortcutButton(QWidget):
@@ -1300,7 +1283,42 @@ class TransferProgress(ProgressBar):
     def __init__(self, parent, max_value, height):
         self.up = parent
         super().__init__(parent, max_value, height)
-        
+
+class ExePathLine(InputLine):
+    def __init__(self, height_f:int, 
+                 place_holder:str,
+                 font:QFont,
+                 scrollbar_color = "#C3C3C3", 
+                 scrollbar_color_hover = "#6B6B6B", 
+                 scrollbar_color_pressed = "#1F1F1F"):
+        super().__init__(height_f, scrollbar_color, scrollbar_color_hover, scrollbar_color_pressed)
+        self.setPlaceholderText(place_holder)
+        self.font_f = font
+        self._setstyle()
+    
+    def _setstyle(self):
+        self.setFont(self.font_f)
+        self.style_sheet = f'''
+        background-color: transparent;
+        '''
+
+class NameLabel(QLabel):
+    def __init__(self, text_f:str, font:QFont, 
+                 background_f:str="transparent",
+                 border_color:str="#6B6B6B"):
+        super().__init__()
+        self.setText(text_f)
+        self.setFont(font)
+        style_sheet = f'''
+            QLabel {{
+                background-color: {background_f};  /* 背景颜色 */
+                border: 2px solid {border_color};  /* 边框颜色 */
+                border-radius: 10px;        /* 四角圆弧 */
+                padding: 10px;              /* 控件内边距 */
+            }}
+        '''
+        self.setStyleSheet(style_sheet)
+
 class LauncherSetting(QWidget):
     def __init__(self, config:Config_Manager, parent:QMainWindow, manager:LauncherPathManager):
         super().__init__(parent)
@@ -1309,18 +1327,140 @@ class LauncherSetting(QWidget):
         self.config = config
         self.name = 'LauncherSetting'
         self.config.group_chose(mode='Setting', widget=self.name)
+        self._layout_set()
+        self._load()
+        self._init_multi_line()
     
     def _layout_set(self):
         self.layout_0 = amlayoutV(align_h='c', spacing=15)
         self.setLayout(self.layout_0)
-    def _init_tiles(self):
-        pass
-    def _init_single_line(self):
-        pass
-
-
+        self.objs = {'icon':[], 'name':[], "chname":[], 'exe':[], 'search':[]}
     
+    def _load(self):
+        self.df = self.manager.dfs
+        self.name_font = self.config.get('name', obj='font')
+        self.chname_font = self.config.get('chname', obj='font')
+        self.exe_font = self.config.get('exe', obj='font')
+        self.line_height = self.config.get('line_height', obj='Size')
+        self.searcher_icon = QIcon(self.config.get('searcher_icon', obj='path'))
+        self.num = int(self.config.get('ori_line_num', obj=None))
 
+        self.objs_l = {}
+    
+    def _init_tiles(self):
+        self.title_layout = amlayoutH()
+        self.titles = ['icon_col', 'name_col', 'chname_col','exe_col','search_col']
+        for title_i in self.titles:
+            col_i = QLabel(self)
+            col_style_sheet = f'''
+            "background: {self.config.get('col_background', obj='color')};"
+            '''
+            col_i.setStyleSheet(col_style_sheet)
+            icon_i = QPixmap(self.config.get(f'{title_i}_icon',obj='path'))
+            size_i = self.config.get('col_icon_size', obj='Size')
+            col_i.setPixmap(icon_i.scaled(QSize(size_i, size_i)))
+            setattr(self, title_i, col_i)
+            self.title_layout.addWidget(getattr(self, title_i))
+        self.layout_0.addLayout(self.title_layout)
+
+    def _init_layout(self):
+        self.obj_layout = amlayoutV()
+        # Create a scroll area and add the content layout to it
+        self.scroll_content = QWidget()  # Create a widget to contain the layout
+        self.scroll_content.setLayout(self.obj_layout)
+        
+        self.frame = QFrame()  # Create a frame to contain the scroll area
+        self.frame_layout = QVBoxLayout()
+        self.frame_layout.addWidget(self.scroll_content)
+        self.frame_layout.setContentsMargins(0, 0, 0, 0)
+        self.frame.setLayout(self.frame_layout)
+        self.frame.setStyleSheet("background: transparent;border-radius: 10px; border: 1px solid gray; background-color: transparent;")  # Set border to the frame
+        
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidget(self.frame)  # Set the frame as the widget of the scroll area
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setStyleSheet("background: transparent; border: none;")  # Set background to transparent and no border to the scroll area
+        self.layout_0.addWidget(self.scroll_area)
+        
+        # Customize scrollbar style
+        self.scroll_bar = self.scroll_area.verticalScrollBar()
+        self.scroll_bar.setStyleSheet("""
+            QScrollBar:vertical {
+                border: none;
+                background: transparent;
+                width: 20px;
+                margin: 5px;
+                
+            }
+            QScrollBar::handle:vertical {
+                background: rgba(255, 255, 255, 25);
+                min-height: 20px;
+                border-radius: 5px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #737373;
+            }
+            QScrollBar::add-line:vertical {
+                background: transparent;
+                height: 0px;
+                subcontrol-position: bottom;
+                subcontrol-origin: margin;
+            }
+            QScrollBar::sub-line:vertical {
+                background: transparent;
+                height: 0px;
+                subcontrol-position: top;
+                subcontrol-origin: margin;
+            }
+            QScrollBar::sub-page:vertical, QScrollBar::add-page:vertical {
+            background: transparent; 
+            }
+        """)
+
+    def _init_single_line(self, index_f:int, df:pandas.DataFrame=None, default:bool=False):
+        if default is not False:
+            icon_i = QIcon(self.config.get('default_button_icon', 'Launcher', 'shortcut_button', 'path'))
+            name = 'Launcher'
+            chname = '启动器'
+            exe_path = os.getcwd()
+        else:
+            name = df.iloc[index_f, 0]
+            icon_i = self.manager.get_icon(name)
+            chname = df.iloc[index_f, 1]
+            exe_path = df.iloc[index_f, 3]
+            if os.path.isfile(exe_path):
+                exe_path = os.path.basename(exe_path)
+        icon_w = YohoPushButton(icon_i, self.size_f, 'shake')
+        icon_w.setProperty('index', index_f)
+        icon_w.clicked.connect(lambda: self._change_icon(index_f))
+        name_label = NameLabel(name, self.name_font)
+        chname_label = NameLabel(chname, self.chname_font)
+        exe_edit = ExePathLine(self.line_height,exe_path,self.exe_font)
+        exe_edit.textChanged.connect(self._edit_change)
+        folder_button = YohoPushButton(self.searcher_icon, QSize(self.line_height,self.line_height))
+        return icon_w, name_label, chname_label, exe_edit, folder_button
+    
+    def _init_multi_line(self):
+        for i in self.num:
+            icon_w, name_label, chname_label, exe_edit, folder_button = self._init_single_line(i, default=True)
+            self.objs_l[i] = {'icon':icon_w, 'name':name_label, 'chname':chname_label, 'exe':exe_edit, 'search':folder_button}
+            layout_i = amlayoutH()
+            widget_i = QWidget()
+            widget_i.setLayout(layout_i)
+            add_obj(icon_w, name_label, chname_label, exe_edit, folder_button, parent_f=layout_i)
+            self.layout_0.addWidget(widget_i)
+
+    def _init_add_line(self):
+        pass
+    
+    def _add_line(self):
+        pass
+
+
+    def _change_icon(self, index_f:int):
+        pass
+    def _edit_change(self):
+        pass
 
 
     
