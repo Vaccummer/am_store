@@ -213,6 +213,7 @@ Settings:
       namedit_max_length: 5*gap
       exeedit_min_ledngth: 2*gap
       add_line_height: het
+      tab_height: 1.2*het
     path:
       number_col_icon: './load/Settings/col_icons/opto_setting_window_icon.svg'
       icon_col_icon: './load/Settings/col_icons/opto_setting_window_icon.svg'
@@ -222,6 +223,11 @@ Settings:
       search_col_icon: './load/Settings/col_icons/opto_setting_window_icon.svg'
       searcher_icon: './load/Settings/col_icons/opto_setting_window_icon.svg'
       add_button_icon: './load/Settings/col_icons/opto_setting_window_icon.svg'
+      tab_delete:
+        - './load/Settings/col_icons/opto_setting_window_icon.svg'
+        - './load/Settings/col_icons/opto_setting_window_icon.svg'
+        - './load/Settings/col_icons/opto_setting_window_icon.svg'
+      add_sheet_button: './load/Settings/col_icons/opto_setting_window_icon.svg'
     color:
       col_background: transparent
       scrollbar_color: "#C3C3C3"
@@ -230,6 +236,7 @@ Settings:
       nameedit_background: "#F7F7F7"
       exeedit_background: ["#F7F7F7", "#FFC300", "#FF5733"] # 包括普通, 警告, 错误三种颜色
       add_button: ["black", "#9D8383", "#E99393"]  # 包括普通, 悬浮, 点击三种颜色
+      tab_button: ["#F7F7F7", "#FFC300", "#FF5733"]  # 包括普通, 悬浮, 点击三种颜色
     ori_line_num: 25
 # Searcher:  
 #   Size:

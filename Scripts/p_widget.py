@@ -83,6 +83,7 @@ class YohoPushButton(QPushButton):
             """)
         else:
             self.setStyleSheet(style_str)
+
 class ColorfulButton(QPushButton):
     def __init__(self, text:str, font:QFont, ori_color:str, hover_color:str, click_color:str):
         super().__init__()

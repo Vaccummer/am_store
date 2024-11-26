@@ -1341,8 +1341,6 @@ class ExePathLine(QLineEdit):
         '''
         self.setStyleSheet(self.style_sheet)
 
-        
-
 class NameEdit(QLineEdit):
     def __init__(self, text_f:str, font:QFont, height:int,
                  background_f:str="#F7F7F7",):
@@ -1359,6 +1357,90 @@ class NameEdit(QLineEdit):
             }}
         '''
         self.setStyleSheet(style_sheet)
+
+class SheetControl(QTabBar):
+    def __init__(self, parent:QWidget, color_l:List[str], icon_l:List[str]):
+        super().__init__(parent)
+    
+    def wheelEvent(self, event):
+        event.ignore()
+
+    def _stestyle(self, color_l:List[str], icon_l:List[str]):
+        style_sheet = f'''
+        QTabBar{{
+            border: none;
+            border-radius: 8px;
+            padding: 8px;
+            background: transparent; 
+        }}
+        QTabBar::tab {{
+            background: {color_l[0]};
+        }}
+        QTabBar::tab:selected {{
+            background: {color_l[2]};
+        }}
+        QTabBar::tab:hover {{
+            background: {color_l[1]};
+        }}
+        QTabBar::tab:!selected {{
+            margin-top: 2px; 
+        }}
+        QTabBar::close-button {{
+        image: url({icon_l[0]}); 
+        subcontrol-position: right; 
+        margin: 2px; 
+        }}
+        QTabBar::close-button:hover {{
+            image: url({icon_l[1]}); 
+        }}
+        QTabBar::close-button:pressed {{
+            image: url({icon_l[2]}); 
+        }}
+        '''
+        self.setTabsClosable(True)
+        self.setMovable(True) 
+        self.tabCloseRequested.connect(self.close_tab)
+        self.setContextMesnuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.open_context_menu)
+        self.setStyleSheet(style_sheet)
+    
+    def close_tab(self, index):
+        self.removeTab(index)
+    
+    def add_tab(self, name='new_sheet'):
+        text_l = self.get_texts()
+        for i in range(99):
+            name = f'{name}_{i}'
+            if name not in text_l:
+                break
+        widget = QWidget()  
+        self.tab_widget.addTab(widget, name)
+    
+    def get_texts(self):
+        texts = []
+        for index in range(self.tab_widget.count()):  
+            texts.append(self.tab_widget.tabText(index))  
+        return texts
+    
+    def open_context_menu(self, position): 
+        index = self.tab_widget.tabBar().tabAt(position)
+        if index == -1:
+            return
+        menu = QMenu()
+        rename_action = menu.addAction("Rename")
+        close_action = menu.addAction("Delete")
+
+        action = menu.exec_(self.tab_widget.mapToGlobal(position))
+        if action == rename_action:
+            self.rename_tab(index)
+        elif action == close_action:
+            self.close_tab(index)
+
+    def rename_tab(self, index):
+        current_name = self.tab_widget.tabText(index)
+        new_name, ok = QInputDialog.getText(self, "Rename Sheet", "Enter New Name:", text=current_name)
+        if ok and new_name.strip():
+            self.tab_widget.setTabText(index, new_name)
 
 class LauncherSetting(QWidget):
     def __init__(self, config:Config_Manager, parent:QMainWindow, manager:LauncherPathManager):
@@ -1555,9 +1637,18 @@ class LauncherSetting(QWidget):
         self.add_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.add_button.clicked.connect(self._insert_line)
     
-    def _bottom_control(self):
+    def _line_fresh(self, df_t:pandas.DataFrame):
         pass
 
+    def _bottom_control(self):
+        self.bottom_layout = amlayoutH('c')
+        self.tab_layout = amlayoutH('l', spacing=10)
+        tab_color = self.config.get('tab_button', obj='color')
+        tab_delete_icon = self.config.get('tab_delete', obj='path')
+        self.tab_bar = SheetControl(self, tab_color, tab_delete_icon)
+        self.tab_bar.setFixedHeight(self.config.get('tab_height', obj='Size'))
+        self.b_add_button = YohoPushButton(QIcon(self.config.get('add_sheet_button', obj='path')), self.line_height, an_type='resize')
+        self.b_add_button.clicked.connect(self.tab_bar.add_tab)
 
     def _insert_line(self):
         layout_i = amlayoutH()
