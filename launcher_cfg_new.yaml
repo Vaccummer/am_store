@@ -213,7 +213,8 @@ Settings:
       namedit_max_length: 5*gap
       exeedit_min_ledngth: 2*gap
       add_line_height: het
-      tab_height: 1.2*het
+      tab_height: 0.7*het
+      bottom_margin: [0, 30]
     path:
       number_col_icon: './load/Settings/col_icons/opto_setting_window_icon.svg'
       icon_col_icon: './load/Settings/col_icons/opto_setting_window_icon.svg'
@@ -237,6 +238,9 @@ Settings:
       exeedit_background: ["#F7F7F7", "#FFC300", "#FF5733"] # 包括普通, 警告, 错误三种颜色
       add_button: ["black", "#9D8383", "#E99393"]  # 包括普通, 悬浮, 点击三种颜色
       tab_button: ["#F7F7F7", "#FFC300", "#FF5733"]  # 包括普通, 悬浮, 点击三种颜色
+      save_button: ["#F7F7F7", "#FFC300", "#FF5733"]  # 包括普通, 悬浮, 点击三种颜色
+      discard_button: ["#F7F7F7", "#FFC300", "#FF5733"]  # 包括普通, 悬浮, 点击三种颜色
+      reset_button: ["#F7F7F7", "#FFC300", "#FF5733"]  # 包括普通, 悬浮, 点击三种颜色
     ori_line_num: 25
 # Searcher:  
 #   Size:

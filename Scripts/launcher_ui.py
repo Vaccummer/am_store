@@ -1359,21 +1359,27 @@ class NameEdit(QLineEdit):
         self.setStyleSheet(style_sheet)
 
 class SheetControl(QTabBar):
-    def __init__(self, parent:QWidget, color_l:List[str], icon_l:List[str]):
+    def __init__(self, parent:QWidget, color_l:List[str], icon_l:List[str], height:int):
         super().__init__(parent)
-    
+        self._stestyle(color_l, icon_l, height)
+        self.setFont(QFont("Consolas", 8))
+        self.setElideMode(Qt.ElideNone)
     def wheelEvent(self, event):
         event.ignore()
-
-    def _stestyle(self, color_l:List[str], icon_l:List[str]):
-        style_sheet = f'''
+    
+    def _stestyle(self, color_l:List[str], icon_l:List[str], height_f:int):
+        icon_l = [i.replace('\\', '/') for i in icon_l]
+        style_sheet = f"""
+        
         QTabBar{{
             border: none;
-            border-radius: 8px;
-            padding: 8px;
             background: transparent; 
         }}
         QTabBar::tab {{
+            margin-right: 10px;
+            padding: 5px 10px;
+            border-radius: 10px;
+            height: {height_f}px;  /* 设置标签高度 */
             background: {color_l[0]};
         }}
         QTabBar::tab:selected {{
@@ -1383,24 +1389,16 @@ class SheetControl(QTabBar):
             background: {color_l[1]};
         }}
         QTabBar::tab:!selected {{
-            margin-top: 2px; 
         }}
         QTabBar::close-button {{
-        image: url({icon_l[0]}); 
+        image: url("{icon_l[0]}"); 
         subcontrol-position: right; 
         margin: 2px; 
         }}
-        QTabBar::close-button:hover {{
-            image: url({icon_l[1]}); 
-        }}
-        QTabBar::close-button:pressed {{
-            image: url({icon_l[2]}); 
-        }}
-        '''
-        self.setTabsClosable(True)
+        """
+        #self.setTabsClosable(True)
         self.setMovable(True) 
-        self.tabCloseRequested.connect(self.close_tab)
-        self.setContextMesnuPolicy(Qt.CustomContextMenu)
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.open_context_menu)
         self.setStyleSheet(style_sheet)
     
@@ -1414,33 +1412,57 @@ class SheetControl(QTabBar):
             if name not in text_l:
                 break
         widget = QWidget()  
-        self.tab_widget.addTab(widget, name)
+        self.addTab(name)
     
     def get_texts(self):
         texts = []
-        for index in range(self.tab_widget.count()):  
-            texts.append(self.tab_widget.tabText(index))  
+        for index in range(self.count()):  
+            texts.append(self.tabText(index))  
         return texts
     
     def open_context_menu(self, position): 
-        index = self.tab_widget.tabBar().tabAt(position)
+        index = self.tabAt(position)
         if index == -1:
             return
         menu = QMenu()
         rename_action = menu.addAction("Rename")
         close_action = menu.addAction("Delete")
 
-        action = menu.exec_(self.tab_widget.mapToGlobal(position))
+        action = menu.exec_(self.mapToGlobal(position))
         if action == rename_action:
             self.rename_tab(index)
         elif action == close_action:
             self.close_tab(index)
 
     def rename_tab(self, index):
-        current_name = self.tab_widget.tabText(index)
+        current_name = self.tabText(index)
         new_name, ok = QInputDialog.getText(self, "Rename Sheet", "Enter New Name:", text=current_name)
         if ok and new_name.strip():
-            self.tab_widget.setTabText(index, new_name)
+            self.setTabText(index, new_name)
+
+class ChangeControl(QPushButton):
+    def __init__(self, text_f:str, colors:List[str], font:QFont, height:int):
+        super().__init__()
+        self.setText(text_f)
+        self.setFont(font)
+        self.setFixedHeight(height)
+        self._setstyle(colors)
+    
+    def _setstyle(self, colors):
+        style_sheet = f'''
+        QPushButton {{
+            background-color: {colors[0]};
+            border-radius: 10px;
+            padding: 10px;
+        }}
+        QPushButton:hover {{
+            background-color: {colors[1]};
+        }}
+        QPushButton:pressed {{
+            background-color: {colors[2]};
+        }}
+        '''
+        self.setStyleSheet(style_sheet)
 
 class LauncherSetting(QWidget):
     def __init__(self, config:Config_Manager, parent:QMainWindow, manager:LauncherPathManager):
@@ -1456,8 +1478,10 @@ class LauncherSetting(QWidget):
         self._init_layout()
         self._init_multi_line()
         self._init_add_line()
+        self._bottom_control()
         add_obj(self.add_button, parent_f=self.obj_layout)
         add_obj(self.title_layout, self.scroll_area,parent_f=self.layout_0)
+        self.layout_0.addLayout(self.bottom_layout)
     
     def _layout_set(self):
         self.layout_0 = amlayoutV(align_h='c', spacing=5)
@@ -1466,6 +1490,9 @@ class LauncherSetting(QWidget):
     
     def _load(self):
         self.df = self.manager.df
+        self.dfc = self.df.copy(deep=True)
+        self.dfc['IconData'] = ''
+        self.default_app_icon = self.config.get('default_button_icon', 'Launcher', 'shortcut_button', 'path')
         self.name_font = self.config.get('name', obj='font')
         self.chname_font = self.config.get('chname', obj='font')
         self.exe_font = self.config.get('exe', obj='font')
@@ -1477,6 +1504,9 @@ class LauncherSetting(QWidget):
         self.nameedit_color = self.config.get('nameedit_background', obj='color')
         self.exeedit_min_length = self.config.get('exeedit_min_ledngth', obj='Size')
         self.exeedit_color = self.config.get('exeedit_background', obj='color')
+        self.tab_height = self.config.get('tab_height', obj='Size')
+        self.bottom_margin = self.config.get('bottom_margin', obj='Size')
+        
         self.objs_l = {}
         self.widget_l = []
     
@@ -1568,11 +1598,10 @@ class LauncherSetting(QWidget):
 
     def _init_single_line(self, index_f:int, df:pandas.DataFrame=None, default:bool=False):
         if default is not False:
-            icon_i = QIcon(self.config.get('default_button_icon', 'Launcher', 'shortcut_button', 'path'))
-            name = 'Launcher'
-            chname = '启动器'
-            #exe_path = os.getcwd()
-            exe_path = r'c:\Windows\servicing\InboxFodMetadataCache\metadata\Language.Basic~ar-sa~1.0.mum'
+            icon_i = QIcon(self.default_app_icon)
+            name = ''
+            chname = ''
+            exe_path = ''
         else:
             name = df.iloc[index_f, 0]
             icon_i = self.manager.get_icon(name)
@@ -1637,19 +1666,44 @@ class LauncherSetting(QWidget):
         self.add_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.add_button.clicked.connect(self._insert_line)
     
-    def _line_fresh(self, df_t:pandas.DataFrame):
-        pass
+    def _line_fresh(self, name_f:str):
+        if name_f not in self.df.loc['Group'].tolist():
+            self.widget_l[0].setVisiable(True)
+            self.objs_l[0]['name'].setText('')
+            self.objs_l[0]['chname'].setText('')
+            self.objs_l[0]['exe'].setText('')
+            self.objs_l[0]['icon'].setIcon(QIcon(self.default_app_icon))
+            for i in range(1, self.num):
+                self.widget_l[i].setVisiable(False)
+            return
+        df_n = self.df[self.df['Group']==name_f]
 
     def _bottom_control(self):
-        self.bottom_layout = amlayoutH('c')
+        self.bottom_layout = amlayoutH('c', spacing=25)
+        
+        self.tab_wdiget = QWidget()
         self.tab_layout = amlayoutH('l', spacing=10)
+        self.tab_wdiget.setLayout(self.tab_layout)
         tab_color = self.config.get('tab_button', obj='color')
         tab_delete_icon = self.config.get('tab_delete', obj='path')
-        self.tab_bar = SheetControl(self, tab_color, tab_delete_icon)
-        self.tab_bar.setFixedHeight(self.config.get('tab_height', obj='Size'))
+        self.tab_bar = SheetControl(self, tab_color, tab_delete_icon, int(0.8*self.tab_height))
+        self.tab_bar.add_tab('haha')
+        self.tab_bar.setFixedHeight(self.tab_height)
         self.b_add_button = YohoPushButton(QIcon(self.config.get('add_sheet_button', obj='path')), self.line_height, an_type='resize')
         self.b_add_button.clicked.connect(self.tab_bar.add_tab)
-
+        self.tab_layout.addWidget(self.tab_bar)
+        add_obj(self.b_add_button, parent_f=self.tab_layout)
+        self.save_button = ChangeControl('Save', self.config.get('save_button', obj='color'), self.config.get('save_button', obj='font'), self.line_height)
+        self.save_button.clicked.connect(self._save)
+        self.reset_button = ChangeControl('Reset', self.config.get('reset_button', obj='color'), self.config.get('set_button', obj='font'), self.line_height)
+        self.reset_button.clicked.connect(self._reset)
+        # self.discard_button = ChangeControl('Discard', self.config.get('discard_button', obj='color'), self.config.get('discard_button', obj='font'), self.line_height)
+        # self.discard_button.clicked.connect(self._discard)
+        self.bottom_layout.setContentsMargins(self.bottom_margin[0], 0, self.bottom_margin[1], 0)
+        self.bottom_layout.addWidget(self.tab_wdiget)
+        self.bottom_layout.addStretch()
+        add_obj(self.save_button, self.reset_button, parent_f=self.bottom_layout)
+        
     def _insert_line(self):
         layout_i = amlayoutH()
         layout_i.setMargin(0)
@@ -1668,5 +1722,11 @@ class LauncherSetting(QWidget):
     def _exe_search(self, index_f:int):
         pass
     
+    def _reset(self):
+        pass
 
+    def _discard(self):
+        pass
 
+    def _save(self):
+        pass

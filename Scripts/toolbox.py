@@ -401,12 +401,12 @@ def amlayoutV(align_h:Literal['l','r','c']=None, align_v:Literal['t','b','c']=No
 
 def add_obj(*args, parent_f:Union[QHBoxLayout, QVBoxLayout]):
     for arg_i in args:
-        if isinstance(arg_i, QWidget):
-            parent_f.addWidget(arg_i)
-        elif isinstance(arg_i, QHBoxLayout):
+        if isinstance(arg_i, QHBoxLayout):
             parent_f.addLayout(arg_i)
         elif isinstance(arg_i, QVBoxLayout):
             parent_f.addLayout(arg_i)
+        else:
+            parent_f.addWidget(arg_i)
     return parent_f
 
 
@@ -572,9 +572,13 @@ class Config_Manager(object):
 
     def after_process(self, args_a:tuple, target_f):
         if "path" in args_a:
-           if os.path.isabs(target_f):
+
+            if isinstance(target_f, list):
+                return [str((pathlib.Path(self.wkdr)/pathlib.Path(i)).resolve()) for i in target_f]
+            elif os.path.isabs(target_f):
                return target_f
-           return str((pathlib.Path(self.wkdr)/pathlib.Path(target_f)).resolve())
+            else:
+                return str((pathlib.Path(self.wkdr)/pathlib.Path(target_f)).resolve())
         elif "font" in args_a:
             font_dict = {i[0]:i[1] for i in target_f}
             return font_get(font_dict)
