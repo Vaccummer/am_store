@@ -318,6 +318,7 @@ def font_get(para_dict_f={"Family":None,
             dict_f = {'font_f':font_f,
                       'value':value}
             exec(f'font_f.set{key}(value)', dict_f)
+    
     return font_f
 
 def parse_ssh_config(file_path, fliter:Literal['all'] | None | List[str]):
@@ -594,6 +595,7 @@ class LauncherPathManager(object):
         self._read_xlsx()
         self.check()
         self._load_icon_dict()
+        self.conduct_l = []
     
     def _read_xlsx(self):
         xls = pd.ExcelFile(self.data_path)
@@ -618,37 +620,45 @@ class LauncherPathManager(object):
         self.df['EXE Path'] = self.df['EXE Path'].apply(lambda x: x if os.path.exists(x) else "")
     
     def _load_icon_dict(self):
-        self.default_app_icon = QIcon(self.config.get('default_app_icon', mode="Launcher", widget='associate_list', obj="path"))
+        self.default_app_icon_path = self.config.get('default_app_icon', mode="Launcher", widget='associate_list', obj="path")
+        self.default_app_icon = QIcon(self.default_app_icon_path)
         self.app_icon_folder = self.config.get('app_icon_folder', mode="Launcher", widget='associate_list', obj="path")
         self.app_icon_d = {}
         for name_i in os.listdir(self.app_icon_folder):
             path_i = os.path.join(self.app_icon_folder, name_i)
             if os.path.isfile(path_i):
                 app_name, ext = os.path.splitext(name_i)
+                if app_name not in self.df['Name'].to_list():
+                    os.remove(path_i)
+                    continue
                 self.app_icon_d[app_name] = path_i
         self.exe_icon_getter = self.config.get('exe_icon_getter', mode="Launcher", widget='associate_list', obj="path").replace('\\', '/')
     
     def get_icon(self, name:str)->QIcon:
         # index_i = self.df.loc[self.df['Name'] == name].index[0]
+        if name == '360broswer':
+            a = 1
         icon_l = self.app_icon_d.get(name, "")
         if icon_l:
             return QIcon(icon_l)
         else:
-            exe_t = self.df[self.df['Name']==name]['EXE Path'].values[0]
+            exe_t = self.df[self.df['Name']==name]['EXE Path'].values[0].strip()
             target_icon_path = os.path.join(self.app_icon_folder, name).replace('\\', '/')
-            if exe_t.endswith('.exe'):
+            if exe_t.endswith('.exe') and (name not in self.conduct_l):
+                self.conduct_l.append(name)
                 commands_f = [self.exe_icon_getter, exe_t, target_icon_path+'.png']
                 #print(commands_f)
                 result = subprocess.check_output(commands_f, cwd=os.path.dirname(self.exe_icon_getter)).decode('gbk')
                 #result = subprocess.run(commands_f, cwd=self.config.wkdr, capture_output=True, text=True)
                 # out_f = result.stdout
                 if result and "图标已保存为" in result:
-                    print(1)
                     self.app_icon_d[name] = (target_icon_path+'.png').replace('/', '\\')
                     return QIcon(target_icon_path+'.png')
                 else:
-                    return self.default_app_icon
+                    self.app_icon_d[name] = self.default_app_icon
+                    return self.default_app_icon               
             else:
+                self.app_icon_d[name] = self.default_app_icon
                 return self.default_app_icon
 
 class ShortcutsPathManager(object):
@@ -757,41 +767,7 @@ class SshManager(object):
         except Exception as e:
             return 0
 
-class InfoTip(QWidget):
-    def __init__(self, parent:Union[QWidget, QMainWindow], 
-                 type_f:Literal['Info', 'Warning', 'Error'], 
-                 icon:QIcon,
-                 prompt_f:str, choices:OrderedDict):
-        super().__init__(parent)
-    
-    def _init_ui(self):
-        self.layout0 = amlayoutH()
-        self.layout_tile = amlayoutH(spacing=15)
-        self.layout_prompt = amlayoutH()
-        self.layout_button = amlayoutH()
-        self.layout_button.setContentsMargins(0, 0, 0, 0)
-
-        self.title_icon = QLabel()
-        self.title_icon.setPixmap(self.icon.pixmap(32, 32))
-        self.title_icon.setFixedSize(32, 32)
-        self.title_icon.setAlignment(Qt.AlignCenter)
-
-        self.title_name = QLabel(self.type)
-        self.title_name.setFont(font_get({'Family':'Microsoft YaHei', 'PointSize':12, 'Bold':True}))
-        self.title_name.setAlignment(Qt.AlignLeft)
-
-        self.promt_label = QLabel(self.prompt)
-        self.promt_label.setFont(font_get({'Family':'Microsoft YaHei', 'PointSize':10}))
-        self.promt_label.setWordWrap(True)
-        self.promt_label.setAlignment(Qt.AlignLeft)
 
 
     
 
-class InfoTip(QWidget):
-    def __init__(self, parent = ..., f = ...):
-        super().__init__(parent, f)
-
-class ConfirmTip(QWidget):
-    def __init__(self, parent = ..., f = ...):
-        super().__init__(parent, f)

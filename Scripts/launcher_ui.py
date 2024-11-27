@@ -1035,7 +1035,7 @@ class ShortcutSetting(QWidget):
         self._init_title()
         self._init_colname()
         self._init_obj()
-        self._init_action_button()
+        #self._init_action_button()
         self.setLayout(self.layout_0)
 
     def _init_title(self):
@@ -1401,10 +1401,7 @@ class SheetControl(QTabBar):
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.open_context_menu)
         self.setStyleSheet(style_sheet)
-    
-    def close_tab(self, index):
-        self.removeTab(index)
-    
+
     def get_texts(self):
         texts = []
         for index in range(self.count()):  
@@ -1430,15 +1427,10 @@ class SheetControl(QTabBar):
 
         action = menu.exec_(self.mapToGlobal(position))
         if action == rename_action:
-            self.rename_tab(index)
+            self.up.rename_tab(index)
         elif action == close_action:
-            self.close_tab(index)
+            self.up.close_tab(index)
 
-    def rename_tab(self, index):
-        current_name = self.tabText(index)
-        new_name, ok = QInputDialog.getText(self, "Rename Sheet", "Enter New Name:", text=current_name)
-        if ok and new_name.strip():
-            self.setTabText(index, new_name)
 
 class LauncherSetting(QWidget):
     def __init__(self, config:Config_Manager, parent:QMainWindow, manager:LauncherPathManager):
@@ -1467,12 +1459,13 @@ class LauncherSetting(QWidget):
         self.obj_layout.addStretch()
         add_obj(self.title_layout, self.scroll_area,parent_f=self.layout_0)
         self.layout_0.addLayout(self.bottom_layout)
-        self._line_fresh()
+        self._line_fresh(0)
     
     def _load(self):
         self.df = self.manager.df
         self.dfc = self.df.copy(deep=True)
-        self.dfc['IconPath'] = ''
+        self.dfc['IconID'] = None
+        self.tmp_icon_folder = self.config.get('tmp_icon_folder', obj='path')
         self.default_app_icon = self.config.get('default_button_icon', 'Launcher', 'shortcut_button', 'path')
         self.name_font = self.config.get('name', obj='font')
         self.chname_font = self.config.get('chname', obj='font')
@@ -1591,15 +1584,16 @@ class LauncherSetting(QWidget):
             exe_path = df.iloc[index_f, 3]
             if os.path.isfile(exe_path):
                 exe_path = os.path.basename(exe_path)
-        nummber_w = QLabel(str(index_f))
+        index_i = len(self.objs_l.keys())
+        nummber_w = QLabel(str(index_i))
         nummber_w.setFont(self.config.get('number', obj='font'))
         nummber_w.setAlignment(Qt.AlignCenter)
         nummber_w.setStyleSheet("background-color: transparent; border: none;text-align: center;")
         nummber_w.setFixedWidth(self.line_height)
         nummber_w.setFixedHeight(self.line_height)
         icon_w = YohoPushButton(icon_i, self.line_height, 'shake')
-        icon_w.setProperty('index', index_f)
-        icon_w.clicked.connect(lambda: self._change_icon(index_f))
+        icon_w.setProperty('index', index_i)
+        icon_w.clicked.connect(lambda: self._change_icon(index_i))
         name_label = NameEdit(name, self.name_font, self.line_height, self.nameedit_color)
         name_label.setMaximumWidth(self.nameedit_length)
         chname_label = NameEdit(chname, self.chname_font, self.line_height, self.nameedit_color)
@@ -1612,7 +1606,8 @@ class LauncherSetting(QWidget):
         self.objs_l[len(self.objs_l.keys())] = {'number':nummber_w, 'icon':icon_w, 'name':name_label, 'chname':chname_label, 'exe':exe_edit, 'search':folder_button}
         layout_i = amlayoutH()
         layout_i.setMargin(0)
-        widget_i = QWidget()
+        setattr(self, f'widget_{len(self.objs_l.keys())}', QWidget())
+        widget_i = getattr(self, f'widget_{len(self.objs_l.keys())}')
         widget_i.setLayout(layout_i)
         add_obj(nummber_w, icon_w, name_label, chname_label, exe_edit, folder_button, parent_f=layout_i)
         self.widget_l.append(widget_i)
@@ -1663,11 +1658,13 @@ class LauncherSetting(QWidget):
         self.add_button_lo.setContentsMargins(self.add_button_margin[0], 0, self.add_button_margin[1], 0)
         add_obj(self.add_button, parent_f=self.add_button_lo)
     
-    def _line_fresh(self):
+    def _line_fresh(self, index_f:int):
+        name_f = self.tab_bar.tabText(index_f)
         self.line_num = 0
-        name_f = self.tab_bar.get_current_text()
+        #name_f = self.tab_bar.get_current_text()
         if name_f not in set(self.dfc.loc[:,'Group'].tolist()):
             self.widget_l[0].setVisible(True)
+            self.objs_l[0]['number'].setText('0')
             self.objs_l[0]['name'].setText('')
             self.objs_l[0]['chname'].setText('')
             self.objs_l[0]['exe'].setText('')
@@ -1681,20 +1678,20 @@ class LauncherSetting(QWidget):
             if i >= self.num:
                 self._insert_line()
             self.widget_l[i].setVisible(True)
+            self.objs_l[i]['number'].setText(str(i))
             self.objs_l[i]['name'].setText(df_n.iloc[i, 0])
             self.objs_l[i]['chname'].setText(df_n.iloc[i, 1])
             self.objs_l[i]['exe'].setText(df_n.iloc[i, 3])
             icon_c = df_n.iloc[i,-1]
-            if icon_c:
+            if False:
                 self.objs_l[i]['icon'].setIcon(QIcon(df_n.iloc[i, -1]))
             else:
                 icon_d = self.manager.get_icon(df_n.iloc[i, 0])
                 self.objs_l[i]['icon'].setIcon(icon_d)
             self.line_num += 1
-        for i in range(self.num):
+        for i in range(len(self.widget_l)):
             if i >= df_n.shape[0]:
                 self.widget_l[i].setVisible(False)
-        self.line_num = df_n.shape[0]
     
     def _bottom_control(self):
         self.bottom_layout = amlayoutH('c', spacing=25)
@@ -1704,15 +1701,17 @@ class LauncherSetting(QWidget):
         tab_color = self.config.get('tab_button', obj='color')
         tab_delete_icon = self.config.get('tab_delete', obj='path')
         self.tab_bar = SheetControl(self, tab_color, tab_delete_icon, int(0.8*self.tab_height))
+        
         for name_i in set(self.dfc.loc[:, 'Group'].to_list()):
             self.tab_bar.addTab(name_i)
         self.tab_bar.currentChanged.connect(self._line_fresh)
         self.tab_bar.setCurrentIndex(0)
         self.tab_bar.setFixedHeight(self.tab_height)
         self.b_add_button = YohoPushButton(QIcon(self.config.get('add_sheet_button', obj='path')), self.line_height, an_type='resize')
-        self.b_add_button.clicked.connect(self.tab_bar.addTab)
+        self.b_add_button.clicked.connect(self.add_tab)
         self.tab_layout.addWidget(self.tab_bar)
         add_obj(self.b_add_button, parent_f=self.tab_layout)
+        
         self.save_button = ColorfulButton('Save', self.config.get('save_button', obj='color'), self.config.get('save_button', obj='font'), self.line_height)
         self.save_button.clicked.connect(self._save)
         self.reset_button = ColorfulButton('Reset', self.config.get('reset_button', obj='color'), self.config.get('set_button', obj='font'), self.line_height)
@@ -1739,10 +1738,40 @@ class LauncherSetting(QWidget):
                 break
         self.tab_bar.addTab(name_t)
         if refresh:
-            self._line_fresh(name_t)
+            self._line_fresh(self.tab_bar.count()-1)
+    
+    def rename_tab(self, index):
+        current_name = self.tab_bar.tabText(index)
+        new_name, ok = QInputDialog.getText(self, "Rename Sheet", "Enter New Name:", text=current_name)
+        if ok and new_name.strip():
+            self.tab_bar.setTabText(index, new_name)
+        self.dfc['Group'] = self.dfc['Group'].replace(current_name, new_name)
+    
+    def close_tab(self, index):
+        tip_prompt = f'Are you sure to DELETE sheet "{self.tab_bar.tabText(index)}"?'
+        out_f = self.up.tip('Warning', tip_prompt, {'Yes':True, 'No':False}, False)
+        if out_f:
+            self.tab_bar.removeTab(index)
+            self.dfc = self.dfc[self.dfc['Group']!=self.tab_bar.tabText(index)]
     
     def _change_icon(self, index_f:int):
-        pass
+        file_filter = "Images (*.svg *.png *.jpg *.jpeg *.ico)"
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select an image", "", file_filter)
+        if not file_path:
+            return
+        icon_i = QIcon(file_path)
+        self.objs_l[index_f]['icon'].setIcon(icon_i)
+        _, ext = os.path.splitext(file_path)
+        id_l = self.dfc.loc[:,'IconID'].to_list()
+        name = self.objs_l[index_f]['name'].text()
+        id_ls = [i.split('.')[0] for i in id_l if i]
+        if name in id_ls:
+            for path_i in glob(os.path.join(self.tmp_icon_folder, f'{name}.*')):
+                os.remove(path_i)
+        
+        self.dfc.loc[index_f, 'IconID'] = f'{name}{ext}'
+        dst = os.path.join(self.tmp_icon_folder, f'{name}{ext}')
+        shutil.copy(file_path, dst)
     
     def _edit_change(self):
         pass
@@ -1759,38 +1788,52 @@ class LauncherSetting(QWidget):
     def _save(self):
         pass
 
-class InfoTip(QWidget):
-    def __init__(self, parent:Union[QWidget, QMainWindow, None], 
-                 config:Config_Manager,
-                 type_f:Literal['Info', 'Warning', 'Error'], prompt_f:str, 
-                 buttons:OrderedDict[str,Union[str, Dict[Literal['colors', 'size', 'value', 'font'], Union[bool, str, int, QFont]]]]):
-        super().__init__(parent)
-        self.config = config.deepcopy()
+class InfoTip(QDialog):
+    def __init__(self, parent,
+                 type_f:Literal['Info', 'Warning', 'Error'], 
+                 prompt_f:str, 
+                 buttons:OrderedDict[str,Union[str, Dict[Literal['colors', 'value',], Union[bool, str, List[str]]]]],
+                 config:Config_Manager=None,):
+        super().__init__()
+        self.VALUE = -10
+        if config and not hasattr(self, 'config'):
+            self._load_config(config)
         self.config.group_chose(mode='MainWindow', widget='Tip')
         self.type = type_f
         self.prompt = prompt_f
         self.buttons = buttons
-
+        self._load()
+        self._init_ui()
+        self._setStyle()
+    
+    @classmethod
+    def _load_config(cls, config:Config_Manager):
+        cls.config = config.deepcopy()
+    
     def _load(self):
         self.button_margin = self.config.get('button_margin', obj='Size')
         self.prompt_margin = self.config.get('prompt_margin', obj='Size')
-        self.title_icon = QIcon(self.config.get(f'{self.type}_icon', obj='path'))
+        self.title_icon_i = QIcon(self.config.get(f'{self.type}_icon', obj='path'))
         self.title_height = self.config.get('title_height', obj='Size')
         self.title_font = self.config.get('title', obj='font')
         self.prompt_font = self.config.get('prompt', obj='font')
         self.button_font = self.config.get('button', obj='font')
+        self.button_size = self.config.get('button_size', obj='Size')
+        self.button_colors = self.config.get('button', obj='color')
         self.widget_size = self.config.get('widget_size', obj='Size')
     
     def _init_ui(self):
-        self.layout0 = amlayoutH()
+        self.layout0 = amlayoutV()
+        self.setLayout(self.layout0)
         self.layout_tile = amlayoutH(spacing=15)
         self.layout_prompt = amlayoutH()
         self.layout_prompt.setContentsMargins(self.prompt_margin[0], 0, self.prompt_margin[1], 0)
         self.layout_button = amlayoutH()
         self.layout_button.setContentsMargins(self.button_margin[0], 0, self.button_margin[1], 0)
+        self.setFont(self.title_font)
         
         self.title_icon = QLabel()
-        self.title_icon.setPixmap(self.title_icon.pixmap(self.title_height, self.title_height))
+        self.title_icon.setPixmap(self.title_icon_i.pixmap(self.title_height, self.title_height))
         self.title_icon.setFixedSize(self.title_height, self.title_height)
         self.title_icon.setAlignment(Qt.AlignCenter)
 
@@ -1805,10 +1848,12 @@ class InfoTip(QWidget):
         self.promt_label.setAlignment(Qt.AlignCenter)
         self.layout_prompt.addWidget(self.promt_label)
 
-        for name in self.buttons.keys():
-            button_i  = ColorfulButton(name, self.buttons[name]['colors'], self.buttons[name]['font'], self.buttons[name]['size'])
+        for name, value in self.buttons.items():
+            button_i  = ColorfulButton(name, self.button_colors, self.font(), self.button_size[-1])
+            button_i.setProperty('value', value)
+            button_i.setFixedSize(QSize(*self.button_size))
             self.layout_button.addWidget(button_i)
-            button_i.clicked.connect(lambda: self._return(self.buttons[name]['value']))
+            button_i.clicked.connect(self._return)
         
         add_obj(self.layout_tile, self.layout_prompt, self.layout_button, parent_f=self.layout0)
         self.setFixedSize(QSize(*self.widget_size))
@@ -1820,7 +1865,10 @@ class InfoTip(QWidget):
                 border-radius: 10px;
             }}
         '''
-    def _return(self, value):
-        self.VALUE = value  
-        self.hide()
+        self.setStyleSheet(style_sheet)
     
+    def _return(self):
+        button = self.sender()
+        self.VALUE = button.property('value')
+        super().accept()
+

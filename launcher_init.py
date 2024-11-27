@@ -22,7 +22,8 @@ class BaseLauncher(QMainWindow):
         self._init_para()
         self.createTrayIcon()
         self._mainwindow_set()
-    
+        tip = InfoTip(self, "Info", "Test OK", {}, self.config.deepcopy())
+        tip.close()
     # For mouse control
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -55,9 +56,7 @@ class BaseLauncher(QMainWindow):
     def isNearEdge(self, pos):
         x, y, w, h = self.get_geometry(self)
         return (
-            pos.x() < self.edge_threshold or
             pos.x() > w - self.edge_threshold or
-            pos.y() < self.edge_threshold or
             pos.y() > h - self.edge_threshold
         )
     def resizeWindow(self, pos):
@@ -141,7 +140,21 @@ class BaseLauncher(QMainWindow):
         self.launcher_data = LauncherPathManager(self.config)
         self.shortcut_data = ShortcutsPathManager(self.config)
         self.ssh_manager = SshManager(self.config)
-        
+    
+    def tip(self, title:str, prompt_f:str, value_d:dict, default_v):
+        keys = list(value_d.keys())
+        values = list(value_d.values())
+        value_dn = {keys[i]: i for i in range(len(keys)) }
+        tip = InfoTip(self, title, prompt_f, value_dn)
+        if tip.exec_() == QDialog.Accepted:
+            return_i = tip.VALUE
+            tip.close()
+        else:
+            return_i = -10
+        if return_i < -2:
+            return default_v
+        return values[return_i]
+
     @staticmethod
     def restart_program(script_path):
         os.system(f"python {script_path}")
@@ -248,7 +261,10 @@ class UILauncher(BaseLauncher):
         # self.progress_bar.setFixedWidth(max(50, line_edit_width - 150))
 
 if __name__ == "__main__":
+    # QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
+    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
     app = QApplication([])
+
     config  = yml.read(r'launcher_cfg_new.yaml')
     launcher = UILauncher(config, app)
     launcher.show()

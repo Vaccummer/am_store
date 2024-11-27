@@ -80,9 +80,11 @@ MainWindow:
       button: [[Family, *yahei], [PixelSize, 30]]
     color: 
       background: "#FFFFFF"
+      button: ["#F7F7F7", "#FFC300", "#FF5733"]
     Size:
       widget_size: [0.5*win_x, 0.5*win_y]
       button_margin: [gap, gap]
+      button_size: [gap, het]
       prompt_margin: [gap, gap]
       title_height: het
     path:
@@ -121,9 +123,9 @@ Launcher:
     font: 
       main: [[Family, *yahei], [PixelSize, 50]]
     path:
-      file_icon_folder: './load/Launcher/assoicate_list/default_icon_folder'
-      app_icon_folder: './load/Launcher/assoicate_list/app_icon_folder'
-      default_button_icon: &default_button_icon './load/Launcher/shortcut_setting/default/default_button_icon.svg'
+      file_icon_folder: './load/Launcher/file_icons'
+      app_icon_folder: './load/Launcher/app_icons'
+      default_app_icon: &default_button_icon './load/Launcher/shortcut_setting/default/default_button_icon.svg'
       default_folder_icon: &default_folder_icon './load/Launcher/shortcut_setting/default/default_button_icon.svg'
       default_file_icon: &default_file_icon './load/Launcher/shortcut_setting/default/default_button_icon.svg'
       download_save_dir: './load/Launcher/assoicate_list/download'
@@ -245,6 +247,7 @@ Settings:
         - './load/Settings/col_icons/opto_setting_window_icon.svg'
         - './load/Settings/col_icons/opto_setting_window_icon.svg'
       add_sheet_button: './load/Settings/col_icons/opto_setting_window_icon.svg'
+      tmp_icon_folder: './tmp/icon'
     color:
       col_background: transparent
       scrollbar_color: "#C3C3C3"

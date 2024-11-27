@@ -357,31 +357,5 @@ class InputLine(QLineEdit):
         '''
         #self.horizontalScrollBar().setStyleSheet(self.scroll_bar_style_sheet)
 
-class InfoTip(QWidget):
-    def __init__(self, parent:Union[QWidget, QMainWindow, None], 
-                 type_f:Literal['Info', 'Warning', 'Error'], 
-                 icon:QIcon,
-                 prompt_f:str, buttons:OrderedDict):
-        super().__init__(parent)
 
-    def _init_ui(self, type_f:str, icon_f:QIcon, prompt_f:str, 
-                 buttons:OrderedDict[str,Union[str, List[str], bool, QSize]]):
-        self.layout0 = amlayoutH()
-        self.layout_tile = amlayoutH(spacing=15)
-        self.layout_prompt = amlayoutH()
-        self.layout_button = amlayoutH()
-        self.layout_button.setContentsMargins(0, 0, 0, 0)
-
-        self.title_icon = QLabel()
-        self.title_icon.setPixmap(icon_f.pixmap(32, 32))
-        self.title_icon.setFixedSize(32, 32)
-        self.title_icon.setAlignment(Qt.AlignCenter)
-
-        self.title_name = QLabel(self.type)
-        self.title_name.setFont(font_get({'Family':'Microsoft YaHei', 'PointSize':12, 'Bold':True}))
-        self.title_name.setAlignment(Qt.AlignLeft)
-
-        self.promt_label = QLabel(self.prompt)
-        self.promt_label.setFont(font_get({'Family':'Microsoft YaHei', 'PointSize':10}))
-        self.promt_label.setWordWrap(True)
-        self.promt_label.setAlignment(Qt.AlignCenter)
+    
