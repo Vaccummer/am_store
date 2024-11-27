@@ -23,9 +23,8 @@ async def copy_file_chunk(src:str, dst:str, chunk_size:int, bar:QProgressBar):
             await fdst.write(chunk)
             # update progress bar here 
 
-
 class Associate:
-    def __init__(self, nums:Config_Manager, 
+    def __init__(self, nums:int, 
                  program_info_df:pandas.DataFrame):
         self.num = nums
         self.df = program_info_df
@@ -1233,7 +1232,7 @@ class Terminal(QTextEdit):
     def __init__(self, config:Config_Manager, parent:QMainWindow):
         super().__init__(parent)
         self.name = 'Terminal'
-        self.config=config
+        self.config=config.deepcopy()
         self.config.group_chose(mode='Terminal', widget=None)
         self._setstyle()
     def _setstyle(self):
@@ -1441,36 +1440,12 @@ class SheetControl(QTabBar):
         if ok and new_name.strip():
             self.setTabText(index, new_name)
 
-class ChangeControl(QPushButton):
-    def __init__(self, text_f:str, colors:List[str], font:QFont, height:int):
-        super().__init__()
-        self.setText(text_f)
-        self.setFont(font)
-        self.setFixedHeight(height)
-        self._setstyle(colors)
-    
-    def _setstyle(self, colors):
-        style_sheet = f'''
-        QPushButton {{
-            background-color: {colors[0]};
-            border-radius: 10px;
-            padding: 10px;
-        }}
-        QPushButton:hover {{
-            background-color: {colors[1]};
-        }}
-        QPushButton:pressed {{
-            background-color: {colors[2]};
-        }}
-        '''
-        self.setStyleSheet(style_sheet)
-
 class LauncherSetting(QWidget):
     def __init__(self, config:Config_Manager, parent:QMainWindow, manager:LauncherPathManager):
         super().__init__(parent)
         self.up = parent
         self.manager = manager
-        self.config = config
+        self.config = config.deepcopy()
         self.name = 'LauncherSetting'
         self.config.group_chose(mode='Settings', widget=self.name)
         self._layout_set()
@@ -1738,9 +1713,9 @@ class LauncherSetting(QWidget):
         self.b_add_button.clicked.connect(self.tab_bar.addTab)
         self.tab_layout.addWidget(self.tab_bar)
         add_obj(self.b_add_button, parent_f=self.tab_layout)
-        self.save_button = ChangeControl('Save', self.config.get('save_button', obj='color'), self.config.get('save_button', obj='font'), self.line_height)
+        self.save_button = ColorfulButton('Save', self.config.get('save_button', obj='color'), self.config.get('save_button', obj='font'), self.line_height)
         self.save_button.clicked.connect(self._save)
-        self.reset_button = ChangeControl('Reset', self.config.get('reset_button', obj='color'), self.config.get('set_button', obj='font'), self.line_height)
+        self.reset_button = ColorfulButton('Reset', self.config.get('reset_button', obj='color'), self.config.get('set_button', obj='font'), self.line_height)
         self.reset_button.clicked.connect(self._reset)
         # self.discard_button = ChangeControl('Discard', self.config.get('discard_button', obj='color'), self.config.get('discard_button', obj='font'), self.line_height)
         # self.discard_button.clicked.connect(self._discard)
@@ -1783,3 +1758,69 @@ class LauncherSetting(QWidget):
 
     def _save(self):
         pass
+
+class InfoTip(QWidget):
+    def __init__(self, parent:Union[QWidget, QMainWindow, None], 
+                 config:Config_Manager,
+                 type_f:Literal['Info', 'Warning', 'Error'], prompt_f:str, 
+                 buttons:OrderedDict[str,Union[str, Dict[Literal['colors', 'size', 'value', 'font'], Union[bool, str, int, QFont]]]]):
+        super().__init__(parent)
+        self.config = config.deepcopy()
+        self.config.group_chose(mode='MainWindow', widget='Tip')
+        self.type = type_f
+        self.prompt = prompt_f
+        self.buttons = buttons
+
+    def _load(self):
+        self.button_margin = self.config.get('button_margin', obj='Size')
+        self.prompt_margin = self.config.get('prompt_margin', obj='Size')
+        self.title_icon = QIcon(self.config.get(f'{self.type}_icon', obj='path'))
+        self.title_height = self.config.get('title_height', obj='Size')
+        self.title_font = self.config.get('title', obj='font')
+        self.prompt_font = self.config.get('prompt', obj='font')
+        self.button_font = self.config.get('button', obj='font')
+        self.widget_size = self.config.get('widget_size', obj='Size')
+    
+    def _init_ui(self):
+        self.layout0 = amlayoutH()
+        self.layout_tile = amlayoutH(spacing=15)
+        self.layout_prompt = amlayoutH()
+        self.layout_prompt.setContentsMargins(self.prompt_margin[0], 0, self.prompt_margin[1], 0)
+        self.layout_button = amlayoutH()
+        self.layout_button.setContentsMargins(self.button_margin[0], 0, self.button_margin[1], 0)
+        
+        self.title_icon = QLabel()
+        self.title_icon.setPixmap(self.title_icon.pixmap(self.title_height, self.title_height))
+        self.title_icon.setFixedSize(self.title_height, self.title_height)
+        self.title_icon.setAlignment(Qt.AlignCenter)
+
+        self.title_name = QLabel(self.type)
+        self.title_name.setFont(self.title_font)
+        self.title_name.setAlignment(Qt.AlignLeft)
+        add_obj(self.title_icon, self.title_name, parent_f=self.layout_tile)
+        
+        self.promt_label = QLabel(self.prompt)
+        self.promt_label.setFont(self.prompt_font)
+        self.promt_label.setWordWrap(True)
+        self.promt_label.setAlignment(Qt.AlignCenter)
+        self.layout_prompt.addWidget(self.promt_label)
+
+        for name in self.buttons.keys():
+            button_i  = ColorfulButton(name, self.buttons[name]['colors'], self.buttons[name]['font'], self.buttons[name]['size'])
+            self.layout_button.addWidget(button_i)
+            button_i.clicked.connect(lambda: self._return(self.buttons[name]['value']))
+        
+        add_obj(self.layout_tile, self.layout_prompt, self.layout_button, parent_f=self.layout0)
+        self.setFixedSize(QSize(*self.widget_size))
+    
+    def _setStyle(self):
+        style_sheet = f'''
+            QWidget {{
+                background-color: {self.config.get('background', obj='color')};
+                border-radius: 10px;
+            }}
+        '''
+    def _return(self, value):
+        self.VALUE = value  
+        self.hide()
+    

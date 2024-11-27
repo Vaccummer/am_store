@@ -2,7 +2,8 @@ from PySide2.QtCore import *
 from PySide2.QtGui import *
 from PySide2.QtWidgets import *
 import random
-from typing import Literal, Optional, Tuple, Union, List
+from toolbox import *
+from typing import Literal, Optional, Tuple, Union, List, OrderedDict, Dict
 from abc import abstractmethod
 
 class Asize(QSize):
@@ -85,29 +86,28 @@ class YohoPushButton(QPushButton):
             self.setStyleSheet(style_str)
 
 class ColorfulButton(QPushButton):
-    def __init__(self, text:str, font:QFont, ori_color:str, hover_color:str, click_color:str):
+    def __init__(self, text_f:str, colors:List[str], font:QFont, height:int):
         super().__init__()
-        self.setText(text)
+        self.setText(text_f)
         self.setFont(font)
-        self.ori_color = ori_color
-        self.hover_color = hover_color
-        self.click_color = click_color
-    def _initUI(self):
-        self.setStyleSheet(f'''
-                            QPushButton {{
-                            padding: 10px;
-                            color: #fff;
-                            border: none;
-                            border-radius: 10px;
-                            background-color: {self.ori_color};
-                        }}
-                        QPushButton:hover {{
-                            background-color: {self.hover_color}; 
-                        }}
-                        QPushButton:pressed {{
-                                background-color: {self.click_color};
-                        }}
-                        ''')
+        self.setFixedHeight(height)
+        self._setstyle(colors)
+    
+    def _setstyle(self, colors):
+        style_sheet = f'''
+        QPushButton {{
+            background-color: {colors[0]};
+            border-radius: 10px;
+            padding: 10px;
+        }}
+        QPushButton:hover {{
+            background-color: {colors[1]};
+        }}
+        QPushButton:pressed {{
+            background-color: {colors[2]};
+        }}
+        '''
+        self.setStyleSheet(style_sheet)
 
 class AutoLabel(QLabel):
     def __init__(self, text:str, font:QFont, color:str="#171818"):
@@ -356,3 +356,32 @@ class InputLine(QLineEdit):
         }}
         '''
         #self.horizontalScrollBar().setStyleSheet(self.scroll_bar_style_sheet)
+
+class InfoTip(QWidget):
+    def __init__(self, parent:Union[QWidget, QMainWindow, None], 
+                 type_f:Literal['Info', 'Warning', 'Error'], 
+                 icon:QIcon,
+                 prompt_f:str, buttons:OrderedDict):
+        super().__init__(parent)
+
+    def _init_ui(self, type_f:str, icon_f:QIcon, prompt_f:str, 
+                 buttons:OrderedDict[str,Union[str, List[str], bool, QSize]]):
+        self.layout0 = amlayoutH()
+        self.layout_tile = amlayoutH(spacing=15)
+        self.layout_prompt = amlayoutH()
+        self.layout_button = amlayoutH()
+        self.layout_button.setContentsMargins(0, 0, 0, 0)
+
+        self.title_icon = QLabel()
+        self.title_icon.setPixmap(icon_f.pixmap(32, 32))
+        self.title_icon.setFixedSize(32, 32)
+        self.title_icon.setAlignment(Qt.AlignCenter)
+
+        self.title_name = QLabel(self.type)
+        self.title_name.setFont(font_get({'Family':'Microsoft YaHei', 'PointSize':12, 'Bold':True}))
+        self.title_name.setAlignment(Qt.AlignLeft)
+
+        self.promt_label = QLabel(self.prompt)
+        self.promt_label.setFont(font_get({'Family':'Microsoft YaHei', 'PointSize':10}))
+        self.promt_label.setWordWrap(True)
+        self.promt_label.setAlignment(Qt.AlignCenter)

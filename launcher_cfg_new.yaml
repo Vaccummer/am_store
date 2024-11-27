@@ -63,7 +63,6 @@ MainWindow:
   Size:
     switch_button: [gap,gap,0,1.2*het]
     top_button: [win_x-0.5*gap-8*het, 0.5*gap, 8*het, 1.2*het]
-
   switch_button:
     font: [[Family, *jetbrains], [PixelSize, 35]]
   top_button:
@@ -74,6 +73,22 @@ MainWindow:
       middle: "./load/MainWindow/middle.svg"
   taskbar_icon:
     path: "./load/MainWindow/taskbar_icon.ico"
+  Tip:
+    font: 
+      title: [[Family, *jetbrains], [PixelSize, 40]]
+      prompt: [[Family, *yahei], [PixelSize, 30]]
+      button: [[Family, *yahei], [PixelSize, 30]]
+    color: 
+      background: "#FFFFFF"
+    Size:
+      widget_size: [0.5*win_x, 0.5*win_y]
+      button_margin: [gap, gap]
+      prompt_margin: [gap, gap]
+      title_height: het
+    path:
+      Info_icon: "./load/MainWindow/info_icon.svg"
+      Error_icon: "./load/MainWindow/error_icon.svg"
+      Warning_icon: "./load/MainWindow/warning_icon.svg"
 
 Launcher:
   Size:

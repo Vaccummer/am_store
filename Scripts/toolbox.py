@@ -7,10 +7,10 @@ import os
 import copy
 from typing import Literal, Optional, Tuple, Union, List, OrderedDict
 import re
-from PySide2.QtGui import QScreen
-from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget
-from PySide2.QtGui import QFont, QIcon
-from PySide2.QtCore import QSize, Qt
+from PySide2.QtGui import *
+from PySide2.QtWidgets import *
+from PySide2.QtGui import *
+from PySide2.QtCore import *
 import warnings
 import math
 from sympy import symbols, sympify
@@ -622,7 +622,7 @@ class LauncherPathManager(object):
         self.app_icon_folder = self.config.get('app_icon_folder', mode="Launcher", widget='associate_list', obj="path")
         self.app_icon_d = {}
         for name_i in os.listdir(self.app_icon_folder):
-            path_i = os.path.isfile(os.path.join(self.app_icon_folder, name_i))
+            path_i = os.path.join(self.app_icon_folder, name_i)
             if os.path.isfile(path_i):
                 app_name, ext = os.path.splitext(name_i)
                 self.app_icon_d[app_name] = path_i
@@ -650,7 +650,6 @@ class LauncherPathManager(object):
                     return self.default_app_icon
             else:
                 return self.default_app_icon
-
 
 class ShortcutsPathManager(object):
     def __init__(self, config:Config_Manager):
@@ -757,4 +756,42 @@ class SshManager(object):
             return self.sftp.stat(src).st_size
         except Exception as e:
             return 0
-        
+
+class InfoTip(QWidget):
+    def __init__(self, parent:Union[QWidget, QMainWindow], 
+                 type_f:Literal['Info', 'Warning', 'Error'], 
+                 icon:QIcon,
+                 prompt_f:str, choices:OrderedDict):
+        super().__init__(parent)
+    
+    def _init_ui(self):
+        self.layout0 = amlayoutH()
+        self.layout_tile = amlayoutH(spacing=15)
+        self.layout_prompt = amlayoutH()
+        self.layout_button = amlayoutH()
+        self.layout_button.setContentsMargins(0, 0, 0, 0)
+
+        self.title_icon = QLabel()
+        self.title_icon.setPixmap(self.icon.pixmap(32, 32))
+        self.title_icon.setFixedSize(32, 32)
+        self.title_icon.setAlignment(Qt.AlignCenter)
+
+        self.title_name = QLabel(self.type)
+        self.title_name.setFont(font_get({'Family':'Microsoft YaHei', 'PointSize':12, 'Bold':True}))
+        self.title_name.setAlignment(Qt.AlignLeft)
+
+        self.promt_label = QLabel(self.prompt)
+        self.promt_label.setFont(font_get({'Family':'Microsoft YaHei', 'PointSize':10}))
+        self.promt_label.setWordWrap(True)
+        self.promt_label.setAlignment(Qt.AlignLeft)
+
+
+    
+
+class InfoTip(QWidget):
+    def __init__(self, parent = ..., f = ...):
+        super().__init__(parent, f)
+
+class ConfirmTip(QWidget):
+    def __init__(self, parent = ..., f = ...):
+        super().__init__(parent, f)
