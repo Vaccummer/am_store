@@ -207,7 +207,8 @@ Settings:
       exe: [[Family, *jetbrains], [PointSize, 12], [Weight, 70]]
       number: [[Family, *yahei], [PointSize, 12], [Weight, 90]]
     Size:
-      col_margin: [25, 45]
+      col_margin: [125, 50]
+      add_button_margin: [190, 84]
       line_height: 0.85*het
       line_spacing: 0.2*het
       namedit_max_length: 5*gap
