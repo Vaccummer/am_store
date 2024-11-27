@@ -49,10 +49,10 @@ Common:
     jetbrains_family: &jetbrains JetBrains Mono
     arial_family: &arial Arial
   color_family:
-    grey: \#4A4A4A
-    blue: \#2F76D5
-    red: \#EA124F
-    white: \#F1F1F1
+    grey: "#4A4A4A"
+    blue: "#2F76D5"
+    red: "#EA124F"
+    white: "#F1F1F1"
   task_bar_title: Super Launcher      
   max_op_num: 99
   horizontal_button_num: 5
@@ -79,7 +79,7 @@ Launcher:
   Size:
     main_window: [scr_x/2-win_x/2,scr_y/2-win_y/2,win_x,win_y]   # [x,y,w,h]
     srh_icon: null
-    path_mode_switch: [0,1.3*het]
+    path_mode_switch: [0,het]
     input_box: [gap,1.5*gap+het,win_x-2*gap,het]
     opto_icon: null
     shortcut_entry: [win_x-gap-het,1.5*gap+1.1*het,0.8*het,0.8*het]
@@ -130,7 +130,7 @@ Launcher:
     path:
       button_icons: &shortcut_button_icons './load/Launcher/shortcut_botton/button_icons/*'
       setting_xlsx: &shortcut_setting_xlsx './load/Launcher/shortcut_setting/shortcut_set.xlsx'
-      default_button_icon: './load/Launcher/shortcut_botton/default_button_icon.svg'
+      default_button_icon: *default_button_icon # 和associate共享默认app_icon
     color:
       button_hover: "#619F99"
   
@@ -201,8 +201,49 @@ Terminal:
 
 Settings:
   LauncherSetting:
-    a:1
-# Searcher:
+    font:
+      name: [[Family, *arial], [PointSize, 12], [Weight, 70]]
+      chname: [[Family, *yahei], [PointSize, 12], [Weight, 70]]
+      exe: [[Family, *jetbrains], [PointSize, 12], [Weight, 70]]
+      number: [[Family, *yahei], [PointSize, 12], [Weight, 90]]
+    Size:
+      col_margin: [125, 50]
+      add_button_margin: [190, 84]
+      line_height: 0.85*het
+      line_spacing: 0.2*het
+      namedit_max_length: 5*gap
+      exeedit_min_ledngth: 2*gap
+      add_line_height: het
+      tab_height: 0.7*het
+      bottom_margin: [0, 30]
+    path:
+      number_col_icon: './load/Settings/col_icons/opto_setting_window_icon.svg'
+      icon_col_icon: './load/Settings/col_icons/opto_setting_window_icon.svg'
+      name_col_icon: './load/Settings/col_icons/opto_setting_window_icon.svg'
+      chname_col_icon: './load/Settings/col_icons/opto_setting_window_icon.svg'
+      exe_col_icon: './load/Settings/col_icons/opto_setting_window_icon.svg'
+      search_col_icon: './load/Settings/col_icons/opto_setting_window_icon.svg'
+      searcher_icon: './load/Settings/col_icons/opto_setting_window_icon.svg'
+      add_button_icon: './load/Settings/col_icons/opto_setting_window_icon.svg'
+      tab_delete:
+        - './load/Settings/col_icons/opto_setting_window_icon.svg'
+        - './load/Settings/col_icons/opto_setting_window_icon.svg'
+        - './load/Settings/col_icons/opto_setting_window_icon.svg'
+      add_sheet_button: './load/Settings/col_icons/opto_setting_window_icon.svg'
+    color:
+      col_background: transparent
+      scrollbar_color: "#C3C3C3"
+      scrollbar_color_hove: "#6B6B6B"
+      scrollbar_color_pressed: "#1F1F1F"
+      nameedit_background: "#F7F7F7"
+      exeedit_background: ["#F7F7F7", "#FFC300", "#FF5733"] # 包括普通, 警告, 错误三种颜色
+      add_button: ["black", "#9D8383", "#E99393"]  # 包括普通, 悬浮, 点击三种颜色
+      tab_button: ["#F7F7F7", "#FFC300", "#FF5733"]  # 包括普通, 悬浮, 点击三种颜色
+      save_button: ["#F7F7F7", "#FFC300", "#FF5733"]  # 包括普通, 悬浮, 点击三种颜色
+      discard_button: ["#F7F7F7", "#FFC300", "#FF5733"]  # 包括普通, 悬浮, 点击三种颜色
+      reset_button: ["#F7F7F7", "#FFC300", "#FF5733"]  # 包括普通, 悬浮, 点击三种颜色
+    ori_line_num: 25
+# Searcher:  
 #   Size:
 #       main_window: [scr_x/2-win_x/2,scr_y/2-win_y/2,win_x,win_y]
 #       srh_icon: [win_x/2-srh_r/2,win_y/2-srh_r/2-3.6*gap,srh_r,srh_r]

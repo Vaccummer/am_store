@@ -116,7 +116,6 @@ class Associate:
         elif len(output_1) == 1:
             return output_1[0]
 
-
 class AssociateList(QListWidget):
     def __init__(self, config:Config_Manager, parent:Union[QMainWindow, QWidget],manager:LauncherPathManager):  
         super(AssociateList, self).__init__(parent)
@@ -179,23 +178,15 @@ class AssociateList(QListWidget):
 
     def _load_default_icons(self) -> dict:
         self.file_icon_folder = self.config.get('file_icon_folder', mode="Launcher", widget=self.name, obj="path")
-        self.app_icon_folder = self.config.get('app_icon_folder', mode="Launcher", widget=self.name, obj="path")
-        self.app_icon_d = {}
-        for name_i in os.listdir(self.app_icon_folder):
-            path_i = os.path.isfile(os.path.join(self.app_icon_folder, name_i))
-            if os.path.isfile(path_i):
-                app_name, ext = os.path.splitext(name_i)
-                self.app_icon_d[app_name] = path_i
-            
+        
         self.file_icon_d = {}
         for name_i in os.listdir(self.file_icon_folder):
             name, ext = os.path.splitext(name_i)
             self.file_icon_d[name] = QIcon(os.path.join(self.file_icon_folder, name_i))
         
-        default_app_icon = QIcon(self.config.get('default_app_icon', mode="Launcher", widget=self.name, obj="path"))
         default_folder_icon = QIcon(self.config.get('default_folder_icon', mode="Launcher", widget=self.name, obj="path"))
         default_file_icon = QIcon(self.config.get('default_file_icon', mode="Launcher", widget=self.name, obj="path"))
-        self.default_icon_d = {'app':default_app_icon, 'dir':default_folder_icon, 'file':default_file_icon}
+        self.default_icon_d = {'dir':default_folder_icon, 'file':default_file_icon}
     
     def _setStyle(self):
         self.setFont(self.font_a)
@@ -283,7 +274,7 @@ class AssociateList(QListWidget):
         label_font = self.font() if label_font is None else label_font
         item_i = QListWidgetItem()
         item_i.setData(Qt.UserRole, int(index_f))
-        button_i = YohoPushButton(self.default_icon_d['app'], button_size, an_type="shake")
+        button_i = YohoPushButton(self.default_icon_d['dir'], button_size, an_type="shake")
         label_i = AutoLabel(text="Default", font=label_font)
         widget_i = QWidget()
         layout_i = QHBoxLayout()
@@ -311,23 +302,7 @@ class AssociateList(QListWidget):
     def _geticon(self, name:str, sign:Literal['name', "path"], type_f:Literal["dir", 'file'])->QIcon:
         match sign:
             case "name":
-                index_i = self.launcher_df.loc[self.launcher_df['A'] == name].index[0]
-                icon_l = self.app_icon_d.get(name, "")
-                if icon_l:
-                    return QIcon(icon_l)
-                else:
-                    exe_t = self.launcher_df.loc[index_i, 'Exe Path']
-                    target_icon_path = os.path.join(self.app_icon_folder, name)
-                    if exe_t.endswith('.exe'):
-                        commands_f = [rf'{self.exe_icon_getter}', rf'{exe_t}', rf'{target_icon_path}.png']
-                        result = subprocess.run(commands_f, cwd=self.up.WKDR, capture_output=True, text=True)
-                        out_f = result.stdout
-                        if out_f and "图标已保存为" in out_f.decode('gbk'):
-                            return QIcon(target_icon_path+'.png')
-                        else:
-                            return self.default_icon_d['app']    
-                    else:
-                        return self.default_icon_d['app']
+                return self.manager.get_icon(name)
             case _:
                 if type_f == 'dir':
                     return self.default_icon_d['folder']
@@ -592,7 +567,6 @@ class AssociateList(QListWidget):
             print(f"文件传输失败: {e}")
             return False
 
-
 class SwitchButton(QComboBox):
     def __init__(self, parent: QMainWindow, config:Config_Manager) -> None:
         super().__init__(parent)
@@ -689,9 +663,11 @@ class PathModeSwitch(QComboBox):
         QComboBox {
             background-color: rgba(255, 255, 255, 50);
             border: 0px solid #2980b9;
-            border-radius: 10px;
+            border-top-left-radius: 20px;
+            border-bottom-left-radius: 20px;
             padding: 5px;
             color: white;
+            margin: 0px;
         }
         QComboBox::drop-down {
             border: none;  /* 移除下拉箭头的边框 */
@@ -758,7 +734,14 @@ class InputBox(QLineEdit):
         self.returnPressed.connect(self.clear)
     def _initUI(self):
         self.config.group_chose(mode=self.up.MODE, widget="input_box")
-        self.setStyleSheet("border-radius: 20px; padding-left: 20px;padding-right: 15px")  # smooth four angle
+        sty_sheet = f'''
+                border-top-right-radius: 20px;
+                border-bottom-right-radius: 20px;
+                padding-left: 20px;
+                padding-right: 15px;
+                margin: 0px;
+        '''
+        self.setStyleSheet(sty_sheet)  # smooth four angle
         # self.up.input_box.textChanged.connect(self.up.update_associated_words)
         # self.up.input_box.returnPressed.connect(self.up.confirm_action)
         self.setFont(self.config.get("main", obj="font"))
@@ -829,7 +812,7 @@ class ShortcutEntry(YohoPushButton):
         self.config.group_chose(mode="Launcher", widget=self.name)
         icon_p = self.config.get("icon", obj="path")
 
-        super().__init__(icon_p, int(1.2*self.up.het), "resize")
+        super().__init__(icon_p, int(1.2*self.up.het), "shake")
         self.setParent(parent)
 
 class ShortcutButton(QWidget):
@@ -1300,7 +1283,188 @@ class TransferProgress(ProgressBar):
     def __init__(self, parent, max_value, height):
         self.up = parent
         super().__init__(parent, max_value, height)
-        
+
+class ExePathLine(QLineEdit):
+    def __init__(self, height_f:int, 
+                 place_holder:str,
+                 font:QFont,
+                 colors:List[str] = ["#F7F7F7", "#F0F411","#EE1515"]):
+        # super().__init__(height_f, scrollbar_color, scrollbar_color_hover, scrollbar_color_pressed)
+        super().__init__()
+        self.background_color, self.warning_color, self.error_color = colors
+        self.setMaximumHeight(height_f)
+        self.setPlaceholderText(place_holder)
+        self.font_f = font
+        self._setstyle()
+        self.textChanged.connect(self._text_change)
+    
+    def _setstyle(self):
+        self.setFont(self.font_f)
+        self.setToolTip("sadasdad"+self.text())  # 鼠标悬停时显示完整文本
+        self.style_sheet = f'''
+        QLineEdit{{
+        background-color: {self.background_color};  
+        border-radius: 10px;
+        }}
+        QToolTip {{
+        background-color: {self.background_color};  
+        color: #161616;           
+        font-family:: Consolas;
+        font-size: 40px;         
+        border-radius: 6px;      
+        padding: 8px;            
+        }}
+        '''
+        self.setStyleSheet(self.style_sheet)
+
+    def _text_change(self, text):
+        self.setToolTip(text)
+        if os.path.exists(text) or (not text):
+            color_n = self.background_color
+        elif os.path.isabs(text):
+            color_n = self.warning_color
+        else:
+            color_n = self.error_color
+        self.style_sheet = f'''
+        QLineEdit{{
+        background-color: {color_n};  
+        border-radius: 10px;
+        }}
+        QToolTip {{
+        background-color: {self.background_color};  
+        color: #161616;           
+        font-family:: Consolas;
+        font-size: 40px;         
+        border-radius: 6px;      
+        padding: 8px;            
+        }}
+        '''
+        self.setStyleSheet(self.style_sheet)
+
+class NameEdit(QLineEdit):
+    def __init__(self, text_f:str, font:QFont, height:int,
+                 background_f:str="#F7F7F7",):
+        super().__init__()
+        self.setText(text_f)
+        self.setFont(font)
+        self.setFixedHeight(height)
+        style_sheet = f'''
+            QLineEdit {{
+                background-color: {background_f};  
+                border: none; 
+                border-radius: 10px;        
+                padding: 10px;              
+            }}
+        '''
+        self.setStyleSheet(style_sheet)
+
+class SheetControl(QTabBar):
+    def __init__(self, parent:QWidget, color_l:List[str], icon_l:List[str], height:int):
+        super().__init__(parent)
+        self.up = parent
+        self._stestyle(color_l, icon_l, height)
+        self.setFont(QFont("Consolas", 8))
+        self.setElideMode(Qt.ElideNone)
+    
+    def wheelEvent(self, event):
+        event.ignore()
+    
+    def _stestyle(self, color_l:List[str], icon_l:List[str], height_f:int):
+        icon_l = [i.replace('\\', '/') for i in icon_l]
+        style_sheet = f"""
+        QTabBar{{
+            border: none;
+            background: transparent; 
+        }}
+        QTabBar::tab {{
+            margin-right: 10px;
+            padding: 5px 10px;
+            border-radius: 10px;
+            height: {height_f}px;  /* 设置标签高度 */
+            background: {color_l[0]};
+        }}
+        QTabBar::tab:selected {{
+            background: {color_l[2]};
+        }}
+        QTabBar::tab:hover {{
+            background: {color_l[1]};
+        }}
+        QTabBar::tab:!selected {{
+        }}
+        QTabBar::close-button {{
+        image: url("{icon_l[0]}"); 
+        subcontrol-position: right; 
+        margin: 2px; 
+        }}
+        """
+        #self.setTabsClosable(True)
+        self.setMovable(True) 
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.open_context_menu)
+        self.setStyleSheet(style_sheet)
+    
+    def close_tab(self, index):
+        self.removeTab(index)
+    
+    def get_texts(self):
+        texts = []
+        for index in range(self.count()):  
+            texts.append(self.tabText(index))  
+        return texts
+    
+    def get_current_text(self):
+        index = self.currentIndex()
+        return self.tabText(index)
+    
+    def set_current_tab(self, name:str):
+        if name in self.get_texts():
+            index = self.get_texts().index(name)
+            self.setCurrentIndex(index)
+
+    def open_context_menu(self, position): 
+        index = self.tabAt(position)
+        if index == -1:
+            return
+        menu = QMenu()
+        rename_action = menu.addAction("Rename")
+        close_action = menu.addAction("Delete")
+
+        action = menu.exec_(self.mapToGlobal(position))
+        if action == rename_action:
+            self.rename_tab(index)
+        elif action == close_action:
+            self.close_tab(index)
+
+    def rename_tab(self, index):
+        current_name = self.tabText(index)
+        new_name, ok = QInputDialog.getText(self, "Rename Sheet", "Enter New Name:", text=current_name)
+        if ok and new_name.strip():
+            self.setTabText(index, new_name)
+
+class ChangeControl(QPushButton):
+    def __init__(self, text_f:str, colors:List[str], font:QFont, height:int):
+        super().__init__()
+        self.setText(text_f)
+        self.setFont(font)
+        self.setFixedHeight(height)
+        self._setstyle(colors)
+    
+    def _setstyle(self, colors):
+        style_sheet = f'''
+        QPushButton {{
+            background-color: {colors[0]};
+            border-radius: 10px;
+            padding: 10px;
+        }}
+        QPushButton:hover {{
+            background-color: {colors[1]};
+        }}
+        QPushButton:pressed {{
+            background-color: {colors[2]};
+        }}
+        '''
+        self.setStyleSheet(style_sheet)
+
 class LauncherSetting(QWidget):
     def __init__(self, config:Config_Manager, parent:QMainWindow, manager:LauncherPathManager):
         super().__init__(parent)
@@ -1308,21 +1472,314 @@ class LauncherSetting(QWidget):
         self.manager = manager
         self.config = config
         self.name = 'LauncherSetting'
-        self.config.group_chose(mode='Setting', widget=self.name)
+        self.config.group_chose(mode='Settings', widget=self.name)
+        self._layout_set()
+        self._load()
+        self._layout_load()
     
     def _layout_set(self):
-        self.layout_0 = amlayoutV(align_h='c', spacing=15)
+        self.layout_0 = amlayoutV(align_h='c', spacing=5)
         self.setLayout(self.layout_0)
+        self.objs = {'icon':[], 'name':[], "chname":[], 'exe':[], 'search':[]}
+    
+    def _layout_load(self):
+        self._init_tiles()
+        self._init_layout()
+        self._init_multi_line()
+        self._init_add_line()
+        self._bottom_control()
+        add_obj(self.add_button_lo, parent_f=self.obj_layout)
+        self.obj_layout.addStretch()
+        add_obj(self.title_layout, self.scroll_area,parent_f=self.layout_0)
+        self.layout_0.addLayout(self.bottom_layout)
+        self._line_fresh()
+    
+    def _load(self):
+        self.df = self.manager.df
+        self.dfc = self.df.copy(deep=True)
+        self.dfc['IconPath'] = ''
+        self.default_app_icon = self.config.get('default_button_icon', 'Launcher', 'shortcut_button', 'path')
+        self.name_font = self.config.get('name', obj='font')
+        self.chname_font = self.config.get('chname', obj='font')
+        self.exe_font = self.config.get('exe', obj='font')
+        self.line_height = self.config.get('line_height', obj='Size')
+        self.searcher_icon = QIcon(self.config.get('searcher_icon', obj='path'))
+        self.add_button_margin = self.config.get('add_button_margin', obj='Size')
+        self.col_margin = self.config.get('col_margin', obj='Size')
+        self.num = int(self.config.get('ori_line_num', obj=None))
+        self.nameedit_length = self.config.get('namedit_max_length', obj='Size')
+        self.nameedit_color = self.config.get('nameedit_background', obj='color')
+        self.exeedit_min_length = self.config.get('exeedit_min_ledngth', obj='Size')
+        self.exeedit_color = self.config.get('exeedit_background', obj='color')
+        self.tab_height = self.config.get('tab_height', obj='Size')
+        self.bottom_margin = self.config.get('bottom_margin', obj='Size')
+        self.line_num = 0
+        self.objs_l = {}
+        self.widget_l = []
+    
     def _init_tiles(self):
-        pass
-    def _init_single_line(self):
-        pass
+        self.title_layout = amlayoutH()
+        self.title_layout.setContentsMargins(self.col_margin[0], 0, self.col_margin[1], 0)
+        self.titles = ['number_col', 'icon_col', 'name_col', 'chname_col','exe_col', 'searcher']
+        width_l = [self.line_height, self.line_height, self.nameedit_length, self.nameedit_length, self.exeedit_min_length, self.line_height]
+        for i, title_i in enumerate(self.titles):
+            col_i = QLabel(self)
+            col_style_sheet = f'''
+            background: {self.config.get('col_background', obj='color')};
+            text_align
+            '''
+            col_i.setStyleSheet(col_style_sheet)
+            icon_i = QPixmap(self.config.get(f'{title_i}_icon',obj='path'))
+            # size_i = self.config.get('col_icon_size', obj='Size')
+            col_i.setPixmap(icon_i.scaled(QSize(self.line_height, self.line_height)))
+            if self.titles[i] != 'exe_col':
+                col_i.setFixedWidth(width_l[i])
+            col_i.setAlignment(Qt.AlignCenter)
+            setattr(self, title_i, col_i)
+            self.title_layout.addWidget(getattr(self, title_i))
 
+    def _init_layout(self):
+        self.obj_layout = amlayoutV(spacing=self.config.get('line_spacing', obj='Size'))
+        # Create a scroll area and add the content layout to it
+        self.scroll_content = QWidget()  # Create a widget to contain the layout
+        self.scroll_content.setLayout(self.obj_layout)
+        self.frame = QFrame()  # Create a frame to contain the scroll area
+        self.frame_layout = QVBoxLayout()
+        self.frame_layout.addWidget(self.scroll_content)
+        self.frame_layout.setContentsMargins(0, 0, 0, 0)
+        self.frame.setLayout(self.frame_layout)
+        self.frame.setObjectName("OuterFrame")
+        self.frame.setStyleSheet("""
+                        QFrame#OuterFrame {
+                            background: transparent;
+                            border-radius: 10px;
+                            border: 1px solid gray;
+                            background-color: transparent;
+                        }
+                    """)  # Set border to the frame
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setObjectName("myScrollArea")
+        self.scroll_area.setWidget(self.frame)  # Set the frame as the widget of the scroll area
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setStyleSheet("""
+                        QScrollArea#myScrollArea {
+                            background: transparent;
+                            border: none;
+                        }
+                    """)  # Set background to transparent and no border to the scroll area
+        
+        # Customize scrollbar style
+        self.scroll_bar = self.scroll_area.verticalScrollBar()
+        self.scroll_bar.setStyleSheet("""
+            QScrollBar:vertical {
+                border: none;
+                background: transparent;
+                width: 20px;
+                margin: 5px;
+                
+            }
+            QScrollBar::handle:vertical {
+                background: rgba(255, 255, 255, 25);
+                min-height: 20px;
+                border-radius: 5px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #737373;
+            }
+            QScrollBar::add-line:vertical {
+                background: transparent;
+                height: 0px;
+                subcontrol-position: bottom;
+                subcontrol-origin: margin;
+            }
+            QScrollBar::sub-line:vertical {
+                background: transparent;
+                height: 0px;
+                subcontrol-position: top;
+                subcontrol-origin: margin;
+            }
+            QScrollBar::sub-page:vertical, QScrollBar::add-page:vertical {
+            background: transparent; 
+            }
+        """)
 
+    def _init_single_line(self, index_f:int, df:pandas.DataFrame=None, default:bool=False, insert:bool=False):
+        if default is not False:
+            icon_i = QIcon(self.default_app_icon)
+            name = ''
+            chname = ''
+            exe_path = ''
+        else:
+            name = df.iloc[index_f, 0]
+            icon_i = self.manager.get_icon(name)
+            chname = df.iloc[index_f, 1]
+            exe_path = df.iloc[index_f, 3]
+            if os.path.isfile(exe_path):
+                exe_path = os.path.basename(exe_path)
+        nummber_w = QLabel(str(index_f))
+        nummber_w.setFont(self.config.get('number', obj='font'))
+        nummber_w.setAlignment(Qt.AlignCenter)
+        nummber_w.setStyleSheet("background-color: transparent; border: none;text-align: center;")
+        nummber_w.setFixedWidth(self.line_height)
+        nummber_w.setFixedHeight(self.line_height)
+        icon_w = YohoPushButton(icon_i, self.line_height, 'shake')
+        icon_w.setProperty('index', index_f)
+        icon_w.clicked.connect(lambda: self._change_icon(index_f))
+        name_label = NameEdit(name, self.name_font, self.line_height, self.nameedit_color)
+        name_label.setMaximumWidth(self.nameedit_length)
+        chname_label = NameEdit(chname, self.chname_font, self.line_height, self.nameedit_color)
+        chname_label.setMaximumWidth(self.nameedit_length)
+        exe_edit = ExePathLine(self.line_height,exe_path,self.exe_font,self.exeedit_color)
+        exe_edit.setMinimumWidth(self.exeedit_min_length)
+        exe_edit.textChanged.connect(self._edit_change)
+        folder_button = YohoPushButton(self.searcher_icon, self.line_height, an_type='resize')
+        folder_button.clicked.connect(lambda: self._exe_search(index_f))
+        self.objs_l[len(self.objs_l.keys())] = {'number':nummber_w, 'icon':icon_w, 'name':name_label, 'chname':chname_label, 'exe':exe_edit, 'search':folder_button}
+        layout_i = amlayoutH()
+        layout_i.setMargin(0)
+        widget_i = QWidget()
+        widget_i.setLayout(layout_i)
+        add_obj(nummber_w, icon_w, name_label, chname_label, exe_edit, folder_button, parent_f=layout_i)
+        self.widget_l.append(widget_i)
+        if insert:
+            self.obj_layout.insertWidget(self.obj_layout.count()-1, widget_i)
+        else:
+            self.obj_layout.addWidget(widget_i)
+        #return nummber_w, icon_w, name_label, chname_label, exe_edit, folder_button
     
+    def _init_multi_line(self):
+        for i in range(self.num):
+            self._init_single_line(i, default=True)
+            #nummber_w, icon_w, name_label, chname_label, exe_edit, folder_button = self._init_single_line(i, default=True)
+            # self.objs_l[i] = {'number':nummber_w, 'icon':icon_w, 'name':name_label, 'chname':chname_label, 'exe':exe_edit, 'search':folder_button}
+            # layout_i = amlayoutH()
+            # layout_i.setMargin(0)
+            # widget_i = QWidget()
+            # widget_i.setLayout(layout_i)
+            # add_obj(nummber_w, icon_w, name_label, chname_label, exe_edit, folder_button, parent_f=layout_i)
+            # self.obj_layout.addWidget(widget_i)
+            # self.widget_l.append(widget_i)
 
-
-
+    def _init_add_line(self):
+        color_l = self.config.get('add_button', obj='color')
+        self.add_style_sheet = f'''
+            QPushButton {{
+                border: none;
+                border-radius: 10px;
+                background-color: {color_l[0]};
+                text-align: center; 
+            }}
+            QPushButton:hover {{
+                background-color: {color_l[1]};  
+            }}
+            QPushButton:pressed {{
+                background-color: {color_l[2]};                   
+            }}
+        '''
+        self.add_button = YohoPushButton(QIcon(self.config.get('add_button_icon',obj='path')), self.line_height, an_type='resize', style_assign=self.add_style_sheet)
+        # self.add_button = QPushButton()
+        # self.add_button.setIcon(QIcon(self.config.get('add_button_icon',obj='path')))
+        self.add_button.setIconSize(QSize(self.line_height, self.line_height))
+        self.add_button.setFixedHeight(self.config.get('add_line_height', obj='Size'))
+        self.add_button.setMaximumWidth(11111)
+        self.add_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.add_button.clicked.connect(self._insert_line)
+        self.add_button_lo = amlayoutH()
+        self.add_button_lo.setContentsMargins(self.add_button_margin[0], 0, self.add_button_margin[1], 0)
+        add_obj(self.add_button, parent_f=self.add_button_lo)
     
+    def _line_fresh(self):
+        self.line_num = 0
+        name_f = self.tab_bar.get_current_text()
+        if name_f not in set(self.dfc.loc[:,'Group'].tolist()):
+            self.widget_l[0].setVisible(True)
+            self.objs_l[0]['name'].setText('')
+            self.objs_l[0]['chname'].setText('')
+            self.objs_l[0]['exe'].setText('')
+            self.objs_l[0]['icon'].setIcon(QIcon(self.default_app_icon))
+            for i in range(1, self.num):
+                self.widget_l[i].setVisible(False)
+            self.line_num += 1
+            return
+        df_n = self.dfc[self.df['Group']==name_f]
+        for i in range(df_n.shape[0]):
+            if i >= self.num:
+                self._insert_line()
+            self.widget_l[i].setVisible(True)
+            self.objs_l[i]['name'].setText(df_n.iloc[i, 0])
+            self.objs_l[i]['chname'].setText(df_n.iloc[i, 1])
+            self.objs_l[i]['exe'].setText(df_n.iloc[i, 3])
+            icon_c = df_n.iloc[i,-1]
+            if icon_c:
+                self.objs_l[i]['icon'].setIcon(QIcon(df_n.iloc[i, -1]))
+            else:
+                icon_d = self.manager.get_icon(df_n.iloc[i, 0])
+                self.objs_l[i]['icon'].setIcon(icon_d)
+            self.line_num += 1
+        for i in range(self.num):
+            if i >= df_n.shape[0]:
+                self.widget_l[i].setVisible(False)
+        self.line_num = df_n.shape[0]
+    
+    def _bottom_control(self):
+        self.bottom_layout = amlayoutH('c', spacing=25)
+        self.tab_wdiget = QWidget()
+        self.tab_layout = amlayoutH('l', spacing=10)
+        self.tab_wdiget.setLayout(self.tab_layout)
+        tab_color = self.config.get('tab_button', obj='color')
+        tab_delete_icon = self.config.get('tab_delete', obj='path')
+        self.tab_bar = SheetControl(self, tab_color, tab_delete_icon, int(0.8*self.tab_height))
+        for name_i in set(self.dfc.loc[:, 'Group'].to_list()):
+            self.tab_bar.addTab(name_i)
+        self.tab_bar.currentChanged.connect(self._line_fresh)
+        self.tab_bar.setCurrentIndex(0)
+        self.tab_bar.setFixedHeight(self.tab_height)
+        self.b_add_button = YohoPushButton(QIcon(self.config.get('add_sheet_button', obj='path')), self.line_height, an_type='resize')
+        self.b_add_button.clicked.connect(self.tab_bar.addTab)
+        self.tab_layout.addWidget(self.tab_bar)
+        add_obj(self.b_add_button, parent_f=self.tab_layout)
+        self.save_button = ChangeControl('Save', self.config.get('save_button', obj='color'), self.config.get('save_button', obj='font'), self.line_height)
+        self.save_button.clicked.connect(self._save)
+        self.reset_button = ChangeControl('Reset', self.config.get('reset_button', obj='color'), self.config.get('set_button', obj='font'), self.line_height)
+        self.reset_button.clicked.connect(self._reset)
+        # self.discard_button = ChangeControl('Discard', self.config.get('discard_button', obj='color'), self.config.get('discard_button', obj='font'), self.line_height)
+        # self.discard_button.clicked.connect(self._discard)
+        self.bottom_layout.setContentsMargins(self.bottom_margin[0], 0, self.bottom_margin[1], 0)
+        self.bottom_layout.addWidget(self.tab_wdiget)
+        self.bottom_layout.addStretch()
+        add_obj(self.save_button, self.reset_button, parent_f=self.bottom_layout)
+        
+    def _insert_line(self):
+        if self.line_num >= len(self.widget_l):
+            self._init_single_line(self.line_num, default=True, insert=True)
+        else:
+            self.widget_l[self.line_num].setVisible(True)
+        self.line_num += 1
+    
+    def add_tab(self, name='new_sheet', refresh:bool=True):
+        text_l = self.tab_bar.get_texts()
+        for i in range(99):
+            name_t = f'{name}_{i}'
+            if name_t not in text_l:
+                break
+        self.tab_bar.addTab(name_t)
+        if refresh:
+            self._line_fresh(name_t)
+    
+    def _change_icon(self, index_f:int):
+        pass
+    
+    def _edit_change(self):
+        pass
 
+    def _exe_search(self, index_f:int):
+        pass
+    
+    def _reset(self):
+        pass
 
+    def _discard(self):
+        pass
+
+    def _save(self):
+        pass

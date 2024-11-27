@@ -1,47 +1,85 @@
-from PySide2.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton
+import sys
+from PySide2.QtWidgets import QApplication, QTabWidget, QTabBar, QVBoxLayout, QWidget, QScrollArea
 from PySide2.QtCore import Qt
 
-class MyWindow(QWidget):
+
+class CustomTabBar(QTabBar):
+    def __init__(self, parent):
+        self.up = parent
+        super().__init__()
+        self.setMouseTracking(True)
+
+    def wheelEvent(self, event):
+        # redefine the wheel event to scroll the tab bar
+        #super().wheelEvent(event)
+        self.up.scroll_right(50)
+        #event.ignore()
+
+class TabBarOnlyWidget(QWidget):
     def __init__(self):
         super().__init__()
 
-        # 创建顶层垂直布局
-        outer_layout = QVBoxLayout()
+        # 创建一个 QScrollArea 用于包装 TabBar
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
 
-        # 创建内部布局（另一个垂直布局）
-        inner_layout = QVBoxLayout()
+        # 自定义 TabBar
+        self.tab_bar = CustomTabBar(self)
+        self.scroll_area.setWidget(self.tab_bar)
 
-        # 添加按钮到内部布局
-        button1 = QPushButton("Button 1")
-        button2 = QPushButton("Button 2")
-        button3 = QPushButton("Button 3")
+        # 创建布局，用于放置滚动区域
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.scroll_area)
 
-        # 添加按钮到内部布局
-        inner_layout.addWidget(button1)
-        inner_layout.addWidget(button2)
-        inner_layout.addWidget(button3)
+        self.setLayout(layout)
+        self.tab_bar.setStyleSheet("""
+        QTabBar{
+            border: none;
+            padding: 8px;
+            background: transparent; /* 可选：设置背景透明 */
+        }
+        QTabBar::tab {
+            background: lightgray;
+            border: none;
+            border-radius: 8px;
+            padding: 8px;
+        }
+        QTabBar::tab:selected {
+            background: white;
+            font-weight: bold;
+        }
+        QTabBar::tab:hover {
+            background: #f0f0f0;                
+        }
+        QTabBar::tab:!selected {
+            margin-top: 2px; /* 未选中标签距离顶部的间距 */
+        }
+    """)
+        # 添加示例 Tabs
+        for i in range(5):
+            self.addTab(f"Tab {i + 1}")
 
-        # 设置内部布局的对齐方式为右对齐
-        inner_layout.setAlignment(Qt.AlignRight)
+    def addTab(self, label):
+        # 动态添加标签
+        self.tab_bar.addTab(label)
+    
+    def scroll_right(self, index:int):
+        # 模拟向右滑动
+        scroll_bar = self.scroll_area.horizontalScrollBar()
+        current_value = scroll_bar.value()  
+        new_value = max(scroll_bar.minimum(), min(current_value + index, scroll_bar.maximum()))  
+        scroll_bar.setValue(new_value)  
 
-        # 创建外部按钮，并添加到外部布局
-        outer_button = QPushButton("Outer Button")
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
 
-        # 将内部布局和外部按钮添加到顶层布局
-        outer_layout.addWidget(outer_button)
-        outer_layout.addLayout(inner_layout)
+    # 创建 TabBar 只显示标签部分
+    window = TabBarOnlyWidget()
+    window.resize(800, 100)
+    window.setWindowTitle("Tab Bar Only Widget")
+    window.show()
 
-        # 设置顶层布局的对齐方式为右对齐
-        outer_layout.setAlignment(Qt.AlignRight)
-
-        # 设置窗口的布局
-        self.setLayout(outer_layout)
-
-        # 设置窗口标题
-        self.setWindowTitle("Right Aligning Widgets in Nested Layouts")
-
-# 创建应用并显示窗口
-app = QApplication([])
-window = MyWindow()
-window.show()
-app.exec_()
+    sys.exit(app.exec_())

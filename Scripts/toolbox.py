@@ -9,7 +9,7 @@ from typing import Literal, Optional, Tuple, Union, List, OrderedDict
 import re
 from PySide2.QtGui import QScreen
 from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget
-from PySide2.QtGui import QFont
+from PySide2.QtGui import QFont, QIcon
 from PySide2.QtCore import QSize, Qt
 import warnings
 import math
@@ -401,12 +401,12 @@ def amlayoutV(align_h:Literal['l','r','c']=None, align_v:Literal['t','b','c']=No
 
 def add_obj(*args, parent_f:Union[QHBoxLayout, QVBoxLayout]):
     for arg_i in args:
-        if isinstance(arg_i, QWidget):
-            parent_f.addWidget(arg_i)
-        elif isinstance(arg_i, QHBoxLayout):
+        if isinstance(arg_i, QHBoxLayout):
             parent_f.addLayout(arg_i)
         elif isinstance(arg_i, QVBoxLayout):
             parent_f.addLayout(arg_i)
+        else:
+            parent_f.addWidget(arg_i)
     return parent_f
 
 
@@ -572,7 +572,13 @@ class Config_Manager(object):
 
     def after_process(self, args_a:tuple, target_f):
         if "path" in args_a:
-           return str((pathlib.Path(self.wkdr)/pathlib.Path(target_f)).resolve())
+
+            if isinstance(target_f, list):
+                return [str((pathlib.Path(self.wkdr)/pathlib.Path(i)).resolve()) for i in target_f]
+            elif os.path.isabs(target_f):
+               return target_f
+            else:
+                return str((pathlib.Path(self.wkdr)/pathlib.Path(target_f)).resolve())
         elif "font" in args_a:
             font_dict = {i[0]:i[1] for i in target_f}
             return font_get(font_dict)
@@ -587,24 +593,64 @@ class LauncherPathManager(object):
         self.col_names= ['Name', 'Chinese Name', 'Description', 'EXE Path', 'Group']
         self._read_xlsx()
         self.check()
+        self._load_icon_dict()
+    
     def _read_xlsx(self):
         xls = pd.ExcelFile(self.data_path)
         self.df = pd.DataFrame()
         # read all sheets and add a column to indicate the group
         for sheet_name in xls.sheet_names:
             df_t = pd.read_excel(self.data_path, sheet_name=sheet_name)
+            df_t = df_t.dropna(how='all')
             df_t['Group'] = sheet_name
             self.df = pd.concat([self.df, df_t], ignore_index=True)
         # check the hash ID
         self.df.fillna("", inplace=True)
         self.df['ID'] = self.df.apply(lambda row: row['Name']+"-_-"+row['Chinese Name'], axis=1)
+
     def save_xlsx(self):
         groups = list(self.df['Group'].unique())
         with pd.ExcelWriter(self.data_path) as writer:
             for gropu_i in groups:
                 self.df[self.df['Group']==gropu_i].to_excel(writer, sheet_name=gropu_i, index=False)
+    
     def check(self):
         self.df['EXE Path'] = self.df['EXE Path'].apply(lambda x: x if os.path.exists(x) else "")
+    
+    def _load_icon_dict(self):
+        self.default_app_icon = QIcon(self.config.get('default_app_icon', mode="Launcher", widget='associate_list', obj="path"))
+        self.app_icon_folder = self.config.get('app_icon_folder', mode="Launcher", widget='associate_list', obj="path")
+        self.app_icon_d = {}
+        for name_i in os.listdir(self.app_icon_folder):
+            path_i = os.path.isfile(os.path.join(self.app_icon_folder, name_i))
+            if os.path.isfile(path_i):
+                app_name, ext = os.path.splitext(name_i)
+                self.app_icon_d[app_name] = path_i
+        self.exe_icon_getter = self.config.get('exe_icon_getter', mode="Launcher", widget='associate_list', obj="path").replace('\\', '/')
+    
+    def get_icon(self, name:str)->QIcon:
+        # index_i = self.df.loc[self.df['Name'] == name].index[0]
+        icon_l = self.app_icon_d.get(name, "")
+        if icon_l:
+            return QIcon(icon_l)
+        else:
+            exe_t = self.df[self.df['Name']==name]['EXE Path'].values[0]
+            target_icon_path = os.path.join(self.app_icon_folder, name).replace('\\', '/')
+            if exe_t.endswith('.exe'):
+                commands_f = [self.exe_icon_getter, exe_t, target_icon_path+'.png']
+                #print(commands_f)
+                result = subprocess.check_output(commands_f, cwd=os.path.dirname(self.exe_icon_getter)).decode('gbk')
+                #result = subprocess.run(commands_f, cwd=self.config.wkdr, capture_output=True, text=True)
+                # out_f = result.stdout
+                if result and "图标已保存为" in result:
+                    print(1)
+                    self.app_icon_d[name] = (target_icon_path+'.png').replace('/', '\\')
+                    return QIcon(target_icon_path+'.png')
+                else:
+                    return self.default_app_icon
+            else:
+                return self.default_app_icon
+
 
 class ShortcutsPathManager(object):
     def __init__(self, config:Config_Manager):

@@ -15,40 +15,36 @@ class Asize(QSize):
 
 class YohoPushButton(QPushButton):
     def __init__(self, icon_i:Union[str, QIcon], 
-                 size_f:Union[int, Asize], 
+                 size_f:Union[int, Asize]=None, 
                  an_type:Literal["shake", 'resize', None]=None, 
                  an_time:int=180,
                  change_size:float=0.6,
-                 change_period:float=0.7):
+                 change_period:float=0.7,
+                 style_assign:str=None):
         super().__init__()
 
         # 设置按钮图标
         icon_i = icon_i if isinstance(icon_i, QIcon) else QIcon(icon_i)
         self.setIcon(icon_i)
-        if isinstance(size_f, int):
-            size_f = QSize(size_f, size_f)
-        elif isinstance(size_f, QSize):
-            pass
-        elif isinstance(size_f, list):
-            size_f = QSize(*size_f)
-        # if isinstance(size_f, Asize):
-        #     #size_t = 1.1*size_f
-        #     self.size_f = size_f.q()
-        # else:
-        self.size_f = size_f
-            #size_t = QSize(size_f.width(), size_f.height())
-        self.setIconSize(self.size_f)
-        self.setFixedSize(self.size_f)
+        if size_f:
+            if isinstance(size_f, int):
+                size_f = QSize(size_f, size_f)
+            elif isinstance(size_f, QSize):
+                pass
+            elif isinstance(size_f, list):
+                size_f = QSize(*size_f)
+            # if isinstance(size_f, Asize):
+            #     #size_t = 1.1*size_f
+            #     self.size_f = size_f.q()
+            # else:
+            self.size_f = QSize(int(size_f.width()*0.9), int(size_f.width()*0.9))
+                #size_t = QSize(size_f.width(), size_f.height())
+            self.setIconSize(self.size_f)
+            self.setFixedSize(size_f)
         self.an_time = an_time
         self.change_size = change_size
         self.change_period = change_period
-        self.setStyleSheet("""
-            QPushButton {
-                border: none;
-                background-color: transparent;
-                text-align: center; 
-            }
-        """)
+        self._set_style(style_assign)
 
         if an_type == "shake":
             self.clicked.connect(self.shake_icon)
@@ -75,6 +71,18 @@ class YohoPushButton(QPushButton):
         self.animation.setKeyValueAt(self.change_period, size_n)  
         self.animation.setEndValue(self.size_f.q() if isinstance(self.size_f, Asize) else self.size_f)  
         self.animation.start()
+
+    def _set_style(self, style_str:str):
+        if not style_str:
+            self.setStyleSheet("""
+                QPushButton {
+                    border: none;
+                    background-color: transparent;
+                    text-align: center; 
+                }
+            """)
+        else:
+            self.setStyleSheet(style_str)
 
 class ColorfulButton(QPushButton):
     def __init__(self, text:str, font:QFont, ori_color:str, hover_color:str, click_color:str):
@@ -283,3 +291,68 @@ class ProgressBar(QProgressBar):
         }}
         '''
         self.setStyleSheet(self.stylesheet)
+
+class InputLine(QLineEdit):
+    def __init__(self, height_f:int, scrollbar_color:str="#C3C3C3", 
+                 scrollbar_color_hover:str="#6B6B6B",
+                 scrollbar_color_pressed:str="#1F1F1F",
+                 ):
+        super().__init__()
+        self.height_f = height_f
+        self.color1 = scrollbar_color
+        self.color2 = scrollbar_color_hover
+        self.color3 = scrollbar_color_pressed
+        #self._style_set()
+    
+    def _style_set(self):
+        #self.setTextInteractionFlags(Qt.TextEditable)  # 保证可编辑
+        self.setCursorPosition(0)  # 可选：将光标放置在文本开头
+        self.setAlignment(Qt.AlignLeft)  # 确保文本左对齐
+        self.setFixedHeight(self.height_f)  
+        # self.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)  
+        # self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  
+        self.setTextMargins(10, 0, 10, 0)
+        self.setToolTip(self.text())  # 鼠标悬停时显示完整文本
+        QToolTip.setFont(QFont("Arial", 10))  # 设置工具提示字体大小
+        #self.setWordWrapMode(QTextOption.NoWrap)
+        self.scroll_bar_style_sheet = f'''
+        /* 水平滚动条 */
+        QScrollBar:horizontal {{
+            height: 16px;
+            background: rgba(255, 255, 255, 255);
+            border: none;
+        }}
+
+        QScrollBar::handle:horizontal {{
+            background: {self.color1};
+            border-radius: 6px;
+            min-width: 20px;
+        }}
+
+        QScrollBar::handle:horizontal:hover {{
+            background: {self.color2};
+        }}
+
+        QScrollBar::handle:horizontal:pressed {{
+            background: {self.color3};
+        }}
+
+        QScrollBar::add-line:horizontal {{
+            border: 1px solid transparent;
+            background: transparent;
+        }}
+
+        QScrollBar::sub-line:horizontal {{
+            border: 1px solid transparent;
+            background: transparent;
+        }}
+
+        QScrollBar::up-arrow:horizontal, QScrollBar::down-arrow:horizontal {{
+            background: transparent;
+        }}
+
+        QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
+            background: transparent;
+        }}
+        '''
+        #self.horizontalScrollBar().setStyleSheet(self.scroll_bar_style_sheet)
