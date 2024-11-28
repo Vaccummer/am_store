@@ -171,7 +171,6 @@ class AssociateList(QListWidget):
 
         self.font_a = self.config.get('main', obj='font')
         
-        
         self._load_default_icons()
         self.remote_server:SshManager=None
 
@@ -586,7 +585,8 @@ class SwitchButton(QComboBox):
         self.setCurrentIndex(self.mode_list.index(self.up.MODE))
 
         font_metrics = QFontMetrics(self.font())
-        w_f = font_metrics.boundingRect(self.up.MODE).width() + 30  
+        min_length = font_metrics.boundingRect(self.mode_list[0]).width() + 30
+        w_f = max(font_metrics.boundingRect(self.up.MODE).width() + 30, min_length)
         #self.setFixedSize(w_f, self.gem[-1])
         self.setMaximumWidth(self.gem[-1])
         button_style = """
@@ -619,7 +619,8 @@ class SwitchButton(QComboBox):
         mode_n = self.currentText()
         self.up.MODE = mode_n
         font_metrics = QFontMetrics(self.font())
-        w_f = font_metrics.boundingRect(mode_n).width() + 30  
+        min_length = font_metrics.boundingRect('Local').width() + 30  
+        w_f = max(font_metrics.boundingRect(mode_n).width() + 30  ,min_length)  
         self.setFixedSize(w_f, self.gem[-1])
 
 class PathModeSwitch(QComboBox):
@@ -658,36 +659,61 @@ class PathModeSwitch(QComboBox):
         font_metrics = QFontMetrics(self.font())
         w_f = font_metrics.boundingRect(self.up.MODE).width() + 30  
         self.setFixedSize(w_f, self.gem[-1])
-        button_style = """
-        QComboBox {
+        button_style = f"""
+        QComboBox {{
             background-color: rgba(255, 255, 255, 50);
             border: 0px solid #2980b9;
             border-top-left-radius: 20px;
             border-bottom-left-radius: 20px;
             padding: 5px;
-            color: white;
             margin: 0px;
-        }
-        QComboBox::drop-down {
+        }}
+        QComboBox::drop-down {{
             border: none;  /* 移除下拉箭头的边框 */
-        }
-        QComboBox QAbstractItemView {
+        }}
+        QComboBox QAbstractItemView {{
         border-radius: 0px;
         background-color:  qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #73B1A7, stop:1 #EDFFFF);
         border: 0px solid #CCCCCC; /* 下拉列表的边框 */
         color: black; /* 下拉列表的文本颜色 */
         selection-background-color: #4CC1B5; /* 选中项的背景颜色 */
         selection-color: black; /* 选中项的文本颜色 */
-        }
+        }}
+        """
+        self._setStyle(0)
+    
+    def _setStyle(self, index_f):
+        index_f = 0 if index_f != 1 else 1
+        button_style = f"""
+        QComboBox {{
+            background-color: {self.config.get('box_background', obj='color')[index_f]};
+            border: 0px solid #2980b9;
+            border-top-left-radius: 20px;
+            border-bottom-left-radius: 20px;
+            padding: 10px;
+            margin: 0px;
+        }}
+        QComboBox::drop-down {{
+            border: none;  /* 移除下拉箭头的边框 */
+        }}
+        QComboBox QAbstractItemView {{
+        border-radius: 0px;
+        background-color:  {self.config.get('item_background', obj='color')};
+        border: 0px solid #CCCCCC; /* 下拉列表的边框 */
+        color: black; /* 下拉列表的文本颜色 */
+        selection-background-color: #4CC1B5; /* 选中项的背景颜色 */
+        selection-color: black; /* 选中项的文本颜色 */
+        }}
         """
         self.setStyleSheet(button_style)
-    
+
     def _index_change(self):
         mode_n = self.currentText()
         self.up.HOST = mode_n
         self.up.HOST_TYPE = self.host_types[mode_n]
         font_metrics = QFontMetrics(self.font())
-        w_f = font_metrics.boundingRect(mode_n).width() + 30  
+        min_length = font_metrics.boundingRect(self.mode_list[0]).width() + 40  
+        w_f = max(font_metrics.boundingRect(mode_n).width() + 40  ,min_length)
         self.setFixedSize(w_f, self.gem[-1])
     
 class TopButton(QWidget):
@@ -1342,14 +1368,18 @@ class ExePathLine(QLineEdit):
 
 class NameEdit(QLineEdit):
     def __init__(self, text_f:str, font:QFont, height:int,
-                 background_f:str="#F7F7F7",):
+                 background_colors:List[str]=['#FFFFFF', '#FF5733'],):
         super().__init__()
+        self.colors = background_colors
         self.setText(text_f)
         self.setFont(font)
         self.setFixedHeight(height)
+        self._setStlye(0)
+    
+    def _setStlye(self, index_f:int):
         style_sheet = f'''
             QLineEdit {{
-                background-color: {background_f};  
+                background-color: {self.colors[index_f]};  
                 border: none; 
                 border-radius: 10px;        
                 padding: 10px;              
@@ -1364,6 +1394,7 @@ class SheetControl(QTabBar):
         self._stestyle(color_l, icon_l, height)
         self.setFont(QFont("Consolas", 8))
         self.setElideMode(Qt.ElideNone)
+        self.tabMoved.connect(self.up.sort_tab)
     
     def wheelEvent(self, event):
         event.ignore()
@@ -1463,8 +1494,11 @@ class LauncherSetting(QWidget):
     
     def _load(self):
         self.df = self.manager.df
-        self.dfc = self.df.copy(deep=True)
-        self.dfc['IconID'] = None
+        self.df_l = []
+        for i, name in enumerate(self.df['Group'].unique()):
+            self.df_l.append([name, self.df[self.df['Group']==name].copy(deep=True)])
+            self.df_l[i][1].loc[:,'IconID'] = None
+        self.df_n = self.df_l[0][1]
         self.tmp_icon_folder = self.config.get('tmp_icon_folder', obj='path')
         self.default_app_icon = self.config.get('default_button_icon', 'Launcher', 'shortcut_button', 'path')
         self.name_font = self.config.get('name', obj='font')
@@ -1484,7 +1518,12 @@ class LauncherSetting(QWidget):
         self.line_num = 0
         self.objs_l = {}
         self.widget_l = []
-    
+
+    def _get_default_df(self, group:str):
+        # ['Name', 'Chinese Name', 'Description', 'EXE Path', 'Group']
+        data = OrderedDict([['Name', ['']], ['Chinese Name', ['']], ['Description', ['']], ['EXE Path', ['']], ['Group', [group]], ['IconID',[None]]])
+        return pandas.DataFrame(data)
+
     def _init_tiles(self):
         self.title_layout = amlayoutH()
         self.title_layout.setContentsMargins(self.col_margin[0], 0, self.col_margin[1], 0)
@@ -1595,12 +1634,18 @@ class LauncherSetting(QWidget):
         icon_w.setProperty('index', index_i)
         icon_w.clicked.connect(lambda: self._change_icon(index_i))
         name_label = NameEdit(name, self.name_font, self.line_height, self.nameedit_color)
+        name_label.setProperty('index', index_i)
+        name_label.setProperty('type', 'name')
         name_label.setMaximumWidth(self.nameedit_length)
+        name_label.textChanged.connect(self.name_edit_change)
         chname_label = NameEdit(chname, self.chname_font, self.line_height, self.nameedit_color)
-        chname_label.setMaximumWidth(self.nameedit_length)
+        chname_label.setProperty('index', index_i)
+        chname_label.setProperty('type', 'chname')
+        chname_label.textChanged.connect(self.name_edit_change)
         exe_edit = ExePathLine(self.line_height,exe_path,self.exe_font,self.exeedit_color)
+        exe_edit.setProperty('index', index_i)
         exe_edit.setMinimumWidth(self.exeedit_min_length)
-        exe_edit.textChanged.connect(self._edit_change)
+        exe_edit.textChanged.connect(self.exe_edit_change)
         folder_button = YohoPushButton(self.searcher_icon, self.line_height, an_type='resize')
         folder_button.clicked.connect(lambda: self._exe_search(index_f))
         self.objs_l[len(self.objs_l.keys())] = {'number':nummber_w, 'icon':icon_w, 'name':name_label, 'chname':chname_label, 'exe':exe_edit, 'search':folder_button}
@@ -1659,38 +1704,27 @@ class LauncherSetting(QWidget):
         add_obj(self.add_button, parent_f=self.add_button_lo)
     
     def _line_fresh(self, index_f:int):
-        name_f = self.tab_bar.tabText(index_f)
         self.line_num = 0
         #name_f = self.tab_bar.get_current_text()
-        if name_f not in set(self.dfc.loc[:,'Group'].tolist()):
-            self.widget_l[0].setVisible(True)
-            self.objs_l[0]['number'].setText('0')
-            self.objs_l[0]['name'].setText('')
-            self.objs_l[0]['chname'].setText('')
-            self.objs_l[0]['exe'].setText('')
-            self.objs_l[0]['icon'].setIcon(QIcon(self.default_app_icon))
-            for i in range(1, self.num):
-                self.widget_l[i].setVisible(False)
-            self.line_num += 1
-            return
-        df_n = self.dfc[self.df['Group']==name_f]
-        for i in range(df_n.shape[0]):
+        self.df_n = self.df_l[index_f][1]
+        for i in range(self.df_n.shape[0]):
             if i >= self.num:
                 self._insert_line()
             self.widget_l[i].setVisible(True)
             self.objs_l[i]['number'].setText(str(i))
-            self.objs_l[i]['name'].setText(df_n.iloc[i, 0])
-            self.objs_l[i]['chname'].setText(df_n.iloc[i, 1])
-            self.objs_l[i]['exe'].setText(df_n.iloc[i, 3])
-            icon_c = df_n.iloc[i,-1]
-            if False:
-                self.objs_l[i]['icon'].setIcon(QIcon(df_n.iloc[i, -1]))
+            self.objs_l[i]['name'].setText(self.df_n.iloc[i, 0])
+            self.objs_l[i]['chname'].setText(self.df_n.iloc[i, 1])
+            self.objs_l[i]['exe'].setText(self.df_n.iloc[i, 3])
+            icon_c = self.df_n.iloc[i].loc['IconID']
+            if icon_c:
+                print(icon_c)
+                self.objs_l[i]['icon'].setIcon(QIcon(self.df_n.iloc[i, -1]))
             else:
-                icon_d = self.manager.get_icon(df_n.iloc[i, 0])
+                icon_d = self.manager.get_icon(self.df_n.iloc[i, 0])
                 self.objs_l[i]['icon'].setIcon(icon_d)
             self.line_num += 1
         for i in range(len(self.widget_l)):
-            if i >= df_n.shape[0]:
+            if i >= self.df_n.shape[0]:
                 self.widget_l[i].setVisible(False)
     
     def _bottom_control(self):
@@ -1702,8 +1736,9 @@ class LauncherSetting(QWidget):
         tab_delete_icon = self.config.get('tab_delete', obj='path')
         self.tab_bar = SheetControl(self, tab_color, tab_delete_icon, int(0.8*self.tab_height))
         
-        for name_i in set(self.dfc.loc[:, 'Group'].to_list()):
+        for name_i in [i[0] for i in self.df_l]:
             self.tab_bar.addTab(name_i)
+
         self.tab_bar.currentChanged.connect(self._line_fresh)
         self.tab_bar.setCurrentIndex(0)
         self.tab_bar.setFixedHeight(self.tab_height)
@@ -1724,10 +1759,16 @@ class LauncherSetting(QWidget):
         add_obj(self.save_button, self.reset_button, parent_f=self.bottom_layout)
         
     def _insert_line(self):
+        page_text = self.tab_bar.get_current_text()
+        index_f = [i for i, j in enumerate(self.df_l) if j[0]==page_text]
+        if not index_f:
+            return
+        page_index = index_f[0]
         if self.line_num >= len(self.widget_l):
             self._init_single_line(self.line_num, default=True, insert=True)
         else:
             self.widget_l[self.line_num].setVisible(True)
+        self.df_l[page_index][1].loc[self.df_l[page_index][1].shape[0]] = self._get_default_df(self.tab_bar.tabText(page_index))
         self.line_num += 1
     
     def add_tab(self, name='new_sheet', refresh:bool=True):
@@ -1737,23 +1778,36 @@ class LauncherSetting(QWidget):
             if name_t not in text_l:
                 break
         self.tab_bar.addTab(name_t)
+        self.df_l.append([name_t, self._get_default_df(name_t)])
         if refresh:
-            self._line_fresh(self.tab_bar.count()-1)
+            self.tab_bar.set_current_tab(name_t)
     
     def rename_tab(self, index):
         current_name = self.tab_bar.tabText(index)
         new_name, ok = QInputDialog.getText(self, "Rename Sheet", "Enter New Name:", text=current_name)
         if ok and new_name.strip():
+            if new_name in self.tab_bar.get_texts():
+                self.up.tip('Warning', 'Name already exists', {'OK':False}, False)
+                return
             self.tab_bar.setTabText(index, new_name)
-        self.dfc['Group'] = self.dfc['Group'].replace(current_name, new_name)
+            self.df_l[index][0] = new_name
     
     def close_tab(self, index):
         tip_prompt = f'Are you sure to DELETE sheet "{self.tab_bar.tabText(index)}"?'
         out_f = self.up.tip('Warning', tip_prompt, {'Yes':True, 'No':False}, False)
         if out_f:
             self.tab_bar.removeTab(index)
-            self.dfc = self.dfc[self.dfc['Group']!=self.tab_bar.tabText(index)]
+            self.df_l.pop(index)
     
+    def sort_tab(self):
+        tab_text_l = self.tab_bar.get_texts()
+        df_l = []
+        for i in tab_text_l:
+            for j in self.df_l:
+                if j[0] == i:
+                    df_l.append(j)
+        self.df_l = df_l
+
     def _change_icon(self, index_f:int):
         file_filter = "Images (*.svg *.png *.jpg *.jpeg *.ico)"
         file_path, _ = QFileDialog.getOpenFileName(self, "Select an image", "", file_filter)
@@ -1762,31 +1816,101 @@ class LauncherSetting(QWidget):
         icon_i = QIcon(file_path)
         self.objs_l[index_f]['icon'].setIcon(icon_i)
         _, ext = os.path.splitext(file_path)
-        id_l = self.dfc.loc[:,'IconID'].to_list()
+        id_l = self.df_n.loc[:,'IconID'].to_list()
         name = self.objs_l[index_f]['name'].text()
         id_ls = [i.split('.')[0] for i in id_l if i]
         if name in id_ls:
             for path_i in glob(os.path.join(self.tmp_icon_folder, f'{name}.*')):
                 os.remove(path_i)
         
-        self.dfc.loc[index_f, 'IconID'] = f'{name}{ext}'
+        self.df_n.loc[index_f, 'IconID'] = f'{name}{ext}'
         dst = os.path.join(self.tmp_icon_folder, f'{name}{ext}')
         shutil.copy(file_path, dst)
     
-    def _edit_change(self):
-        pass
+    def name_edit_change(self):
+        edit_f = self.sender()
+        text = edit_f.text()
+        index_f = edit_f.property('index')
+        type_f = edit_f.property('type')
+        if type_f == 'name':
+            self.df_n.iloc[index_f, 0] = text
+        else:
+            self.df_n.iloc[index_f, 1] = text
+        if type_f == 'name':
+            names = self.df_n.loc[:,'Name'].to_list()
+        else:
+            names = self.df_n.loc[:,'Chinese Name'].to_list()
+        if names.count(text) > 1:
+            if type_f == 'name':
+                edit_f._setStlye(1)
+            else:
+                pass
+        else:
+            edit_f._setStlye(0)
+
+    def exe_edit_change(self, text:str):
+        edit_f = self.sender()
+        index_f = edit_f.property('index')
+        self.df_n.iloc[index_f, 3] = text
 
     def _exe_search(self, index_f:int):
-        pass
+        options = QFileDialog.Options()
+        file_name, _ = QFileDialog.getOpenFileName(self, "Open File", "",
+                                                  "All Files (*);;Python Files (*.py)", options=options)
+        if file_name:
+            file_name = file_name.replace('/', '\\')
+            self.objs_l[index_f]['exe'].setText(file_name)
     
     def _reset(self):
-        pass
-
-    def _discard(self):
-        pass
+        title_f = 'Warning'
+        prompt_f = 'Are you sure to reset pages to last stage?'
+        value_d = {'Reset All':2, "Reset This Page":1, 'Cancel':-5}
+        out_f = self.up.tip(title_f, prompt_f, value_d, -5)
+        page_n = self.tab_bar.get_current_text()
+        page_index = self.tab_bar.currentIndex()
+        match out_f:
+            case 1:
+                if page_n not in set(self.df.loc[:,'Group'].to_list()):
+                    self.df_l[page_index][1] = self._get_default_df(page_n)
+                else:
+                    self.df_l[page_index][1] = self.df[self.df['Group']==page_n].copy(deep=True)
+                    self.df_l[page_index][1].loc[:,'IconID'] = None
+                self._line_fresh(page_index)
+            case 2:
+                for i in range(len(self.df_l)):
+                    name_i = self.df_l[i][0]
+                    if name_i not in set(self.df.loc[:,'Group'].to_list()):
+                        self.df_l[i][1] = self._get_default_df(name_i)
+                    else:
+                        self.df_l[i][1] = self.df[self.df['Group']==name_i].copy(deep=True)
+                        self.df_l[i][1].loc[:,'IconID'] = None
+                self._line_fresh(page_index)
 
     def _save(self):
-        pass
+        title_f = 'Warning'
+        prompt_f = 'Are you sure to write in pages to local data?'
+        value_d = {'Save All':2, "Save This Page":1, 'Cancel':-5}
+        out_f = self.up.tip(title_f, prompt_f, value_d, -5)
+        page_n = self.tab_bar.get_current_text()
+        page_index = self.tab_bar.currentIndex()
+        match out_f:
+            case 1:
+                df_toadd = self.df_l[page_index][1].drop('IconID', axis=1)
+                if page_n not in set(self.df.loc[:,'Group'].to_list()):
+                    self.df = pandas.concat([self.df, df_toadd], ignore_index=True)
+                else:
+                    self.df.loc[self.df['Group']==page_n] = df_toadd
+            case 2:
+                for name, df in self.df_l:
+                    df_toadd = df.drop('IconID', axis=1)
+                    if name not in set(self.df.loc[:,'Group'].to_list()):
+                        self.df = pandas.concat([self.df, df_toadd], ignore_index=True)
+                    else:
+                        self.df.loc[self.df['Group']==name] = df_toadd
+            case _:
+                return
+        self.manager.save_xlsx()
+
 
 class InfoTip(QDialog):
     def __init__(self, parent,
@@ -1872,3 +1996,4 @@ class InfoTip(QDialog):
         self.VALUE = button.property('value')
         super().accept()
 
+  

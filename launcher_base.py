@@ -143,7 +143,7 @@ class BaseLauncher(QMainWindow):
     def _load_data(self):
         self.launcher_data = LauncherPathManager(self.config)
         self.shortcut_data = ShortcutsPathManager(self.config)
-        self.ssh_manager = SshManager(self.config)
+        self.ssh_manager = self.up.ssh_manager
         
     @staticmethod
     def restart_program(script_path):

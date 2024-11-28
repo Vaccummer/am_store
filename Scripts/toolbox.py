@@ -21,7 +21,7 @@ import asyncssh
 import aiofiles
 import asyncio
 import pathlib
-
+import time
 
 def is_path(string_f, exist_check:bool=False):
     # To judge whether a variable is Path or not
@@ -598,21 +598,25 @@ class LauncherPathManager(object):
         self.conduct_l = []
     
     def _read_xlsx(self):
-        xls = pd.ExcelFile(self.data_path)
-        self.df = pd.DataFrame()
-        # read all sheets and add a column to indicate the group
-        for sheet_name in xls.sheet_names:
-            df_t = pd.read_excel(self.data_path, sheet_name=sheet_name)
-            df_t = df_t.dropna(how='all')
-            df_t['Group'] = sheet_name
-            self.df = pd.concat([self.df, df_t], ignore_index=True)
-        # check the hash ID
-        self.df.fillna("", inplace=True)
-        self.df['ID'] = self.df.apply(lambda row: row['Name']+"-_-"+row['Chinese Name'], axis=1)
+        with pd.ExcelFile(self.data_path) as xls:
+            self.df = pd.DataFrame()
+            # read all sheets and add a column to indicate the group
+            for sheet_name in xls.sheet_names:
+                df_t = pd.read_excel(self.data_path, sheet_name=sheet_name)
+                df_t = df_t.dropna(how='all')
+                df_t['Group'] = sheet_name
+                self.df = pd.concat([self.df, df_t], ignore_index=True)
+            # check the hash ID
+            self.df.fillna("", inplace=True)
 
     def save_xlsx(self):
+        # if os.path.exists(self.data_path):
+        #     if os.path.exists(self.data_path+'.bak'):
+        #         os.remove(self.data_path+'.bak')
+        #     os.rename(self.data_path, self.data_path+'.bak')
+        print(f"Saving to {self.data_path}")
         groups = list(self.df['Group'].unique())
-        with pd.ExcelWriter(self.data_path) as writer:
+        with pd.ExcelWriter(self.data_path, mode='w') as writer:
             for gropu_i in groups:
                 self.df[self.df['Group']==gropu_i].to_excel(writer, sheet_name=gropu_i, index=False)
     
@@ -677,16 +681,33 @@ class ShortcutsPathManager(object):
         self.df.to_excel(self.data_path, index=False)
 
 class SshManager(object):
-    def __init__(self, config:Config_Manager):
-        self.config = config
+    def __init__(self, parent:QMainWindow, config:Config_Manager):
+        self.up = parent
+        self.config = config.deepcopy()
         self.host_config_path = self.config.get("ssh_config", "Launcher", None, "path")
         self.server=None
         self.sftp = None
         self.hostname_n = None
         self.host = []
+        self.stop_check = False
+        self.sleep_state = True
+        self._read_ssh_config()
+    
+    def _check_connection_service(self):
+        while True:
+            if self.up.HOST not in self.hostnames:
+                time.sleep(30)
+                continue
+            if self.sleep_state:
+                time.sleep(30)
+            if self.stop_check:
+                break
+            if self.hostname_n != 'Local':
+                pass
     
     def _read_ssh_config(self):
-        self.hosts = parse_ssh_config(self.host_config_path)
+        self.hosts = parse_ssh_config(self.host_config_path,
+                                      fliter=self.config.get("hostname", "Launcher", 'path_mode_switch', None))
         self.hostnames = list(self.hosts.keys())
 
     def connect(self, host_name:str):
@@ -701,8 +722,11 @@ class SshManager(object):
                                 password=self.host.get('Password', ''))
             self.stfp = self.server.open_sftp()
             self.hostname_n = host_name
+            self.up.path_switch_button._setStyle(0)
             return True
         except Exception as e:
+            print(2)
+            self.up.path_switch_button._setStyle(1)
             return e
     
     def check_connection(self):
@@ -711,10 +735,13 @@ class SshManager(object):
             stdin, stdout, stderr = self.server.exec_command("uptime")
             output = stdout.read().decode('utf-8')
             if output:
+                self.up.path_switch_button._setStyle(0)
                 return True
             else:
+                self.up.path_switch_button._setStyle(1)
                 return False
         except Exception as e:
+            self.up.path_switch_button._setStyle(1)
             return False
     
     def close(self):
@@ -767,7 +794,20 @@ class SshManager(object):
         except Exception as e:
             return 0
 
+class WorkerThread(QThread):
+    error_signal = Signal(str)
+    def __init__(self, function, *args, **kwargs):
+        super().__init__()
+        self.function = function
+        self.args = args
+        self.kwargs = kwargs
 
+    def run(self):
+        print(3)
+        try:
+            self.function(*self.args, **self.kwargs)
+        except Exception as e:
+            self.error_signal.emit(str(e))
 
     
 

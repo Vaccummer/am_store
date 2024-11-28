@@ -24,6 +24,7 @@ class BaseLauncher(QMainWindow):
         self._mainwindow_set()
         tip = InfoTip(self, "Info", "Test OK", {}, self.config.deepcopy())
         tip.close()
+        self._load_data()
     # For mouse control
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -139,7 +140,7 @@ class BaseLauncher(QMainWindow):
     def _load_data(self):
         self.launcher_data = LauncherPathManager(self.config)
         self.shortcut_data = ShortcutsPathManager(self.config)
-        self.ssh_manager = SshManager(self.config)
+        self.ssh_manager = SshManager(self, self.config)
     
     def tip(self, title:str, prompt_f:str, value_d:dict, default_v):
         keys = list(value_d.keys())
@@ -200,6 +201,7 @@ class UILauncher(BaseLauncher):
     
     def _mainwindowUI(self):
         self.switch_button = SwitchButton(self, self.config)
+        self.switch_button.currentIndexChanged.connect(self._change_mode)
         self.shortcut_entry = ShortcutEntry(self, self.config)
         self.top_buttons = TopButton(self, self.config)._initbuttons()
         self.layout_top.addWidget(self.switch_button)
@@ -209,7 +211,7 @@ class UILauncher(BaseLauncher):
     def _initLauncherUI(self):
         self.path_switch_button = PathModeSwitch(self, config=self.config)
         self.host_d = self.path_switch_button.host_d
-
+        self.path_switch_button.currentIndexChanged.connect(self._change_host)
         self.input_box = InputBox(self, self.config)
         self.search_togle_button =SearchTogleButton(self, self.config)
         button_action = QWidgetAction(self)
@@ -249,16 +251,41 @@ class UILauncher(BaseLauncher):
         # terminal layer content
         self.terminal = Terminal(config=self.config.deepcopy(), parent=self)
         
-
         self.launcher_settings = LauncherSetting(config=self.config.deepcopy(), parent=self, manager=self.launcher_manager)
-        self.stack_ass.addWidget(self.launcher_settings)
-        self.stack_ass.addWidget(self.terminal)
         self.stack_ass.addWidget(self.ass_wd1)
+        self.stack_ass.addWidget(self.terminal)
+        self.stack_ass.addWidget(self.launcher_settings)
+        self.stack_ass.setCurrentIndex(0)
     
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        # line_edit_width = self.input_box.width()
-        # self.progress_bar.setFixedWidth(max(50, line_edit_width - 150))
+    @staticmethod
+    def _change_mode(self, index_n):
+        pass
+    @staticmethod
+    def _change_host(self, index_n):
+        pass
+
+class ControlLauncher(UILauncher):
+    def __init__(self, config: dict, app: QApplication):
+        super().__init__(config, app)
+    
+    def _change_mode(self, index_n:int):
+        self.stack_ass.setCurrentIndex(index_n)
+    
+    def _change_host(self, index_n:int):
+        host_n = self.path_switch_button.itemText(index_n)
+        if host_n not in self.ssh_manager.hostnames:
+            out_f = self.tip('Error', f"{host_n} Config NOT Exsists!", {'OK':-1},-1)
+            self.path_switch_button.setCurrentIndex(0)
+            return
+        self.HOST = host_n
+        thread_i = WorkerThread(self.ssh_manager.connect, self.HOST)
+        #self.ssh_manager.connect(self.HOST)
+        thread_i.error_signal.connect(self.handle_thread_error)
+        thread_i.start()
+    def handle_thread_error(self, error_message):
+        print(error_message)
+            
+
 
 if __name__ == "__main__":
     # QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
@@ -266,6 +293,6 @@ if __name__ == "__main__":
     app = QApplication([])
 
     config  = yml.read(r'launcher_cfg_new.yaml')
-    launcher = UILauncher(config, app)
+    launcher = ControlLauncher(config, app)
     launcher.show()
     sys.exit(app.exec_())
