@@ -28,7 +28,6 @@ class Associate:
                  program_info_df:pandas.DataFrame):
         self.num = nums
         self.df = program_info_df
-        self.df = self.df.fillna(value="")
         self.names = nan_to_sign(list(self.df['Name'].values))
         self.ch_names = nan_to_sign(list(self.df['Chinese Name'].values))
         self.description = nan_to_sign(list(self.df['Description'].values))
@@ -1705,7 +1704,7 @@ class LauncherSetting(QWidget):
     
     def _line_fresh(self, index_f:int):
         self.line_num = 0
-        #name_f = self.tab_bar.get_current_text()
+        name_f = self.tab_bar.get_current_text()
         self.df_n = self.df_l[index_f][1]
         for i in range(self.df_n.shape[0]):
             if i >= self.num:
@@ -1764,11 +1763,22 @@ class LauncherSetting(QWidget):
         if not index_f:
             return
         page_index = index_f[0]
+        print(self.df_n.columns)
+        print(self.df.columns)
+        self.df_n.loc[len(self.df_n)] = ['', '', '', '', page_text, None]
+        print(f'{page_text} has {self.df_l[page_index][1].shape[0]} lines')
         if self.line_num >= len(self.widget_l):
             self._init_single_line(self.line_num, default=True, insert=True)
         else:
             self.widget_l[self.line_num].setVisible(True)
-        self.df_l[page_index][1].loc[self.df_l[page_index][1].shape[0]] = self._get_default_df(self.tab_bar.tabText(page_index))
+            self.objs_l[self.line_num]['number'].setText(str(self.line_num))
+            self.objs_l[self.line_num]['name'].setText('')
+            self.objs_l[self.line_num]['chname'].setText('')
+            self.objs_l[self.line_num]['exe'].setText('')
+            self.objs_l[self.line_num]['icon'].setIcon(QIcon(self.default_app_icon))
+        
+  
+        #self.df_l[page_index][1].loc[self.df_l[page_index][1].shape[0]] = self._get_default_df(self.tab_bar.tabText(page_index))
         self.line_num += 1
     
     def add_tab(self, name='new_sheet', refresh:bool=True):

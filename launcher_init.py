@@ -278,10 +278,12 @@ class ControlLauncher(UILauncher):
             self.path_switch_button.setCurrentIndex(0)
             return
         self.HOST = host_n
-        thread_i = WorkerThread(self.ssh_manager.connect, self.HOST)
+        self.ssh_manager.connect(self.HOST)
+        # thread_i = WorkerThread(self.ssh_manager.connect, self.HOST)
         #self.ssh_manager.connect(self.HOST)
-        thread_i.error_signal.connect(self.handle_thread_error)
-        thread_i.start()
+        # thread_i.error_signal.connect(self.handle_thread_error)
+        # thread_i.start()
+    
     def handle_thread_error(self, error_message):
         print(error_message)
             
@@ -291,7 +293,6 @@ if __name__ == "__main__":
     # QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
     app = QApplication([])
-
     config  = yml.read(r'launcher_cfg_new.yaml')
     launcher = ControlLauncher(config, app)
     launcher.show()

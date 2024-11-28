@@ -719,7 +719,8 @@ class SshManager(object):
             self.server.connect(self.host['HostName'], 
                                 port=int(self.host.get('Port', 22)), 
                                 username=self.host.get('User', os.getlogin()), 
-                                password=self.host.get('Password', ''))
+                                password=self.host.get('Password', ''),
+                                timeout=3)
             self.stfp = self.server.open_sftp()
             self.hostname_n = host_name
             self.up.path_switch_button._setStyle(0)
