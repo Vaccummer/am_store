@@ -591,78 +591,91 @@ class LauncherPathManager(object):
     def __init__(self, config:Config_Manager):
         self.config = config
         self.data_path = AMPATH(self.config.get("settings_xlsx", mode="Launcher", widget="path", obj=None))
-        self.col_names= ['Name', 'Chinese Name', 'Description', 'EXE Path', 'Group']
+        self.permit_col = ['Name', 'Chinese Name', 'EXE Path']
+
+        self.conduct_l = []
+        self.name = 'PathManager'
+        self.sign_for_separate = self.config.get('separate_sign', 'Settings', self.name)
+        disallowed_chars_pattern = r'[<>:"/\\|?*]'
+        if (not self.sign_for_separate) or re.findall(disallowed_chars_pattern, self.sign_for_separate):
+            self.sign_for_separate = "^--$"
         self._read_xlsx()
         self.check()
         self._load_icon_dict()
-        self.conduct_l = []
     
     def _read_xlsx(self):
+        self.df = OrderedDict()
         with pd.ExcelFile(self.data_path) as xls:
-            self.df = pd.DataFrame()
             # read all sheets and add a column to indicate the group
             for sheet_name in xls.sheet_names:
                 df_t = pd.read_excel(self.data_path, sheet_name=sheet_name)
-                df_t = df_t.dropna(how='all')
-                df_t['Group'] = sheet_name
-                self.df = pd.concat([self.df, df_t], ignore_index=True)
-            # check the hash ID
-            self.df.fillna("", inplace=True)
+                for col_i in df_t.columns:
+                    if col_i not in self.permit_col:
+                        df_t.drop(col_i, axis=1, inplace=True)
+                df_t.dropna(axis=0, how='all', inplace=True)
+                df_t.fillna("", inplace=True)
+                self.df[sheet_name] = df_t
+        self.total_name_d = {}
+        self.total_names = []
+        for name_i, df_i in self.df.items():
+            self.total_name_d[name_i] = df_i['Name'].to_list()
+            self.total_names.extend(df_i['Name'].to_list())
+        return self.df
 
     def save_xlsx(self):
-        # if os.path.exists(self.data_path):
-        #     if os.path.exists(self.data_path+'.bak'):
-        #         os.remove(self.data_path+'.bak')
-        #     os.rename(self.data_path, self.data_path+'.bak')
-        print(f"Saving to {self.data_path}")
-        groups = list(self.df['Group'].unique())
         with pd.ExcelWriter(self.data_path, mode='w') as writer:
-            for gropu_i in groups:
-                self.df[self.df['Group']==gropu_i].to_excel(writer, sheet_name=gropu_i, index=False)
+            for name_i, df_i in self.df.items():
+                df_i.to_excel(writer, sheet_name=name_i, index=False)
     
     def check(self):
-        self.df['EXE Path'] = self.df['EXE Path'].apply(lambda x: x if os.path.exists(x) else "")
+        for name_i, df_i in self.df.items():
+            self.df[name_i]['EXE Path'] = self.df[name_i]['EXE Path'].apply(lambda x: x if os.path.exists(x) else "")
+        #self.df['EXE Path'] = self.df['EXE Path'].apply(lambda x: x if os.path.exists(x) else "")
     
     def _load_icon_dict(self):
         self.default_app_icon_path = self.config.get('default_app_icon', mode="Launcher", widget='associate_list', obj="path")
         self.default_app_icon = QIcon(self.default_app_icon_path)
         self.app_icon_folder = self.config.get('app_icon_folder', mode="Launcher", widget='associate_list', obj="path")
-        self.app_icon_d = {}
+        self.app_icon_d = {name:{} for name in self.df.keys()}
         for name_i in os.listdir(self.app_icon_folder):
             path_i = os.path.join(self.app_icon_folder, name_i)
             if os.path.isfile(path_i):
-                app_name, ext = os.path.splitext(name_i)
-                if app_name not in self.df['Name'].to_list():
-                    os.remove(path_i)
+                group_name, ext = os.path.splitext(name_i)
+                tmp_l = group_name.split(self.sign_for_separate)
+                if len(tmp_l) <= 1:
                     continue
-                self.app_icon_d[app_name] = path_i
+                else:
+                    group, app_name = tmp_l[:2]
+                if app_name in self.app_icon_d[group].keys():
+                    warnings.warn(f"Icon for {app_name} in group {group} already exists, skip {path_i}")
+                else:
+                    self.app_icon_d[group][app_name] = path_i
         self.exe_icon_getter = self.config.get('exe_icon_getter', mode="Launcher", widget='associate_list', obj="path").replace('\\', '/')
     
-    def get_icon(self, name:str)->QIcon:
-        # index_i = self.df.loc[self.df['Name'] == name].index[0]
-        if name == '360broswer':
-            a = 1
-        icon_l = self.app_icon_d.get(name, "")
+    def get_icon(self, name:str, group:str)->QIcon:
+        icon_l = self.app_icon_d[group].get(name, "")
         if icon_l:
             return QIcon(icon_l)
         else:
-            exe_t = self.df[self.df['Name']==name]['EXE Path'].values[0].strip()
-            target_icon_path = os.path.join(self.app_icon_folder, name).replace('\\', '/')
+            # 索引Name=name, Group=group的行
+            exe_t = self.df[group][self.df[group]['Name']==name]
+            if len(exe_t) == 0:
+                return self.default_app_icon
+            exe_t = exe_t.iloc[0]['EXE Path']
+            name_t = group+self.sign_for_separate+name
+            target_icon_path = os.path.join(self.app_icon_folder, name_t).replace('\\', '/')
             if exe_t.endswith('.exe') and (name not in self.conduct_l):
                 self.conduct_l.append(name)
                 commands_f = [self.exe_icon_getter, exe_t, target_icon_path+'.png']
-                #print(commands_f)
                 result = subprocess.check_output(commands_f, cwd=os.path.dirname(self.exe_icon_getter)).decode('gbk')
-                #result = subprocess.run(commands_f, cwd=self.config.wkdr, capture_output=True, text=True)
-                # out_f = result.stdout
                 if result and "图标已保存为" in result:
-                    self.app_icon_d[name] = (target_icon_path+'.png').replace('/', '\\')
+                    self.app_icon_d[group][name] = (target_icon_path+'.png').replace('/', '\\')
                     return QIcon(target_icon_path+'.png')
                 else:
-                    self.app_icon_d[name] = self.default_app_icon
+                    self.app_icon_d[group][name] = self.default_app_icon_path
                     return self.default_app_icon               
             else:
-                self.app_icon_d[name] = self.default_app_icon
+                self.app_icon_d[group][name] = self.default_app_icon_path
                 return self.default_app_icon
 
 class ShortcutsPathManager(object):

@@ -121,7 +121,6 @@ Launcher:
       box_background: ['rgba(255, 255, 255, 50)','#FA8A8A']
       item_background: "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #73B1A7, stop:1 #EDFFFF)"
 
-
   associate_list:
     font: 
       main: [[Family, *yahei], [PixelSize, 50]]
@@ -264,6 +263,8 @@ Settings:
       discard_button: ["#F7F7F7", "#FFC300", "#FF5733"]  # 包括普通, 悬浮, 点击三种颜色
       reset_button: ["#F7F7F7", "#FFC300", "#FF5733"]  # 包括普通, 悬浮, 点击三种颜色
     ori_line_num: 25
+  PathManager:
+    separate_sign: "^--$"
 # Searcher:  
 #   Size:
 #       main_window: [scr_x/2-win_x/2,scr_y/2-win_y/2,win_x,win_y]
