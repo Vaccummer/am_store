@@ -10,6 +10,8 @@ class BaseLauncher(QMainWindow):
     MODE = "Launcher"
     HOST = 'Local'
     HOST_TYPE = "Local"
+    CONNECT = True
+    CON_ERROR = ''
     def __init__(self, config:dict, app:QApplication):
         super().__init__()
         self.wkdir = os.getcwd()
@@ -121,6 +123,7 @@ class BaseLauncher(QMainWindow):
         # self.ass = Associate(self.config)
     
     def _mainwindow_set(self):
+        self.setGeometry(*self.config.get('main_window', mode='Launcher', widget=None, obj="Size"))
         self.setWindowFlags(self.windowFlags() | Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setWindowTitle("Super Launcher")
@@ -156,13 +159,16 @@ class BaseLauncher(QMainWindow):
             return default_v
         return values[return_i]
 
-    @staticmethod
-    def restart_program(script_path):
-        os.system(f"python {script_path}")
-    @staticmethod
-    def programm_exit():
+    def programm_exit(self):
         ## programm exit
+        self.close_maintainer()
+        time.sleep(0.5)
         QApplication.instance().quit()
+    
+    def restart_program(self, script_path):
+        os.system(f"python {script_path}")
+        self.programm_exit()
+    
     @staticmethod
     def get_geometry(window_f):
         geom_f = window_f.geometry()
@@ -175,7 +181,6 @@ class UILauncher(BaseLauncher):
         self._mainwindowUI()
         self._initLauncherUI()
         self._initFuncUI()
-        self.setGeometry(*self.config.get('main_window', mode='Launcher', widget=None, obj="Size"))
     @abstractmethod
     def launch(self):
         # recive para/file path to launch certain file
@@ -210,7 +215,6 @@ class UILauncher(BaseLauncher):
     
     def _initLauncherUI(self):
         self.path_switch_button = PathModeSwitch(self, config=self.config)
-        self.host_d = self.path_switch_button.host_d
         self.path_switch_button.currentIndexChanged.connect(self._change_host)
         self.input_box = InputBox(self, self.config)
         self.search_togle_button =SearchTogleButton(self, self.config)
@@ -243,6 +247,7 @@ class UILauncher(BaseLauncher):
         self.associate_list = AssociateList(config=self.config.deepcopy(), parent=self, manager=self.launcher_manager)
         self.shortcut_button = ShortcutButton(self, self.config.deepcopy())
         self.shortcut_setting = ShortcutSetting(self, self.config.deepcopy())
+        self.shortcut_setting.showWin()
         self.ass_wd1 = QWidget()
         self.ass_lo1 = amlayoutH('c', 'c', spacing=20)
         self.ass_wd1.setLayout(self.ass_lo1)
@@ -267,18 +272,42 @@ class UILauncher(BaseLauncher):
 class ControlLauncher(UILauncher):
     def __init__(self, config: dict, app: QApplication):
         super().__init__(config, app)
+        self.start_maintainer()
+        self._obj_connect()
     
     def _change_mode(self, index_n:int):
         self.stack_ass.setCurrentIndex(index_n)
     
     def _change_host(self, index_n:int):
         host_n = self.path_switch_button.itemText(index_n)
-        if host_n not in self.ssh_manager.hostnames:
-            out_f = self.tip('Error', f"{host_n} Config NOT Exsists!", {'OK':-1},-1)
-            self.path_switch_button.setCurrentIndex(0)
-            return
+        host_type = self.ssh_manager.host_type[host_n]
         self.HOST = host_n
-        self.ssh_manager.connect(self.HOST)
+        self.HOST_TYPE = host_type
+        if host_type == 'Local':
+            self.path_switch_button._setStyle(0)
+
+            self.CONNECT = True
+            return
+        elif host_type == 'WSL':
+            if os.path.exists(self.ssh_manager.hostd[host_n]):
+                self.path_switch_button._setStyle(0)
+                self.CONNECT = True
+                return
+            else:
+                out_f = self.tip('Error', f"{host_n} WSL not Exists!", {'OK':-1},-1)
+                self.path_switch_button._setStyle(2)
+                self.CONNECT = False
+                return
+        self.CONNECT = None
+        host_dt = self.ssh_manager.hostd.get(host_n, {})
+        if host_dt:
+            self.path_switch_button._setStyle(1)
+            self.thread = WorkerThread(self._cre_connection, host_dt)
+            self.thread.finished_signal.connect(self._connection_check)
+            self.thread.start()
+        else:
+            self.path_switch_button._setStyle(2)
+            self.CONNECT = False
         # thread_i = WorkerThread(self.ssh_manager.connect, self.HOST)
         #self.ssh_manager.connect(self.HOST)
         # thread_i.error_signal.connect(self.handle_thread_error)
@@ -286,7 +315,50 @@ class ControlLauncher(UILauncher):
     
     def handle_thread_error(self, error_message):
         print(error_message)
-            
+
+    def start_maintainer(self):
+        self.maintainer = ConnectionMaintainer(self.config)
+        self.maintainer.output.connect(self._connection_check)
+        self.maintainer.start()
+    def close_maintainer(self):
+        self.maintainer.stop()
+    
+    def refresh_connect(self):
+        config_t = self.ssh_manager.hostd[self.HOST]
+        data_t = {'HOST': self.HOST, 'HOST_TYPE': self.HOST_TYPE, 'host_config': config_t, 'CONNECT': False}
+        self.maintainer.data_updated.emit(data_t)
+
+    def _obj_connect(self):
+        self.input_box.textChanged.connect(self._input_change)
+    
+    def _input_change(self, text:str):
+        if self.MODE == "Launcher":
+            self.associate_list.update_associated_words(text)
+        
+    @staticmethod
+    def _cre_connection(host_paras:dict):
+        server = paramiko.SSHClient()
+        server.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        server.connect(host_paras['HostName'], 
+                        port=int(host_paras.get('port', 22)), 
+                        username=host_paras.get('User', os.getlogin()), 
+                        password=host_paras.get('Password', ''),
+                        timeout=5)
+        stfp = server.open_sftp()
+        return (server, stfp)
+    
+    def _connection_check(self, result):
+        sign_f, con = result
+        if not sign_f:
+            self.path_switch_button._setStyle(2)
+            self.CONNECT = False
+            self.CON_ERROR = con
+        else:
+            self.path_switch_button._setStyle(0)
+            self.CONNECT = True
+            self.CON_ERROR = ''
+            self.ssh_manager.server = con[0]
+            self.ssh_manager.stfp = con[1]
 
 
 if __name__ == "__main__":

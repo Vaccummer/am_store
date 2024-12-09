@@ -120,13 +120,16 @@ class AutoLabel(QLabel):
         self.setText(text)
         self.adjustSize()
     def set_color(self, color:str):
-        pass
-        # self.setStyleSheet(f'''
-        #                    QLabel {{
-        #                     color: {color};  # 字体颜色
-        #                     background-color: transparent;  # 背景透明
-        #                     }}
-        #                     ''')
+        sheet_f = '''
+                    QLabel {
+                            padding-left: 5px;   /* 左边距 */
+                            padding-right: 5px;  /* 右边距 */
+                            padding-top: 0px;    /* 上边距 */
+                            padding-bottom: 0px; /* 下边距 */
+                            background-color: transparent;  /* 背景透明 */
+                            }
+                    '''
+        self.setStyleSheet(sheet_f)
 
 class PolygonWidget(QWidget):
     def __init__(self):

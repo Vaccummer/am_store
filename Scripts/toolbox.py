@@ -274,7 +274,7 @@ def get_screen_size(target: Literal['pixel', 'physical', "dpi"]="pixel"):
         case "dpi":
             app.quit()
             return screen.physicalDotsPerInch()
-def excel_to_df(excel_path_f:str, region:str, sheet_name_f:Union[int, str, list]='Sheet1'):
+def excel_to_df(excel_path_f:str, region:str, sheet_name_f:Union[int, str, list]='Sheet1'):  
     # Read XLSX doc and transform it into dataframe
     # region format : 'A1:Z7'
     # sheet_name_f : Sheet name or Sheet order number(start from 1)
@@ -410,7 +410,6 @@ def add_obj(*args, parent_f:Union[QHBoxLayout, QVBoxLayout]):
             parent_f.addWidget(arg_i)
     return parent_f
 
-
 class dicta:
     @staticmethod
     def flatten_dict(dict_f:dict):
@@ -522,7 +521,6 @@ class Config_Manager(object):
             if "Size" in key_i:
                 self.config[key_i] = self._str2int(value_i)
 
-    
     def _str2int(self, input_f:Union[list, str]):
         scr_x, scr_y, win_x, win_y, gap, het, srh_r= symbols('scr_x scr_y win_x win_y gap het srh_r')
         values = {
@@ -548,18 +546,21 @@ class Config_Manager(object):
         self.obj = obj if obj!="_" else self.obj
         return self
         
-    def get(self, name_f:str, mode:str="_", widget:str="_", obj:str="_", default_v='^default_for_get_func$'):
+    def get(self, name_f:str, mode:str="_", widget:str="_", obj:str="_", default_v='^default_for_get_func$',ae:bool=True):
         mode = mode if mode!="_" else self.mode
         widget = widget if widget!="_" else self.widget
         obj = obj if obj!="_" else self.obj
-        args_a = [i for i in [mode, widget, obj, name_f] if i is not None]
+        args_a = [i for i in [mode, widget, obj, name_f] if i != None]
         if default_v != '^default_for_get_func$':
             out_a = self.config.get(tuple(args_a), default_v)
         else:
             out_a = self.config.get(tuple(args_a), None)
             if out_a is None:
                 return out_a
-        return self.after_process(args_a, out_a)
+        if ae:
+            return self.after_process(args_a, out_a)
+        else:
+            return out_a
     
     def __getitem__(self, key):
         if isinstance(key, tuple):
@@ -573,13 +574,21 @@ class Config_Manager(object):
 
     def after_process(self, args_a:tuple, target_f):
         if "path" in args_a:
-
             if isinstance(target_f, list):
-                return [str((pathlib.Path(self.wkdr)/pathlib.Path(i)).resolve()) for i in target_f]
-            elif os.path.isabs(target_f):
-               return target_f
+                out_l = []
+                for i in target_f:
+                    if os.path.isabs(i):
+                        out_l.append(i)
+                    else:
+                        out_l.append(str((pathlib.Path(self.wkdr)/pathlib.Path(i)).resolve()))
+                return out_l
+            elif isinstance(target_f, str):
+                if os.path.isabs(target_f):
+                    return target_f
+                else:
+                    return str((pathlib.Path(self.wkdr)/pathlib.Path(target_f)).resolve())
             else:
-                return str((pathlib.Path(self.wkdr)/pathlib.Path(target_f)).resolve())
+                return target_f
         elif "font" in args_a:
             font_dict = {i[0]:i[1] for i in target_f}
             return font_get(font_dict)
@@ -682,14 +691,70 @@ class ShortcutsPathManager(object):
     def __init__(self, config:Config_Manager):
         self.config = config
         self.col_name = ["Display_Name", "Icon_Path", "EXE_Path"]
-        self.data_path = AMPATH(self.config.get("setting_xlsx", mode="Launcher", widget="shortcut_setting", obj="path"))
+        self.data_path = AMPATH(self.config.get("setting_xlsx", mode="Launcher", widget="shortcut_obj", obj="path"))
         self._read_xlsx()
         self.check()
+        self._load()
+    
     def _read_xlsx(self):
         self.df = pd.read_excel(self.data_path)
+        self.df.fillna("", inplace=True)
+    
     def check(self):
-        self.df['EXE_Path'] = self.df['EXE_Path'].apply(lambda x: x if os.path.exists(x) else "")
-        self.df['Icon_Path'] = self.df['Icon_Path'].apply(lambda x: x if os.path.exists(x) else "")
+        self.df['EXE_Path'] = self.df['EXE_Path'].apply(lambda x: x if is_path(x, exist_check=True) else "")
+        self.df['Icon_Path'] = self.df['Icon_Path'].apply(lambda x: x if is_path(x, exist_check=True) else "")
+    
+    def _load(self):
+        self.icon_dir = AMPATH(self.config.get("button_icons", mode="Launcher", widget="shortcut_obj", obj="path"))
+        self.icon_dict = {}
+        for path_i in self.icon_dir.iterdir():
+            if path_i.is_dir():
+                continue
+            name_i = path_i.stem
+            self.icon_dict[name_i] = str(path_i)
+        self.default_icon = QIcon(self.config.get("default_button_icon", mode="Launcher", widget="shortcut_obj", obj="path"))
+        self.conduct_l = []
+        self.exe_icon_getter = self.config.get('exe_icon_getter', mode="Launcher", widget='associate_list', obj="path").replace('\\', '/')
+    
+    def geticon(self, name:str, str_format:bool=False)->QIcon:
+        path_t = self.icon_dict.get(name, "")
+        if path_t:
+            if str_format:
+                return path_t
+            else:
+                return QIcon(path_t)
+        else:
+            exe_paths = self.df[self.df['Display_Name']==name]['EXE_Path'].values
+            if not exe_paths:
+                if str_format:
+                    return self.default_icon
+                else:
+                    return QIcon(self.default_icon)
+            exe_path = exe_paths[0]
+            if exe_path.endswith('.exe')and (name not in self.conduct_l):
+                target_icon_path = os.path.join(self.icon_dir, name).replace('\\', '/')
+                commands_f = [self.exe_icon_getter, exe_path, target_icon_path+'.png']
+                result = subprocess.check_output(commands_f, cwd=os.path.dirname(self.exe_icon_getter)).decode('gbk')
+                self.conduct_l.append(name) 
+                if result and "图标已保存为" in result:
+                    self.icon_dict[name] = (target_icon_path+'.png').replace('/', '\\')
+                    if str_format:
+                        return target_icon_path+'.png'
+                    else:
+                        return QIcon(target_icon_path+'.png')
+                else:
+                    self.icon_dict[name] = self.default_icon
+                    if str_format:
+                        return self.default_icon
+                    else:
+                        return QIcon(self.default_icon)     
+            else:
+                self.icon_dict[name] = self.default_icon
+                if str_format:
+                    return self.default_icon
+                else:
+                    return QIcon(self.default_icon) 
+                          
     def save(self):
         self.df.to_excel(self.data_path, index=False)
 
@@ -697,73 +762,50 @@ class SshManager(object):
     def __init__(self, parent:QMainWindow, config:Config_Manager):
         self.up = parent
         self.config = config.deepcopy()
-        self.host_config_path = self.config.get("ssh_config", "Launcher", None, "path")
+        self.config.group_chose(mode='Settings', widget='SSHConfig', obj=None)
         self.server=None
         self.sftp = None
         self.hostname_n = None
         self.host = []
         self.stop_check = False
         self.sleep_state = True
-        self._read_ssh_config()
+        self._load_config()
     
-    def _check_connection_service(self):
-        while True:
-            if self.up.HOST not in self.hostnames:
-                time.sleep(30)
-                continue
-            if self.sleep_state:
-                time.sleep(30)
-            if self.stop_check:
-                break
-            if self.hostname_n != 'Local':
-                pass
-    
-    def _read_ssh_config(self):
-        self.hosts = parse_ssh_config(self.host_config_path,
-                                      fliter=self.config.get("hostname", "Launcher", 'path_mode_switch', None))
-        self.hostnames = list(self.hosts.keys())
-
-    def connect(self, host_name:str):
-        try:
-            assert host_name in self.hosts.keys(), f"Host name {host_name} not found in config file"
-            self.host = self.hosts[host_name]
-            self.server = paramiko.SSHClient()
-            self.server.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            self.server.connect(self.host['HostName'], 
-                                port=int(self.host.get('Port', 22)), 
-                                username=self.host.get('User', os.getlogin()), 
-                                password=self.host.get('Password', ''),
-                                timeout=3)
-            self.stfp = self.server.open_sftp()
-            self.hostname_n = host_name
-            self.up.path_switch_button._setStyle(0)
-            return True
-        except Exception as e:
-            print(2)
-            self.up.path_switch_button._setStyle(1)
-            return e
+    def _load_config(self):
+        self.host_config_path = self.config.get("ssh_config")
+        if not self.host_config_path:
+            self.host_config_path = os.path.expanduser("~/.ssh/config")
+        if os.path.exists(self.host_config_path):
+            self.hosts = parse_ssh_config(self.host_config_path,
+                                        fliter=self.config.get("hostname"))
+        else:
+            self.up.tip("Warning", "SSH config file not found, please check the path", {"OK":""}, "")
+            self.hosts = {}
+        self.wsl_l = self.config.get("wsl")
+        self.wsl_d = {i[0]:i[1] for i in self.wsl_l}
+        self.hostd = {'Local':''} | self.wsl_d | self.hosts
+        self.hostnames = list(self.hostd.keys())
+        self.host_type = {'Local':'Local'} | {i:"WSL" for i in self.wsl_d.keys()} | {i:"Remote" for i in self.hosts.keys()}
     
     def check_connection(self):
-        try:
-            # 执行简单命令（例如 uptime）来检测连接
-            stdin, stdout, stderr = self.server.exec_command("uptime")
-            output = stdout.read().decode('utf-8')
-            if output:
-                self.up.path_switch_button._setStyle(0)
-                return True
-            else:
-                self.up.path_switch_button._setStyle(1)
-                return False
-        except Exception as e:
-            self.up.path_switch_button._setStyle(1)
-            return False
+        if self.up.CONNECT:
+            return True
+        else:
+            match self.up.CONNECT:
+                case None:
+                    self.up.tip("Warning", "No connection established yet", {"OK":""}, "")
+                case False:
+                    self.up.tip("Error", f"Connection failed, error info {self.up.CON_ERROR}", {"OK":""}, "")
+                case _:
+                    self.up.tip("Error", "Unknown Error", {"OK":""}, "")
+        return False
     
     def close(self):
         self.server.close()
     
     def list_files(self, path:str):
         if not self.check_connection():
-            self.connect(self.hostname_n)
+            return
         try:
             return self.sftp.listdir(path)
         except Exception as e:
@@ -771,9 +813,8 @@ class SshManager(object):
     
     def check_exist(self, path:str):
         if not self.check_connection():
-            out = self.connect(self.hostname_n)
-            if out is not True:
-                return False
+            self.up.refresh_connect()
+            return "False"
         try:
             file_info = self.sftp.stat(path)
             if stat.S_ISDIR(file_info.st_mode):
@@ -781,7 +822,7 @@ class SshManager(object):
             else:
                 return 'file'
         except Exception:
-            return False
+            return 'False'
     
     def walk(self, src:str):
         file_info = []
@@ -797,7 +838,6 @@ class SshManager(object):
                         file_info.append((relative_path, 'file', entry.st_size))
             except Exception as e:
                 print(f"Error accessing path {path}: {e}")
-
         # 从 src 目录开始递归遍历
         list_files(src)
         return file_info
@@ -809,19 +849,66 @@ class SshManager(object):
             return 0
 
 class WorkerThread(QThread):
-    error_signal = Signal(str)
-    def __init__(self, function, *args, **kwargs):
+    finished_signal = Signal(list)
+    def __init__(self, function:callable, *args:tuple, **kwargs:dict):
         super().__init__()
         self.function = function
         self.args = args
         self.kwargs = kwargs
+    def run(self):
+        try:
+            out = self.function(*self.args, **self.kwargs)
+            self.finished_signal.emit([True, out])
+        except Exception as e:
+            self.finished_signal.emit([False, str(e)])
+
+class ConnectionMaintainer(QThread):
+    data_updated = Signal(dict)
+    output = Signal(list)
+    @Slot(list)
+    def update_data(self, data:dict):
+        # tuple: [host_name:str, host_d, host_type:str, connection_state]
+        self.host_name = data['HOST']
+        self.host_config = data['host_config']
+        self.host_type = data['HOST_TYPE']
+        self.state = data['CONNECT']
+        
+    def __init__(self, config:Config_Manager):
+        super().__init__()
+        self.config = config.deepcopy().group_chose(mode='Settings', widget='SSHConfig',)
+        self.data_updated.connect(self.update_data)
+        self.update_data({'HOST':'Local', 'host_config':{}, 'HOST_TYPE':'Local', 'CONNECT':True})
+        self.close_sign = False
+    
+    def _connect(self) ->list:
+        self.server = paramiko.SSHClient()
+        self.server.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        try:
+            self.server.connect(self.host_config['HostName'], 
+                                port=self.host_config.get('port', 22), 
+                                username=self.host_config.get('User', os.getlogin()), 
+                                password=self.host_config.get('Password', ''),
+                                timeout=3)
+            self.sftp = self.server.open_sftp()
+            return [True, [self.host_name, self.sftp]]
+        except Exception as e:
+            return [False, str(e)]
 
     def run(self):
-        print(3)
-        try:
-            self.function(*self.args, **self.kwargs)
-        except Exception as e:
-            self.error_signal.emit(str(e))
-
-    
+        while True:
+            if self.close_sign:
+                break
+            if self.host_type != 'Remote':
+                time.sleep(0.1)
+                continue
+            else:
+                if self.state:
+                    time.sleep(0.1)
+                    continue
+                else:
+                    out = self._connect()
+                    self.output.emit(out)
+            
+    def stop(self):
+        self.close_sign = True
 

@@ -104,26 +104,22 @@ Launcher:
     search_togle_button: [0.6*het, 0.6*het]
   path:
     settings_xlsx: "./load/Launcher/launcher_set.xlsx"
+    ssh_config: "C:\\Users\\am\\.ssh\\config"
+    wsl:
+      "ubuntu-24.04": "\\\\wsl.localhost\\Ubuntu-24.04"
   input_box:
     font: 
       main: [[Family, *yahei], [PixelSize, 40]]
-  
   path_mode_switch:
     font: [[Family, *yahei], [PixelSize, 40]]
     hostname: "all" # fliter hosts in config, if is "all", include all, if is null, exclude all. Use list format to assign multi host
     color:
-      box_background: ['rgba(255, 255, 255, 50)',"#FAC83F", '#FA8A8A']  # 连接正常,等待连接,连接失败三种颜色
+      box_background: ['rgba(255, 255, 255, 50)','#FA8A8A']
       item_background: "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #73B1A7, stop:1 #EDFFFF)"
 
   associate_list:
-    Size:
-      item_height: 0.8*het
-      button_height: 0.7*het
-      extra_width: 0.22*gap
-      max_width: 7*gap
-      min_width: 2*gap
     font: 
-      main: [[Family, *yahei], [PixelSize, 40]]
+      main: [[Family, *yahei], [PixelSize, 50]]
     path:
       file_icon_folder: './load/Launcher/file_icons'
       app_icon_folder: './load/Launcher/app_icons'
@@ -143,41 +139,53 @@ Launcher:
     remote_min_chunck: 4 # in MB
     remote_max_chunck: 100 # in MB
   
-  shortcut_obj:
+  shortcut_button:
     horizontal_button_num: 6
     vertical_button_num: 5
     Size:
-      entr_icon_r: 0.7*het
-      button_r: 1.6*het
-      button: [0.7*het, 0.7*het]
-      line_height: 0.9*het
-      colname_margin: [20,35]
-      colwidth_0: ["3*gap", "3*gap"]
-      colwidth_1: ["1.3*gap", "1.3*gap"]
-      colwidth_2: ["5*gap", "5*gap"]
-      colwidth_3: ['0', '9999']
-      colwidth_4: ["1.3*gap", "1.3*gap"]
+      button: [0.7*het, 0.7*het]       
     font:
-      button_title: [[Family, *jetbrains], [PixelSize, 30], [Weight, 60]]
+      button_title: [[Family, *jetbrains], [PixelSize, 40], [Weight, 60]]
+    path:
+      button_icons: &shortcut_button_icons './load/Launcher/shortcut_botton/button_icons'
+      setting_xlsx: &shortcut_setting_xlsx './load/Launcher/shortcut_setting/shortcut_set.xlsx'
+      default_button_icon: *default_button_icon # 和associate共享默认app_icon
+    color:
+      button_hover: "#619F99"
+  
+  shortcut_entry:
+    path:
+      icon: "./load/Launcher/entry_button.svg"
+  
+  shortcut_setting:
+    font: 
       window_title: [[Family, *yahei], [PixelSize, 60], [Weight, 70]]
       coordinate_label: [[Family, *jetbrains], [PixelSize, 60], [Weight, 70]]
       app_name_label: [[Family, *jetbrains], [PixelSize, 60], [Weight, 70]]
       exe_lineedit: [[Family, *yahei], [PixelSize, 60], [Weight, 70]]
       option_button: [[Family, *jetbrains], [PixelSize, 60], [Weight, 70]]
     path:
-      entry_icon: './load/Launcher/entry_button.svg'
-      button_icons: &shortcut_button_icons './load/Launcher/shortcut_botton/button_icons'
+      setting_xlsx: *shortcut_setting_xlsx
       taskbar_icon: './load/Launcher/shortcut_setting/taskbar_icon.svg'
-      setting_xlsx: &shortcut_setting_xlsx './load/Launcher/shortcut_obj/shortcut_set.xlsx'
-      default_button_icon: *default_button_icon # 和associate共享默认app_icon
+      button_icons_dir: './load/Launcher/shortcut_botton/button_icons'
+      button_icons: *shortcut_button_icons
+      coordinate_button_set: "./load/Launcher/shortcut_setting/coordinate/svg"
+      default_app_icon: *default_button_icon
       default_folder_icon: './load/Launcher/shortcut_setting/default/default_folder_icon.svg'
       col_coordinate_icon: './load/Launcher/shortcut_setting/col_icon/col_coordinate_icon.svg'
       col_name_icon: './load/Launcher/shortcut_setting/col_icon/col_name_icon.svg'
       col_icon_icon: './load/Launcher/shortcut_setting/col_icon/col_icon_icon.svg'
       col_path_icon: "./load/Launcher/shortcut_setting/col_icon/col_path_icon.svg"
       col_search_icon: "./load/Launcher/shortcut_setting/col_icon/col_search_icon.svg"
+    name:
+      window_title: Shortcut Settings
+    size:
+      colwidth_0: [120, 70]
+      colwidth_1: [270, 70]
+      colwidth_2: [90, 70]
+      colwidth_3: [700, 70]
+      colwidth_4: [90, 70]
     color:
-      button_hover: "#619F99"
       launcher0 : "#008080"
       launcher1 : "#68E4D6"
       launcher2 : "#FA8072"
@@ -190,8 +198,6 @@ Launcher:
       cancel0 : "#C60618"
       cancel1 : "#FF4A6C"
       cancel2 : "#349179"
-    name:
-      window_title: Shortcut Settings
 
   search_togle_button:
     urls: 
@@ -259,15 +265,8 @@ Settings:
     ori_line_num: 25
   PathManager:
     separate_sign: "^--$"
-  SSHConfig:
-    ssh_config: "C:\\Users\\am\\.ssh\\config"
-    hostname: "all" # fliter hosts in config, if is "all", include all, if is null, exclude all. Use list format to assign multi host
-    wsl:
-      - ["ubuntu-24.04", "\\\\wsl.localhost\\Ubuntu-24.04"]
-    connection_check_interval: 30
-
 # Searcher:  
-#   Size:1
+#   Size:
 #       main_window: [scr_x/2-win_x/2,scr_y/2-win_y/2,win_x,win_y]
 #       srh_icon: [win_x/2-srh_r/2,win_y/2-srh_r/2-3.6*gap,srh_r,srh_r]
 #       input_box: [gap,win_y/2,win_x-2*gap,het]
