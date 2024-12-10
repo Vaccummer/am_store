@@ -44,11 +44,11 @@ class Associate:
     # To Associate subdirectory of certain path
     def path(self, prompt_f):
         if not prompt_f:
-            return []
+            return [], []
         path_f = pathlib.Path(prompt_f)
         # prompt is a specific file path
         if path_f.exists and path_f.is_file():
-            return []
+            return [], []
         # prompt is a directory
         if os.path.exists(prompt_f):
             list_1 = os.listdir(prompt_f)
@@ -62,7 +62,7 @@ class Associate:
         sup_path = path_f.parent
         dir_name_n = path_f.name
         if not sup_path.exists():
-            return []
+            return [], []
         else:
             list_1f = sorted([dir_if for dir_if in os.listdir(sup_path) if dir_name_n in dir_if], key=lambda x:x.index(dir_name_n))
             list_2f = sorted([dir_if for dir_if in os.listdir(sup_path) if dir_name_n.lower() in dir_if.lower()], key=lambda x:(x.lower()).index(dir_name_n.lower()))
@@ -82,14 +82,8 @@ class Associate:
         output_name = sorted([name_i for name_i in self.names if prompt_f.lower() in name_i.lower()], key=lambda s: (s.lower().index(prompt_f.lower()))/len(s))
         output_chname = sorted([ch_name_i for ch_name_i in self.ch_names if prompt_f.lower() in ch_name_i.lower()], key=lambda s: (s.lower().index(prompt_f.lower()))/len(s))
         output_chname_t = [i for i in output_chname if self.names[self.ch_names.index(i)] not in output_name]
-        groups_t = []
         names_t = rm_dp_list_elem(output_name+output_chname_t, reverse=False)[0:self.num]
-        for name_i in names_t:
-            if name_i in self.names:
-                groups_t.append(self.groups[self.names.index(name_i)])
-            else:
-                names_t.remove(name_i)
-        return names_t, ['app']*self.num, groups_t
+        return names_t, ['app']*len(names_t)
     
     # To associate programmes with multiple prompts
     def multi_pro_name(self, prompt_list_f):
@@ -115,8 +109,32 @@ class Associate:
                     return os.path.join(sup_path, name_wait_list[0], os.sep)
                 else:
                     return None
+    
     # Automatically complete Remote PATH
-
+    def fill_remote_path(self, prompt_f:str, server:paramiko.SFTPClient):
+        if not server:
+            return None
+        conductor = SSHConductor(server)
+        path_info = conductor.check_path(prompt_f)
+        if (not path_info['connect']) or path_info['type'] != 'dir':
+            return None
+        if path_info['type'] == 'dir':
+            path_list = conductor.list_dir(prompt_f)
+            if len(path_list) == 1:
+                return os.path.join(prompt_f, path_list[0])
+            else:
+                return None
+        dir_t, name_t = os.path.split(prompt_f)
+        path_info = conductor.check_path(dir_t)
+        if path_info['type'] == 'dir':
+            path_list = conductor.list_dir(dir_t)
+            name_wait_list = [name_if for name_if in path_list if (name_if).lower().startswith(name_t.lower())]
+            if len(name_wait_list) == 1:
+                return os.path.join(dir_t, name_wait_list[0])
+            else:
+                return None
+        else:
+            return None
     # Automatically complete Name
     def fill_name(self, prompt_f):
         output_0 = [name_i for name_i in self.names if name_i.lower().startswith(prompt_f.lower())]
@@ -132,35 +150,42 @@ class BasicAS(QListWidget):
         self.up = parent
         self.name = "associate_list"
         self.config = config.deepcopy()
+        self.setAcceptDrops(True)  # 接受放置事件
+        self.setDragEnabled(True)  # 启用拖动事件
         self.config.group_chose("Launcher", self.name)
-        self.manager = manager
+        self.launcher_manager = manager
         self._load()
     
     def focusNextPrevChild(self, next):
-    # inhibit focus move when pressing TAB
-        # Override to prevent normal focus change
         return True
     def dragEnterEvent(self, event: QDragEnterEvent):
-        if event.mimeData().hasUrls():  
-            event.acceptProposedAction()  
-    def dragMoveEvent(self, event):
-        event.accept()
+        if event.mimeData().hasUrls():  # 检查是否有文件 URL
+            event.acceptProposedAction()  # 接受拖入
+        else:
+            super().dragEnterEvent(event)
+    def dragMoveEvent(self, event: QDragMoveEvent):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            super().dragMoveEvent(event)
+    
     def dropEvent(self, event: QDropEvent):
         mime_data = event.mimeData()
-        if mime_data.hasUrls():  
-            urls = mime_data.urls()  
-            paths_t = []
-            for url in urls:
-                paths_t.append(url.toLocalFile())
-            self._upload(self, paths_t)
-            event.acceptProposedAction()  
+        if mime_data.hasUrls():  # 如果拖放的内容是文件
+            urls = mime_data.urls()
+            paths = [url.toLocalFile() for url in urls]  # 获取文件路径
+            #self.append("Dropped files:\n" + "\n".join(paths))  # 显示文件路径
+            event.acceptProposedAction()  # 接受拖放
+        else:
+            super().dropEvent(event)
     
     
     def _load(self):
         self.num = self.config.get("max_exe_num", )
         self.max_num = self.config.get("max_dir_num", )
-        self.launcher_df = self.manager.df
+        self.launcher_df = self.launcher_manager.df
         self.ass = Associate(self.num, self.launcher_df)
+        self.ssh_manager:SshManager = self.up.ssh_manager
         self.config.group_chose(mode="Launcher", widget=self.name, obj=None)
 
         self.local_min_chunck = int(self.config.get('local_min_chunck')*1024*1024)
@@ -200,10 +225,10 @@ class BasicAS(QListWidget):
         else:
             return min(max(self.remote_min_chunck, size_f//48), self.remote_max_chunck)
     
-    def _geticon(self, name:str, sign:Literal['name', "path"], type_f:Literal["dir", 'file'], group_t:str=None)->QIcon:
+    def _geticon(self, name:str, sign:Literal['name', "path"], type_f:Literal["dir", 'file'])->QIcon:
         match sign:
             case "name":
-                return self.manager.get_icon(name, group_t)
+                return self.launcher_manager.get_icon(name)
             case _:
                 if type_f == 'dir':
                     return self.default_icon_d['dir']
@@ -237,7 +262,6 @@ class UIAS(BasicAS):
         self._inititems()
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.right_click)
-        self.itemClicked.connect(self.left_click)
 
     def _setStyle(self):
         self.setFont(self.font_a)
@@ -274,34 +298,31 @@ class UIAS(BasicAS):
             background-color: #14B699;  /* 设置选中项的背景颜色 */
             color: white;  /* 设置选中项的文字颜色 */
         }}
+        QListWidget QScrollBar:vertical {{
+                background: #F0F0F0;  /* 滚动条背景 */
+                width: 14px;  /* 滚动条宽度 */
+                margin: 3px;  /* 滚动条和内容之间的间距 */
+                border-radius: 7px;  /* 滚动条圆角 */
+            }}
+
+            QListWidget QScrollBar::handle:vertical {{
+                background: #32CC99;  /* 滚动条手柄颜色 */
+                min-height: 30px;  /* 滚动条手柄的最小高度 */
+                border-radius: 7px;  /* 滚动条手柄圆角 */
+            }}
+
+            QListWidget QScrollBar::add-line:vertical,
+            QListWidget QScrollBar::sub-line:vertical {{
+                background: none;  /* 去掉上下按钮背景 */
+                height: 0px;  /* 隐藏上下按钮 */
+            }}
+
+            QListWidget QScrollBar::add-page:vertical,
+            QListWidget QScrollBar::sub-page:vertical {{
+                background: none;  /* 空白区域背景 */
+            }}
         '''
         self.setStyleSheet(style_sheet)
-        self.horizontalScrollBar().setStyleSheet("""
-        QScrollBar:horizontal {
-            background: transparent;
-            height: 30px;
-            margin: 3px;
-        }
-
-        QScrollBar::handle:horizontal {
-            background: #32CC99;
-            min-width: 80px;
-            border-radius: 10px;
-        }
-
-        QScrollBar::sub-line:horizontal,
-        QScrollBar::add-line:horizontal,
-        QScrollBar::sub-page:horizontal,
-        QScrollBar::add-page:horizontal,
-        QScrollBar::sub-line:vertical,
-        QScrollBar::add-line:vertical,
-        QScrollBar::sub-page:vertical,
-        QScrollBar::add-page:vertical,
-        QScrollBar::sub-line:corner,
-        QScrollBar::add-line:corner {
-        background: transparent;
-        }
-        """)
         self.setSpacing(1)  # 设置 item 之间的间距为 10 像素
         self.setAttribute(Qt.WA_TranslucentBackground) 
 
@@ -353,6 +374,7 @@ class UIAS(BasicAS):
 class AssociateList(UIAS):
     def __init__(self, config:Config_Manager, parent:Union[QMainWindow, QWidget],manager:LauncherPathManager):  
         super().__init__(config, parent, manager)
+        self.raise_()
 
     def _check_path(self, path_t:str):
         match self.up.HOST:
@@ -379,7 +401,7 @@ class AssociateList(UIAS):
     
     def right_click(self, pos):
         prompt_f = self.up.input_box.text() 
-        item = self.list_widget.itemAt(pos)
+        item = self.itemAt(pos)
         if (("\\" not in prompt_f) and ('/' not in prompt_f)) or not item:
             return
         
@@ -459,8 +481,14 @@ class AssociateList(UIAS):
     
     def update_associated_words(self, text:str):
         current_text:str = text
-        match self.up.HOST:
-            case "Local" | "WSL":
+        match self.up.HOST_TYPE:
+            case "Local":
+                self._local_update(current_text)
+            case "WSL":
+                preffix = self.ssh_manager.get_config(self.up.HOST)['config']['path']
+                username = self.ssh_manager.get_config(self.up.HOST)['config']['user']
+                if current_text.startswith('~'):
+                    current_text = os.path.join(preffix, f"/home/{username}", current_text.lstrip('~'))
                 self._local_update(current_text)
             case "Remote":
                 self._remote_update(current_text)
@@ -468,11 +496,9 @@ class AssociateList(UIAS):
                 return
     
     def _local_update(self, current_text:str):
-        num_n = self.num
+        num_n = len(self.item_l)
         sign_n = "name"
         if is_path(current_text):
-            if self.up.HOST_TYPE == "WSL":
-                current_text = self.up.hostd[self.up.HOST]
             num_n = self.max_num
             sign_n = "local"
             matching_words, type_l = self.ass.path(current_text)
@@ -480,10 +506,10 @@ class AssociateList(UIAS):
             type_l = ['parent'] + type_l
             groups = [None]*len(type_l)
         elif not current_text:
-            matching_words, type_l, groups = [], [], []
+            matching_words, type_l = [], []
         else:
             # if ';' not in current_text:
-            matching_words, type_l, groups = self.ass.name(current_text)
+            matching_words, type_l = self.ass.name(current_text)
             # else:
             #     matching_words = self.ass.multi_pro_name(current_text.split(';'))
 
@@ -493,7 +519,7 @@ class AssociateList(UIAS):
                 continue
             self.item_l[i].setHidden(False)
             text_i = matching_words[i]
-            icon_i = self._geticon(text_i, sign_n, type_l[i], groups[i])
+            icon_i = self._geticon(text_i, sign_n, type_l[i])
             self.label_l[i].setText(text_i)
             self.button_l[i].setIcon(icon_i)
     
@@ -547,7 +573,44 @@ class AssociateList(UIAS):
         width_f = min(width_f, self.max_length)
         width_f = max(width_f, self.min_width)
         self.setFixedWidth(width_f)
-        
+    
+    def _tab_complete(self, current_text:str):
+        if not current_text:
+            return
+        if self.up.HOST_TYPE == "Local":
+            if is_path(current_text):
+                return self.ass.fill_path(current_text)
+            else:       
+                pass
+        elif self.up.HOST_TYPE == "WSL":
+            exp_user = False
+            if not current_text:
+                return 
+            elif current_text.startswith('~/'):
+                exp_user = True
+                username = self.ssh_manager.get_config(self.up.HOST)['config']['user']
+                current_text = current_text.replace('~/', f"/home/{username}/")
+            if is_path(current_text):
+                prefix = self.ssh_manager.get_config(self.up.HOST)['config']['path']
+                current_text = os.path.join(prefix, current_text, '/')
+                tab_out = self.ass.fill_path(current_text)
+                if tab_out:
+                    tab_out = tab_out.replace(prefix, '')
+                    if exp_user:
+                        tab_out = tab_out.replace(f"/home/{username}/", "~/")
+                return tab_out
+            else:
+                pass
+        elif self.up.HOST_TYPE == 'Remote':
+            if current_text.startswith('~/') or is_path(current_text):
+                return self.ass.fill_remote_path(current_text, self.ssh_manager.sftp)
+            else:
+                pass
+        else:
+            warnings.warn('Unknown HOST_TYPE detected!')
+            return
+        return self.ass.fill_name(current_text)
+
 
     def src_dst_parsing(self, src:str, dst:str, src_type:Literal['local', 'remote'], dst_type:Literal['local', 'remote'])->list:
         copy_paths = []  
@@ -772,13 +835,55 @@ class TopButton(QWidget):
             self.max_state = True
 
 class InputBox(QLineEdit):
+    key_press = Signal(dict)
     def __init__(self, parent:QMainWindow, config:Config_Manager):
         super().__init__(parent)
         self.up = parent
         self.name = "input_box"
         self.config = config.deepcopy()
         self._initUI()
-        self.returnPressed.connect(self.clear)
+        self.custom_keys = [Qt.Key_Tab, Qt.Key_Return, Qt.Key_Enter, Qt.Key_Up, Qt.Key_Down]
+        # self.returnPressed.connect(self.clear)
+    
+    @Slot(dict)
+    def event(self, event:QEvent):
+        match event.type():
+            case QEvent.DragEnter:
+                mime_data = event.mimeData()
+                if mime_data.hasUrls():  
+                    event.acceptProposedAction()  
+                    return True  
+                else:
+                    return super().event(event)  
+            case QEvent.DragMove:  
+                mime_data = event.mimeData()
+                if mime_data.hasUrls():
+                    event.acceptProposedAction()  
+                    return True  
+                else:
+                    return super().event(event)  # 交给父类处理其他事件
+            case QEvent.Drop:  
+                mime_data = event.mimeData()
+                if mime_data.hasUrls():  # 如果拖放的是文件
+                    urls = mime_data.urls()
+                    paths = [url.toLocalFile() for url in urls]  # 获取文件路径
+                    self.key_press.emit({'type':'file_drop', 'paths':paths, "text":self.text()})
+                    event.acceptProposedAction()  # 接受拖放操作
+                    return True  # 表示事件已被处理
+            case QEvent.KeyPress:
+                if event.key() in self.custom_keys:
+                    self.key_press.emit({'type':'key_press', 'key':event.key(), "text":self.text()})
+                    return True
+                else:
+                    return super().event(event)
+            case _:
+                return super().event(event)
+    # def keyPressEvent(self, event):
+    #     if event.key() in self.custom_keys:
+    #         self.key_press.emit({'key':event.key(), "text":self.text()})
+    #     else:
+    #         super().keyPressEvent(event)
+    
     def _initUI(self):
         self.config.group_chose(mode=self.up.MODE, widget="input_box")
         sty_sheet = f'''
@@ -1299,6 +1404,7 @@ class ShortcutSetting(UIShortcutSetting):
         name = self.objs[index_f]['name_edit'].text()
         options = QFileDialog.Options()
         file_filter = "SVG Files (*.svg);;ICO Files (*.ico)"
+        dir_f = ''
         file_path, _ = QFileDialog.getOpenFileName(self, f"Choose '{name}' icon", dir_f, file_filter, options=options)
         if not file_path:
             return

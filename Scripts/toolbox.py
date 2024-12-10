@@ -410,6 +410,9 @@ def add_obj(*args, parent_f:Union[QHBoxLayout, QVBoxLayout]):
             parent_f.addWidget(arg_i)
     return parent_f
 
+
+
+
 class dicta:
     @staticmethod
     def flatten_dict(dict_f:dict):
@@ -479,6 +482,58 @@ class dicta:
                         data_n = data_n[key]
                 data_n[key_tuple[-1]] = value
         return data_n
+
+class SSHConductor(object):
+    def __init__(self, sftp:Union[paramiko.SFTPClient]):
+        self.sftp = sftp
+    
+    def check_path(self, path:str):
+        try:
+            file_info = self.sftp.stat(path)
+            return {
+                "connect": True,
+                "exist": True,
+                "mode": self.get_path_type(file_info.st_mode),
+                "size": file_info.st_size,
+                }
+        except FileNotFoundError:
+            return {
+                "connect": True,
+                "exist": False,
+                "mode": None,
+                "size": None,
+                }
+        except Exception as e:
+            return {
+                "connect": False,
+                "exist": None,
+                "mode": None,
+                "size": None,
+                "error": e
+                }
+
+    def list_dir(self, path:str):
+        check_d = self.check_path(path)
+        if not (check_d['connect'] or check_d['exist']):
+            return []
+        if check_d['mode'] != "dir":
+            return []
+        try:
+            dirs = self.sftp.listdir(path)
+            return dirs
+        except Exception as e:
+            return []
+    
+    def get_path_type(self, st_mode):
+        if stat.S_ISDIR(st_mode):
+            return "dir"
+        elif stat.S_ISREG(st_mode):
+            return "file"
+        elif stat.S_ISLNK(st_mode):
+            return "link"
+        else:
+            return "unknown"
+
 
 class Config_Manager(object):
     @classmethod
@@ -595,7 +650,6 @@ class Config_Manager(object):
         else:
             return target_f
 
-
 class LauncherPathManager(object):
     def __init__(self, config:Config_Manager):
         self.config = config
@@ -661,12 +715,21 @@ class LauncherPathManager(object):
                     self.app_icon_d[group][app_name] = path_i
         self.exe_icon_getter = self.config.get('exe_icon_getter', mode="Launcher", widget='associate_list', obj="path").replace('\\', '/')
     
-    def get_icon(self, name:str, group:str)->QIcon:
-        icon_l = self.app_icon_d[group].get(name, "")
+    def get_icon(self, name:str, group:str=None)->QIcon:
+        if group:
+            icon_l = self.app_icon_d[group].get(name, "")
+        else:
+            icon_l = ""
+            for group_i, app_d in self.app_icon_d.items():
+                icon_l = app_d.get(name, "")
+                if icon_l:
+                    group = group_i
+                    break
         if icon_l:
             return QIcon(icon_l)
         else:
-            # 索引Name=name, Group=group的行
+            if not group:
+                return QIcon(self.default_app_icon)
             exe_t = self.df[group][self.df[group]['Name']==name]
             if len(exe_t) == 0:
                 return self.default_app_icon
@@ -782,11 +845,19 @@ class SshManager(object):
             self.up.tip("Warning", "SSH config file not found, please check the path", {"OK":""}, "")
             self.hosts = {}
         self.wsl_l = self.config.get("wsl")
-        self.wsl_d = {i[0]:i[1] for i in self.wsl_l}
+        self.wsl_d = {i[0]:{'path':i[1], 'user':i[2]} for i in self.wsl_l}
         self.hostd = {'Local':''} | self.wsl_d | self.hosts
         self.hostnames = list(self.hostd.keys())
         self.host_type = {'Local':'Local'} | {i:"WSL" for i in self.wsl_d.keys()} | {i:"Remote" for i in self.hosts.keys()}
     
+    def get_config(self, name:str):
+        assert name in self.hostd.keys(), f"Invalid host name: {name}"
+        type_t = self.host_type[name]
+        config_t = self.hostd[name]
+        return {'type':type_t, 'config':config_t}
+
+
+
     def check_connection(self):
         if self.up.CONNECT:
             return True
@@ -908,7 +979,130 @@ class ConnectionMaintainer(QThread):
                 else:
                     out = self._connect()
                     self.output.emit(out)
-            
+
     def stop(self):
         self.close_sign = True
 
+class TransferMaintainer(QThread):
+    bar_state = Signal(list)    # output the state and progress of the transfer
+    stop_signal = Signal(bool)  # stop the transfer
+    def __init__(self,config:Config_Manager):
+        super().__init__()
+        self.name = "TransferMaintainer"
+        self.config = config.deepcopy().group_chose(mode='Settings', widget=self.name,obj=None)
+        self._load()
+    
+    def _load(self):
+        self.local_min_chunck = self.config.get('local_min_chunck')*1024**2
+        self.local_max_chunck = self.config.get('local_max_chunck')*1024**2
+        self.remote_min_chunck = self.config.get('remote_min_chunck')*1024**2
+        self.remote_max_chunck = self.config.get('remote_max_chunck')*1024**2
+        self.task_queue = []
+        self.loop = None  # Event loop for asyncio
+        self.state = 'Stop'
+    
+    def _load_task(self, task:List[dict]):
+        self.task_queue.extend(task)
+    
+    def worker_func(self, data:dict):
+        connect_type = data['connect_type']
+        task_type = data['task_type']
+        paras_old = data['paras'] # [[src, dst, size, type], [src, dst, size, type]]
+        paras_new = []
+        new_config = {}
+        if connect_type == 'remote':
+            connect_config = data.get('connect_config', None)
+            if not connect_config:
+                return
+            new_config['host'] = connect_config['HostName']
+            new_config['port'] = connect_config.get('port', 22)
+            new_config['username'] = connect_config.get('User', os.getlogin())
+            new_config['password'] = connect_config.get('Password', '')
+            new_config['timeout'] = 3
+        for para_i in paras_old:
+            src, dst, size, file_type_t = para_i
+            size_f = int(size)
+            chunk_size = self.cal_chunck_size(size_f, connect_type)
+            paras_new.append({'src':src, 'dst':dst, 'size':size_f, 'chunk_size':chunk_size, 
+                              'connect_type':connect_type, 'task_type':task_type, 'file_type':file_type_t, 
+                              'config':new_config})
+    
+    def run(self):
+        self.loop = asyncio.new_event_loop()  # Create a new event loop
+        asyncio.set_event_loop(self.loop)  # Bind loop to current thread
+        count_i = 0
+        while True:
+            if self.task_queue:
+                data_i = self.task_queue.pop(0)
+                continue
+            time.sleep(0.1)
+            if count_i % 10 == 0:
+                self.bar_state.emit([False, 0])
+            self.stop_signal.emit(True)
+    
+
+    def progress_update(self, updated_progress:int):
+        self.total_progress += updated_progress
+        self.bar_state.emit([True, self.total_progress/self.total_size])
+    
+    def cal_chunck_size(self, size_f:int, hosttype:Literal['local', 'remote'])->int:
+        if hosttype == 'local':
+            tar_size = min(max(self.local_min_chunck, size_f//48), self.local_max_chunck, size_f)
+            return tar_size
+        else:
+            tar_size = min(max(self.remote_min_chunck, size_f//48), self.remote_max_chunck, size_f)
+            return tar_size
+    
+    async def copy_file_chunk(self, src:str, dst:str, chunk_size:int, 
+                              connect_type:Literal['local', 'remote'], 
+                              task_type:Literal['upload', 'download'],
+                              file_type:Literal['file', 'dir']):
+        async with aiofiles.open(src, 'rb') as fsrc, aiofiles.open(dst, 'wb') as fdst:
+            while True:
+                chunk = await fsrc.read(chunk_size)
+                if not chunk:
+                    break  
+                await fdst.write(chunk)
+                self.progress_update(chunk_size)
+    
+    def stop(self):
+        if self.loop:
+            self.loop.call_soon_threadsafe(self.loop.stop)
+        self.quit()
+        self.wait()
+
+
+import asyncio
+import asyncssh
+from typing import List, Literal
+
+class FileTransfer:
+    def __init__(self, remote_server):
+        self.remote_server = remote_server
+
+    async def transfer_single_file(self, src: str, dst: str, sftp, type_f: Literal['get', 'put'], semaphore: asyncio.Semaphore):
+        async with semaphore:  # 限制并发数
+            if type_f == 'get':
+                await sftp.get(src, dst)  # 下载文件
+            elif type_f == 'put':
+                await sftp.put(src, dst)  # 上传文件
+            print(f"{type_f} file from {src} to {dst} completed.")
+
+    async def transfer_multiple_files(self, tasks: List[tuple[str, str]], type_f: Literal['get', 'put'], max_connections: int = 5):
+        host_d = self.remote_server.host
+        semaphore = asyncio.Semaphore(max_connections)  # 最大并发数
+
+        try:
+            async with asyncssh.connect(host_d['HostName'], 
+                                        username=host_d.get('User', os.getlogin()), 
+                                        password=host_d.get(('Password', '')),
+                                        port=int(host_d.get('port', 22))) as conn:
+                async with conn.start_sftp_client() as sftp:
+                    transfer_tasks = []  
+                    for src, dst in tasks:
+                        transfer_tasks.append(self.transfer_single_file(src, dst, sftp, type_f, semaphore))
+                    await asyncio.gather(*transfer_tasks)
+                    return True
+        except Exception as e:
+            print(f"文件传输失败: {e}")
+            return False

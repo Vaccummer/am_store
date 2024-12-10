@@ -70,7 +70,6 @@ class BaseLauncher(QMainWindow):
         else:
             new_height = max(self.original_geometry.height() + diff.y(), self.minimumHeight())
             self.setGeometry(self.original_geometry.x(), self.original_geometry.y(), self.original_geometry.width(), new_height)
-        
     def closeEvent(self, event):
         # rewrite close event
         event.ignore()  # ignore the close event
@@ -161,8 +160,8 @@ class BaseLauncher(QMainWindow):
 
     def programm_exit(self):
         ## programm exit
-        self.close_maintainer()
-        time.sleep(0.5)
+        self.close_all_tread()
+        time.sleep(0.15)
         QApplication.instance().quit()
     
     def restart_program(self, script_path):
@@ -280,7 +279,7 @@ class ControlLauncher(UILauncher):
     
     def _change_host(self, index_n:int):
         host_n = self.path_switch_button.itemText(index_n)
-        host_type = self.ssh_manager.host_type[host_n]
+        host_type = self.ssh_manager.get_config(host_n)['type']
         self.HOST = host_n
         self.HOST_TYPE = host_type
         if host_type == 'Local':
@@ -289,7 +288,7 @@ class ControlLauncher(UILauncher):
             self.CONNECT = True
             return
         elif host_type == 'WSL':
-            if os.path.exists(self.ssh_manager.hostd[host_n]):
+            if os.path.exists(self.ssh_manager.get_config(host_n)['config']['path']):
                 self.path_switch_button._setStyle(0)
                 self.CONNECT = True
                 return
@@ -299,7 +298,7 @@ class ControlLauncher(UILauncher):
                 self.CONNECT = False
                 return
         self.CONNECT = None
-        host_dt = self.ssh_manager.hostd.get(host_n, {})
+        host_dt = self.ssh_manager.get_config(host_n)['config']
         if host_dt:
             self.path_switch_button._setStyle(1)
             self.thread = WorkerThread(self._cre_connection, host_dt)
@@ -320,21 +319,58 @@ class ControlLauncher(UILauncher):
         self.maintainer = ConnectionMaintainer(self.config)
         self.maintainer.output.connect(self._connection_check)
         self.maintainer.start()
-    def close_maintainer(self):
-        self.maintainer.stop()
     
+    def close_all_tread(self):
+        self.maintainer.stop()
+
     def refresh_connect(self):
-        config_t = self.ssh_manager.hostd[self.HOST]
+        config_t = self.ssh_manager.get_config(self.HOST)['config']
         data_t = {'HOST': self.HOST, 'HOST_TYPE': self.HOST_TYPE, 'host_config': config_t, 'CONNECT': False}
         self.maintainer.data_updated.emit(data_t)
 
     def _obj_connect(self):
         self.input_box.textChanged.connect(self._input_change)
+        self.input_box.key_press.connect(self._input_box_signal_process)
+    
+    @Slot(dict)
+    def _input_box_signal_process(self, input_f:Dict[Literal['key', 'text', 'type'], str]):
+        event_type = input_f['type']
+        text = input_f['text']
+        if event_type == 'key_press':
+            key = input_f['key']
+            match key:
+                case Qt.Key_Tab:
+                    tab_out = self.associate_list._tab_complete(text)
+                    if tab_out:
+                        self.input_box.setText(tab_out)
+                case Qt.Key_Return, Qt.Key_Enter:
+                    self.confirm_input(text)
+                    self.input_box.setText('')
+                case Qt.Key_Up:
+                    pass
+                case Qt.Key_Down:
+                    pass
+                case _:
+                    return
+        elif event_type == 'file_drop':
+            paths_com = " ".join(input_f['paths'])
+            if text:
+                self.input_box.setText(text+" "+paths_com)
+            else:
+                self.input_box.setText(paths_com)
+        else:
+            return
     
     def _input_change(self, text:str):
         if self.MODE == "Launcher":
             self.associate_list.update_associated_words(text)
-        
+            driver_parttern = r"^([A-Za-z])[\\]$"
+            dirver_match = re.match(driver_parttern, text)
+            if dirver_match:
+                self.input_box.setText(f"{dirver_match.group(1)}:\\")
+                return
+    
+    
     @staticmethod
     def _cre_connection(host_paras:dict):
         server = paramiko.SSHClient()

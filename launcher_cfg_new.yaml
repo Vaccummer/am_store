@@ -263,9 +263,14 @@ Settings:
     ssh_config: "C:\\Users\\am\\.ssh\\config"
     hostname: "all" # fliter hosts in config, if is "all", include all, if is null, exclude all. Use list format to assign multi host
     wsl:
-      - ["ubuntu-24.04", "\\\\wsl.localhost\\Ubuntu-24.04"]
+      - ["ubuntu-24.04", "//wsl.localhost/Ubuntu-24.04", "am"] # ["hostname", "address", "username"]
     connection_check_interval: 30
+  TransferMaintainer:
+    local_min_chunck: 256 # in MB
+    local_max_chunck: 2048 # in MB
 
+    remote_min_chunck: 4 # in MB
+    remote_max_chunck: 100 # in MB
 # Searcher:  
 #   Size:1
 #       main_window: [scr_x/2-win_x/2,scr_y/2-win_y/2,win_x,win_y]
