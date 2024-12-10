@@ -1532,6 +1532,26 @@ class TransferProgress(ProgressBar):
         self.up = parent
         super().__init__(parent, max_value, height)
 
+class ProgressWidget(QWidget):
+    def __init__(self, parent:QWidget, config:Config_Manager, data:dict):
+        super().__init__(parent)
+        self.up = parent
+        self.data = data
+        self.name = 'progress_widget'
+        self.config = config.deepcopy().group_chose(mode="Launcher", widget=self.name)
+        self._load()
+        
+    def _load(self):
+        pass
+
+    def _initUI(self):
+        self.layout_0 = QVBoxLayout()
+        self.setLayout(self.layout_0)
+
+        self._init_title()
+        self._init_progress()
+    
+
 class ExePathLine(QLineEdit):
     def __init__(self, height_f:int, 
                  place_holder:str,

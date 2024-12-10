@@ -360,5 +360,28 @@ class InputLine(QLineEdit):
         '''
         #self.horizontalScrollBar().setStyleSheet(self.scroll_bar_style_sheet)
 
+class SmartStackWidget(QStackedWidget):
+    def __init__(self, parent:QWidget):
+        super().__init__(parent)
+    
+    def wheelEvent(self, event):
+        current_index = self.currentIndex()
+        num_pages = self.count()
+
+        if event.angleDelta().y() > 0:  # 向上滚动
+            new_index = (current_index + 1) % num_pages
+        else:  
+            new_index = (current_index - 1 + num_pages) % num_pages
+        self.setCurrentIndex(new_index)
+
+    def remove_page(self, index:int):
+        index_n = self.currentIndex()
+        if index == index_n:
+            self.setCurrentIndex((index_n+1 ) % self.count())
+        widget_to_rm = self.widget(index)
+        self.removeWidget(widget_to_rm)
+        widget_to_rm.deleteLater()
+    
+        
 
     

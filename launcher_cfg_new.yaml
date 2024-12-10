@@ -203,7 +203,10 @@ Launcher:
       - "./load/MainWindow/maximum.svg"
       - "./load/MainWindow/middle.svg"
     sign: '^{sign_for_exchange}$'
-
+  
+  progress_widget:
+    1
+    
 Terminal:
   font: 
     main: [[Family, *jetbrains], [PointSize, 60], [Weight, 70]]

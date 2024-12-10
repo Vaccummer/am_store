@@ -1,4 +1,5 @@
 from PySide2.QtWidgets import QApplication
+from sympy import Q
 from Scripts.toolbox import QApplication
 # from launcher_base import BaseLauncher
 from Scripts.toolbox import *
@@ -231,6 +232,7 @@ class UILauncher(BaseLauncher):
         self.progress_layout = amlayoutH(align_h='l')
         #self.progress_bar_layout.addSpacing(30)
         self.progress_layout.addWidget(self.progress_bar)
+        self.progress_stack = QStackedWidget(self)
         #self.progress_bar_layout.addSpacing(30)
         #self.input_box_layout.addLayout(self.progress_bar_layout)
 
