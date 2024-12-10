@@ -233,6 +233,7 @@ class UILauncher(BaseLauncher):
         #self.progress_bar_layout.addSpacing(30)
         self.progress_layout.addWidget(self.progress_bar)
         self.progress_stack = QStackedWidget(self)
+        
         #self.progress_bar_layout.addSpacing(30)
         #self.input_box_layout.addLayout(self.progress_bar_layout)
 

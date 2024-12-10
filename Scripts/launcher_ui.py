@@ -1540,9 +1540,9 @@ class ProgressWidget(QWidget):
         self.name = 'progress_widget'
         self.config = config.deepcopy().group_chose(mode="Launcher", widget=self.name)
         self._load()
-        
+
     def _load(self):
-        pass
+        pass   
 
     def _initUI(self):
         self.layout_0 = QVBoxLayout()

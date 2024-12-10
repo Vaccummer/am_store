@@ -367,7 +367,6 @@ class SmartStackWidget(QStackedWidget):
     def wheelEvent(self, event):
         current_index = self.currentIndex()
         num_pages = self.count()
-
         if event.angleDelta().y() > 0:  # 向上滚动
             new_index = (current_index + 1) % num_pages
         else:  
