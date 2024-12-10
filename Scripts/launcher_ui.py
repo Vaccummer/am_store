@@ -611,7 +611,6 @@ class AssociateList(UIAS):
             return
         return self.ass.fill_name(current_text)
 
-
     def src_dst_parsing(self, src:str, dst:str, src_type:Literal['local', 'remote'], dst_type:Literal['local', 'remote'])->list:
         copy_paths = []  
         if src_type == 'local':
@@ -668,7 +667,7 @@ class AssociateList(UIAS):
             async with asyncssh.connect(host_d['HostName'], 
                                         username=host_d.get('User', os.getlogin()), 
                                         password=host_d.get(('Password', '')),
-                                        port=int(self.host.get('Port', 22))) as conn:
+                                        port=int(self.host.get('port', 22))) as conn:
                 async with conn.start_sftp_client() as sftp:
                     tasks = []  
                     for src, dst, size_f in tasks:
@@ -878,11 +877,6 @@ class InputBox(QLineEdit):
                     return super().event(event)
             case _:
                 return super().event(event)
-    # def keyPressEvent(self, event):
-    #     if event.key() in self.custom_keys:
-    #         self.key_press.emit({'key':event.key(), "text":self.text()})
-    #     else:
-    #         super().keyPressEvent(event)
     
     def _initUI(self):
         self.config.group_chose(mode=self.up.MODE, widget="input_box")

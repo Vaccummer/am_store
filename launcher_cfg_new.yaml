@@ -268,7 +268,6 @@ Settings:
   TransferMaintainer:
     local_min_chunck: 256 # in MB
     local_max_chunck: 2048 # in MB
-
     remote_min_chunck: 4 # in MB
     remote_max_chunck: 100 # in MB
 # Searcher:  
