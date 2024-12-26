@@ -143,7 +143,7 @@ class BaseLauncher(QMainWindow):
     def _load_data(self):
         self.launcher_data = LauncherPathManager(self.config)
         self.shortcut_data = ShortcutsPathManager(self.config)
-        self.ssh_manager = SshManager(self, self.config)
+        self.path_manager = PathManager(self, self.config)
     
     def tip(self, title:str, prompt_f:str, value_d:dict, default_v):
         keys = list(value_d.keys())
@@ -161,7 +161,10 @@ class BaseLauncher(QMainWindow):
 
     def programm_exit(self):
         ## programm exit
-        self.close_all_tread()
+        try:
+            self.close_all_tread()
+        except Exception as e:
+            warnings.warn(f"Error in close thread: {e}")
         time.sleep(0.15)
         QApplication.instance().quit()
     
@@ -274,7 +277,6 @@ class UILauncher(BaseLauncher):
 class ControlLauncher(UILauncher):
     def __init__(self, config: dict, app: QApplication):
         super().__init__(config, app)
-        self.start_maintainer()
         self._obj_connect()
     
     def _change_mode(self, index_n:int):
@@ -282,58 +284,33 @@ class ControlLauncher(UILauncher):
     
     def _change_host(self, index_n:int):
         host_n = self.path_switch_button.itemText(index_n)
-        host_type = self.ssh_manager.get_config(host_n)['type']
+        result_i, type_i, error = self.path_manager.change_host(host_n)
         self.HOST = host_n
-        self.HOST_TYPE = host_type
-        if host_type == 'Local':
+        self.HOST_TYPE = type_i
+        self.CON_ERROR = error
+        self.CONNECT = result_i
+        if result_i is True:
             self.path_switch_button._setStyle(0)
-
-            self.CONNECT = True
-            return
-        elif host_type == 'WSL':
-            if os.path.exists(self.ssh_manager.get_config(host_n)['config']['path']):
-                self.path_switch_button._setStyle(0)
-                self.CONNECT = True
-                return
-            else:
-                out_f = self.tip('Error', f"{host_n} WSL not Exists!", {'OK':-1},-1)
-                self.path_switch_button._setStyle(2)
-                self.CONNECT = False
-                return
-        self.CONNECT = None
-        host_dt = self.ssh_manager.get_config(host_n)['config']
-        if host_dt:
-            self.path_switch_button._setStyle(1)
-            self.thread = WorkerThread(self._cre_connection, host_dt)
-            self.thread.finished_signal.connect(self._connection_check)
-            self.thread.start()
-        else:
+        elif result_i is False:
             self.path_switch_button._setStyle(2)
-            self.CONNECT = False
-        # thread_i = WorkerThread(self.ssh_manager.connect, self.HOST)
-        #self.ssh_manager.connect(self.HOST)
-        # thread_i.error_signal.connect(self.handle_thread_error)
-        # thread_i.start()
-    
+        else:
+            self.path_switch_button._setStyle(1)
+   
     def handle_thread_error(self, error_message):
         print(error_message)
 
-    def start_maintainer(self):
-        self.maintainer = ConnectionMaintainer(self.config)
-        self.maintainer.output.connect(self._connection_check)
-        self.maintainer.start()
+    # def start_maintainer(self):
+    #     self.maintainer = ConnectionMaintainer(self.config)
+    #     self.maintainer.output.connect(self._connection_check)
+    #     self.maintainer.start()
     
     def close_all_tread(self):
-        self.maintainer.stop()
-
-    def refresh_connect(self):
-        config_t = self.ssh_manager.get_config(self.HOST)['config']
-        data_t = {'HOST': self.HOST, 'HOST_TYPE': self.HOST_TYPE, 'host_config': config_t, 'CONNECT': False}
-        self.maintainer.data_updated.emit(data_t)
+        self.path_manager.maintainer.stop()
 
     def _obj_connect(self):
         self.input_box.textChanged.connect(self._input_change)
         self.input_box.key_press.connect(self._input_box_signal_process)
+        self.path_manager.con_res.connect(self._connection_check)
     
     @Slot(dict)
     def _input_box_signal_process(self, input_f:Dict[Literal['key', 'text', 'type'], str]):
@@ -373,31 +350,18 @@ class ControlLauncher(UILauncher):
                 self.input_box.setText(f"{dirver_match.group(1)}:\\")
                 return
     
-    
-    @staticmethod
-    def _cre_connection(host_paras:dict):
-        server = paramiko.SSHClient()
-        server.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        server.connect(host_paras['HostName'], 
-                        port=int(host_paras.get('port', 22)), 
-                        username=host_paras.get('User', os.getlogin()), 
-                        password=host_paras.get('Password', ''),
-                        timeout=5)
-        stfp = server.open_sftp()
-        return (server, stfp)
-    
+    @Slot(list)
     def _connection_check(self, result):
-        sign_f, con = result
+        sign_f, error = result
+        self.CON_ERROR = error
+        if self.CONNECT == sign_f:
+            return
+        else:
+            self.CONNECT = sign_f
         if not sign_f:
             self.path_switch_button._setStyle(2)
-            self.CONNECT = False
-            self.CON_ERROR = con
         else:
             self.path_switch_button._setStyle(0)
-            self.CONNECT = True
-            self.CON_ERROR = ''
-            self.ssh_manager.server = con[0]
-            self.ssh_manager.stfp = con[1]
 
 
 if __name__ == "__main__":

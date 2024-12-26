@@ -102,8 +102,10 @@ Launcher:
     opto_settings: null
     #search_togle_icon: [0.6*het, 0.6*het]
     search_togle_button: [0.6*het, 0.6*het]
+  
   path:
     settings_xlsx: "./load/Launcher/launcher_set.xlsx"
+  
   input_box:
     font: 
       main: [[Family, *yahei], [PixelSize, 40]]
@@ -131,10 +133,15 @@ Launcher:
       default_folder_icon: &default_folder_icon './load/Launcher/shortcut_setting/default/default_button_icon.svg'
       default_file_icon: &default_file_icon './load/Launcher/shortcut_setting/default/default_button_icon.svg'
       download_save_dir: './load/Launcher/assoicate_list/download'
+      filelog_default_path: 'F:\\Windows_Data\\Desktop_File'
       exe_icon_getter: './3rdparty/get_exe_icon/main.exe'
       file_icon_getter: "./3rdparty/get_file_icon/main.exe"
+    color:
+      item_color_common: "#F7F7F7"
+      item_color_hover: "#FFC300" 
+      item_color_selected: "#FF5733"
     max_exe_num: 10
-    max_dir_num: 128
+    max_dir_num: 999
     max_length: 600
 
     local_min_chunck: 256 # in MB
@@ -205,8 +212,20 @@ Launcher:
     sign: '^{sign_for_exchange}$'
   
   progress_widget:
-    1
-    
+    Size:
+      bar_height: 0.2*het
+      info_height: 0.3*het
+    font:
+      label_font: [[Family, *yahei], [PixelSize, 20]]
+    color:
+      bar_color: "#FAC83F"
+      bar_background: "#F7F7F7"
+      src_label_background: "#000000"
+      dst_label_background: "#000000"
+    path:
+      arrow_icon: "./load/Launcher/progress_widget/arrow_icon.png"
+      close_icon: "./load/Launcher/progress_widget/close_icon.png"
+
 Terminal:
   font: 
     main: [[Family, *jetbrains], [PointSize, 60], [Weight, 70]]
@@ -261,8 +280,8 @@ Settings:
       reset_button: ["#F7F7F7", "#FFC300", "#FF5733"]  # 包括普通, 悬浮, 点击三种颜色
     ori_line_num: 25
   PathManager:
+    filename_flitter: ["$"] # filename or dirname starts with these characters will be moved to the end of the list
     separate_sign: "^--$"
-  SSHConfig:
     ssh_config: "C:\\Users\\am\\.ssh\\config"
     hostname: "all" # fliter hosts in config, if is "all", include all, if is null, exclude all. Use list format to assign multi host
     wsl:

@@ -21,14 +21,23 @@ import asyncssh
 import aiofiles
 import asyncio
 import pathlib
+from pathlib import Path
 import time
+from abc import ABC, abstractmethod
+
 
 def is_path(string_f, exist_check:bool=False):
     # To judge whether a variable is Path or not
     if not isinstance(string_f, str):
         return False
     if not exist_check:
-        return os.path.isabs(string_f)
+        sign_f = False
+        if os.path.isabs(string_f):
+            sign_f = True
+        if sign_f:
+            return True
+        pattern_f = r'^[~./\\]|^[a-zA-Z]:\\+'
+        return bool(re.match(pattern_f, string_f))
     else:
         return os.path.exists(string_f)
 
@@ -411,8 +420,6 @@ def add_obj(*args, parent_f:Union[QHBoxLayout, QVBoxLayout]):
     return parent_f
 
 
-
-
 class dicta:
     @staticmethod
     def flatten_dict(dict_f:dict):
@@ -533,7 +540,6 @@ class SSHConductor(object):
             return "link"
         else:
             return "unknown"
-
 
 class Config_Manager(object):
     @classmethod
@@ -821,111 +827,14 @@ class ShortcutsPathManager(object):
     def save(self):
         self.df.to_excel(self.data_path, index=False)
 
-class SshManager(object):
-    def __init__(self, parent:QMainWindow, config:Config_Manager):
-        self.up = parent
-        self.config = config.deepcopy()
-        self.config.group_chose(mode='Settings', widget='SSHConfig', obj=None)
-        self.server=None
-        self.sftp = None
-        self.hostname_n = None
-        self.host = []
-        self.stop_check = False
-        self.sleep_state = True
-        self._load_config()
-    
-    def _load_config(self):
-        self.host_config_path = self.config.get("ssh_config")
-        if not self.host_config_path:
-            self.host_config_path = os.path.expanduser("~/.ssh/config")
-        if os.path.exists(self.host_config_path):
-            self.hosts = parse_ssh_config(self.host_config_path,
-                                        fliter=self.config.get("hostname"))
-        else:
-            self.up.tip("Warning", "SSH config file not found, please check the path", {"OK":""}, "")
-            self.hosts = {}
-        self.wsl_l = self.config.get("wsl")
-        self.wsl_d = {i[0]:{'path':i[1], 'user':i[2]} for i in self.wsl_l}
-        self.hostd = {'Local':''} | self.wsl_d | self.hosts
-        self.hostnames = list(self.hostd.keys())
-        self.host_type = {'Local':'Local'} | {i:"WSL" for i in self.wsl_d.keys()} | {i:"Remote" for i in self.hosts.keys()}
-    
-    def get_config(self, name:str):
-        assert name in self.hostd.keys(), f"Invalid host name: {name}"
-        type_t = self.host_type[name]
-        config_t = self.hostd[name]
-        return {'type':type_t, 'config':config_t}
-
-
-
-    def check_connection(self):
-        if self.up.CONNECT:
-            return True
-        else:
-            match self.up.CONNECT:
-                case None:
-                    self.up.tip("Warning", "No connection established yet", {"OK":""}, "")
-                case False:
-                    self.up.tip("Error", f"Connection failed, error info {self.up.CON_ERROR}", {"OK":""}, "")
-                case _:
-                    self.up.tip("Error", "Unknown Error", {"OK":""}, "")
-        return False
-    
-    def close(self):
-        self.server.close()
-    
-    def list_files(self, path:str):
-        if not self.check_connection():
-            return
-        try:
-            return self.sftp.listdir(path)
-        except Exception as e:
-            return ["Wrong Connection"]
-    
-    def check_exist(self, path:str):
-        if not self.check_connection():
-            self.up.refresh_connect()
-            return "False"
-        try:
-            file_info = self.sftp.stat(path)
-            if stat.S_ISDIR(file_info.st_mode):
-                return 'directory'  
-            else:
-                return 'file'
-        except Exception:
-            return 'False'
-    
-    def walk(self, src:str):
-        file_info = []
-        def list_files(path):
-            try:
-                dir_contents = self.sftp.listdir_attr(path)
-                for entry in dir_contents:
-                    relative_path = os.path.relpath(path + '/' + entry.filename, start=src)
-                    if entry.st_mode & 0o170000 == 0o040000:  # 判断是否是目录
-                        file_info.append((relative_path, 'directory', 0))
-                        list_files(path + '/' + entry.filename)
-                    else:
-                        file_info.append((relative_path, 'file', entry.st_size))
-            except Exception as e:
-                print(f"Error accessing path {path}: {e}")
-        # 从 src 目录开始递归遍历
-        list_files(src)
-        return file_info
-    
-    def getsize(self, src:str):
-        try:
-            return self.sftp.stat(src).st_size
-        except Exception as e:
-            return 0
-
-class WorkerThread(QThread):
+class ConnectionThread(QThread):
     finished_signal = Signal(list)
     def __init__(self, function:callable, *args:tuple, **kwargs:dict):
         super().__init__()
         self.function = function
         self.args = args
         self.kwargs = kwargs
+    
     def run(self):
         try:
             out = self.function(*self.args, **self.kwargs)
@@ -934,54 +843,265 @@ class WorkerThread(QThread):
             self.finished_signal.emit([False, str(e)])
 
 class ConnectionMaintainer(QThread):
-    data_updated = Signal(dict)
-    output = Signal(list)
-    @Slot(list)
-    def update_data(self, data:dict):
-        # tuple: [host_name:str, host_d, host_type:str, connection_state]
-        self.host_name = data['HOST']
-        self.host_config = data['host_config']
-        self.host_type = data['HOST_TYPE']
-        self.state = data['CONNECT']
-        
-    def __init__(self, config:Config_Manager):
+    server_input = Signal(list)
+    check_result = Signal(list)
+    def __init__(self, server_name, server:paramiko.SFTPServer, interval:int=10):
         super().__init__()
-        self.config = config.deepcopy().group_chose(mode='Settings', widget='SSHConfig',)
-        self.data_updated.connect(self.update_data)
-        self.update_data({'HOST':'Local', 'host_config':{}, 'HOST_TYPE':'Local', 'CONNECT':True})
-        self.close_sign = False
+        self.interval = interval
+        self.server_name = server_name
+        self.server = server
+        self.server_input.connect(self._input_server)
+        self.stop_sign = False
     
-    def _connect(self) ->list:
-        self.server = paramiko.SSHClient()
-        self.server.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        try:
-            self.server.connect(self.host_config['HostName'], 
-                                port=self.host_config.get('port', 22), 
-                                username=self.host_config.get('User', os.getlogin()), 
-                                password=self.host_config.get('Password', ''),
-                                timeout=3)
-            self.sftp = self.server.open_sftp()
-            return [True, [self.host_name, self.sftp]]
-        except Exception as e:
-            return [False, str(e)]
-
+    def _input_server(self, server:list):
+        self.server_name = server[0]
+        self.server = server[1]
+    
+    def stop(self):
+        self.stop_sign = True
+    
     def run(self):
         while True:
-            if self.close_sign:
-                break
-            if self.host_type != 'Remote':
-                time.sleep(0.1)
-                continue
-            else:
-                if self.state:
-                    time.sleep(0.1)
-                    continue
-                else:
-                    out = self._connect()
-                    self.output.emit(out)
+            try:
+                server_name = copy.deepcopy(self.server_name)
+                if self.server is not None:
+                    self.server.stat(".")
+                self.check_result.emit([server_name, True, ''])
+            except Exception as e:
+                self.check_result.emit([server_name, False, str(e)])
+            check_interval = 0.1
+            for i in range(int(self.interval/check_interval)):
+                if self.stop_sign:
+                    return
+                time.sleep(check_interval)
 
-    def stop(self):
-        self.close_sign = True
+    
+class SSHManager(QObject):
+    con_res=Signal(list)
+    def __init__(self, parent:QMainWindow, config:Config_Manager):
+        super().__init__()
+        self.up = parent
+        self.config = config.deepcopy()
+        self.name = 'PathManager'
+        self.config.group_chose(mode='Settings', widget=self.name, obj=None)
+        self.server=None
+        self.sftp:paramiko.SFTPClient = None
+        self.hostname_n = 'Local'
+        self.host_type = 'Local'
+        self.host = []
+        self._load_config()
+        self._initMaintainer()
+    
+    def _load_config(self):
+        self.host_config_path = self.config.get("ssh_config")
+        if not self.host_config_path:
+            self.host_config_path = os.path.expanduser("~/.ssh/config")
+        if os.path.exists(self.host_config_path):
+            self.remote_hosts = parse_ssh_config(self.host_config_path,
+                                        fliter=self.config.get("hostname"))
+        else:
+            self.up.tip("Warning", "SSH config file not found, please check the path", {"OK":""}, "")
+            self.remote_hosts = {}
+        self.wsl_l = self.config.get("wsl")
+        self.wsl_d = {i[0]:{'path':i[1], 'user':i[2]} for i in self.wsl_l}
+        self.hostd = {'Local':''} | self.wsl_d | self.remote_hosts
+        self.hostnames = list(self.hostd.keys())
+        self.host_types = {'Local':'Local'} | {i:"WSL" for i in self.wsl_d.keys()} | {i:"Remote" for i in self.remote_hosts.keys()}
+        self.filename_flitter = self.config.get("filename_flitter")
+    
+    def get_config(self, name:str):
+        assert name in self.hostd.keys(), f"Invalid host name: {name}"
+        type_t = self.host_types[name]
+        config_t = self.hostd[name]
+        return {'type':type_t, 'config':config_t}
+
+    def _initMaintainer(self):
+        self.maintainer = ConnectionMaintainer(self.hostname_n, self.sftp)
+        self.maintainer.check_result.connect(self._maintain_result)
+        self.maintainer.start()
+    
+    def change_host(self, host_name:str):
+        assert host_name in self.hostd.keys(), f"Invalid host name: {host_name}"
+        host_type = self.host_types[host_name]
+        self.hostname_n = host_name
+        self.host_type = host_type
+        if host_type == 'Local':
+            self.server = None
+            self.sftp = None
+            return [True, 'Local', '']
+        elif host_type == 'WSL':
+            self.server = None
+            self.sftp = None
+            if not os.path.exists(self.wsl_d[host_name]['path']):
+                return [False, 'WSL', 'Path not exists']
+            return [True, 'WSL', '']
+        self.establish_connection(host_name)
+        return ['wait', 'Remote', '']
+        
+    def establish_connection(self, host_name:str):
+        assert host_name in self.remote_hosts.keys(), f"Invalid remote host name: {host_name}"
+        host_config = self.remote_hosts[host_name]
+        thread = ConnectionThread(self._cre_con, host_config)
+        thread.finished_signal.connect(self._connect_result)
+    @Slot(list)
+    def _connect_result(self, result:list):
+        if result[0]:
+            self.server, self.sftp = result[1]
+            self.con_res.emit([True, ''])
+        self.con_res.emit([False, result[1]])
+    @Slot(list)
+    def _maintain_result(self, result:list):
+        hostname, sign_f, error_info = result
+        if hostname == self.hostname_n:
+            if sign_f:
+                self.con_res.emit([True, ''])
+            else:
+                self.con_res.emit([False, error_info])
+    
+    @staticmethod
+    def _cre_con(host_paras:dict):
+        server = paramiko.SSHClient()
+        server.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        server.connect(host_paras['HostName'], 
+                        port=int(host_paras.get('port', 22)), 
+                        username=host_paras.get('User', os.getlogin()), 
+                        password=host_paras.get('Password', ''),
+                        timeout=5)
+        stfp = server.open_sftp()
+        return (server, stfp)
+class PathManager(SSHManager):
+    def __init__(self, parent:QMainWindow, config:Config_Manager):
+        super().__init__(parent, config)
+
+    def _filename_fliter(self, name:str)->bool:
+        # return True if the file name is allowed else False
+        if not self.filename_flitter:
+            return True
+        for fliter_i in self.filename_flitter:
+            if name.startswith(fliter_i):
+                return False
+        return True
+    
+    def _wsl_path_preprocess(self, path:str):
+        if self.hostname_n not in self.wsl_d.keys():
+            return path
+        if path.startswith('~'):
+            user = self.wsl_d[self.hostname_n]['user']
+            path = path.replace('~', f'/home/{user}', 1)
+        path = os.path.join(self.wsl_d[self.hostname_n]['path'], path)
+        return path
+    
+    def check(self, path:str) -> Union[None, os.stat_result]:
+        if self.host_type == 'WSL':
+            path = self._wsl_path_preprocess(path)
+        if self.host_type in ['Local', 'WSL']:
+            if not os.path.exists(path):
+                return None
+            return os.stat(path)
+        elif self.host_type == 'Remote':
+            try:
+                # 获取文件状态信息
+                return self.sftp.stat(path)
+            except FileNotFoundError:
+                return None
+            except Exception as e:
+                warnings.warn(f'Host{self.hostname_n} connection encounters error {e}')
+                return None
+        else:
+            warnings.warn(f"Invalid host type: {self.host_type}")
+            return None
+    
+    def isdir(self, path:str)->bool:
+        stat_t = self.check(path)
+        if stat_t is None:
+            return False
+        elif stat.S_ISDIR(stat_t.st_mode):
+            return True
+    
+    def isfile(self, path:str)->bool:
+        stat_t = self.check(path)
+        if stat_t is None:
+            return False
+        elif not stat.S_ISDIR(stat_t.st_mode):
+            return True
+        else:
+            return False
+        
+    def listdir(self, path_f:str)->List[list]:
+        dir_l = []
+        stat_l = []
+        dir_s = []
+        stat_s = []
+        if self.host_type == 'WSL':
+            path_f = self._wsl_path_preprocess(path_f)
+        if self.host_type in ['Local', 'WSL']:
+            try:
+                if not os.path.exists(path_f):
+                    return [], []
+                for i in os.listdir(path_f):
+                    path_t = os.path.join(path_f, i)
+                    stat_t = os.stat(path_t)
+                    if self._filename_fliter(i):
+                        dir_l.append(i)
+                        stat_l.append(stat_t)
+                    else:
+                        dir_s.append(i)
+                        stat_s.append(stat_t)
+                return dir_l+dir_s, stat_l+stat_s
+            except Exception as e:
+                warnings.warn(f'Local file search encounters error {e}')
+                return [], []
+        elif self.host_type == 'Remote':
+            try:
+                dir_contents = self.sftp.listdir_attr(path_f)
+                for entry in dir_contents:
+                    if not self._filename_fliter(entry.filename):
+                        continue
+                    if self._filename_fliter(entry.filename):
+                        dir_l.append(entry.filename)
+                        stat_l.append(entry)
+                    else:
+                        dir_s.append(entry.filename)
+                        stat_s.append(entry)
+                return dir_l+dir_s, stat_l+stat_s
+            except FileNotFoundError:
+                return [], []
+            except Exception as e:
+                warnings.warn(f'Host {self.hostname_n} connection encounters error {e}')
+                return [], []
+        else:
+            warnings.warn(f"Invalid host type: {self.host_type}")
+    
+    def walk(self, src:str):
+        return_l = []
+        if self.host_type != 'Remote':
+            for root, dirs, files in os.walk(src):
+                for file_i in files:
+                    rel_path = os.path.relpath(root, src)
+                    size_i = os.path.getsize(os.path.join(root, file_i))
+                    file_path = os.path.join(root, file_i)
+                    return_l.append((rel_path, file_i, file_path, size_i))
+        else:
+            for root, dirs, files in self.sftp_walk(self.sftp, src):
+                for file_i in files:
+                    rel_path = os.path.relpath(root, src)
+                    size_i = self.sftp.stat(os.path.join(root, file_i)).st_size
+                    file_path = os.path.join(root, file_i)
+                    return_l.append((rel_path, file_i, file_path, size_i))
+        return return_l
+    
+    def sftp_walk(self, sftp, remote_dir):
+        try:
+            for attr in sftp.listdir_attr(remote_dir):
+                remote_path = remote_dir + "/" + attr.filename
+                if stat.S_ISDIR(attr.st_mode):
+                    yield remote_path, [d.filename for d in sftp.listdir_attr(remote_path) if stat.S_ISDIR(d.st_mode)], [f.filename for f in sftp.listdir_attr(remote_path) if not stat.S_ISDIR(f.st_mode)]
+                    yield from self.sftp_walk(sftp, remote_path)
+                else:
+                    yield remote_path, [], [attr.filename]
+        except Exception as e:
+            warnings.warn(f'Host {self.hostname_n} connection encounters error {e}')
+            return []
 
 class TransferMaintainer(QThread):
     bar_state = Signal(list)    # output the state and progress of the transfer
@@ -1071,7 +1191,6 @@ class TransferMaintainer(QThread):
         self.quit()
         self.wait()
 
-
 import asyncio
 import asyncssh
 from typing import List, Literal
@@ -1106,3 +1225,4 @@ class FileTransfer:
         except Exception as e:
             print(f"文件传输失败: {e}")
             return False
+

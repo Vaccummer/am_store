@@ -110,7 +110,7 @@ class ColorfulButton(QPushButton):
         self.setStyleSheet(style_sheet)
 
 class AutoLabel(QLabel):
-    def __init__(self, text:str, font:QFont, color:str="#171818"):
+    def __init__(self, text:str, font:QFont, color:str="transparent"):
         super().__init__()
         self.setText(text)
         self.setFont(font)
@@ -119,15 +119,16 @@ class AutoLabel(QLabel):
     def set_text(self, text:str):
         self.setText(text)
         self.adjustSize()
-    def set_color(self, color:str):
-        sheet_f = '''
-                    QLabel {
+    def set_color(self, color:str, border_radius:int=5):
+        sheet_f = f'''
+                    QLabel {{
+                            border-radius: {border_radius}px;  /* 边角弧度 */
                             padding-left: 5px;   /* 左边距 */
                             padding-right: 5px;  /* 右边距 */
                             padding-top: 0px;    /* 上边距 */
                             padding-bottom: 0px; /* 下边距 */
-                            background-color: transparent;  /* 背景透明 */
-                            }
+                            background-color: {color};  /* 背景透明 */
+                            }}
                     '''
         self.setStyleSheet(sheet_f)
 
