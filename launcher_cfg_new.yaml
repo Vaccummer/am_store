@@ -118,7 +118,7 @@ Launcher:
     Size:
       height: het
     font: 
-      main: [[Family, *yahei], [PixelSize, 80]]
+      main: [[Family, *yahei], [PixelSize, 40]]
     hostname: "all" # fliter hosts in config, if is "all", include all, if is null, exclude all. Use list format to assign multi host
     color:
       box_background: ['rgba(255, 255, 255, 50)',"#FAC83F", '#FA8A8A']  # 连接正常,等待连接,连接失败三种颜色
@@ -160,7 +160,8 @@ Launcher:
     Size:
       title_height: 1.3*het
       entry_icon_r: 0.7*het
-      button_r: 1.5*het
+      icon_proportion: 0.8
+      button_r: 1.7*het
       button: [0.7*het, 0.7*het]
       line_height: 0.9*het
       col_label_height: 1.6*het
@@ -260,14 +261,14 @@ Settings:
       add_button_margin: [190, 0, 84, 0]
       line_height: 0.85*het
       numbercol_width: 1.7*het
-      number_width: 
+      number_width: 0.6*het
       layout_spacing: 0.2*het
       line_spacing: 0.2*het
       nameedit_max_length: 5*gap
       exeedit_min_length: 2*gap
       add_line_height: het
       tab_height: 0.7*het
-      tabbar_height: 0.6*het
+      tabbar_height: 0.9*het
       bottom_margin: [0, 0, 30, 0]
       min_handle_height: 30
     path:
@@ -284,7 +285,7 @@ Settings:
       tmp_icon_folder: './tmp/icon'
     color:
       col_background: transparent
-      frame_color: "white"
+      frame_color: "grey"
       title_bkg_color: "#F7F7F7"
       handle_colors: ["#C3C3C3","#6B6B6B","#1F1F1F"] # normal, hover, pressed
       nameedit_background: ['#FFFFFF', '#FF5733']
@@ -308,34 +309,6 @@ Settings:
     local_max_chunck: 2048 # in MB
     remote_min_chunck: 4 # in MB
     remote_max_chunck: 100 # in MB
-# Searcher:  
-#   Size:1
-#       main_window: [scr_x/2-win_x/2,scr_y/2-win_y/2,win_x,win_y]
-#       srh_icon: [win_x/2-srh_r/2,win_y/2-srh_r/2-3.6*gap,srh_r,srh_r]
-#       input_box: [gap,win_y/2,win_x-2*gap,het]
-#       opto_icon: null
-#       shortcut_entry: null
-#       shortcut_button: null
-#       associate_list: null
-#       gpt_box: null
-#       opto_box: null
-#       opto_settings: null
-#   input_box:
-#   searcher_button:
-#     path:
-#       main: './load/Searcher/srh_icons/*'
 
-# GPT:
-#   Size:
-#     main_window: [scr_x/2-win_x/2,scr_y/2-win_y/2,win_x,win_y]
-#     srh_icon: null
-#     input_box: [gap,1.5*gap+het,win_x-2*gap,het]
-#     opto_icon: null
-#     shortcut_entry: null
-#     shortcut_button: null
-#     associate_list: null
-#     gpt_box: [gap,1.8*gap+2*het,win_x-2*gap,win_y-2.8*gap-2*het]
-#     opto_box: null
-#     opto_settings: null
   
 

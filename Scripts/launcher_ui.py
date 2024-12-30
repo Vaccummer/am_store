@@ -1,6 +1,7 @@
 import os
 import sys
 from toolbox import *
+from service_manager import *
 from PySide2.QtWidgets import QListWidget, QMainWindow, QWidget,QListWidgetItem,QPushButton, QHBoxLayout, QVBoxLayout, QLabel
 from PySide2.QtGui import QFontMetrics, QIcon
 from PySide2.QtCore import QSize, Qt
@@ -407,8 +408,8 @@ class AssociateList(UIAS):
             text_i = matching_words[i]
             icon_i = self._geticon(text_i, sign_n, type_l[i])
             self.label_l[i].setText(text_i)
-            self.button_l[i].setIcon(icon_i)
-    
+            self.button_l[i].setIcon(AIcon(icon_i))
+
         # font_metrics = QFontMetrics(self.font())
         # b_h = self.config[self.button_height]
         # e_w = self.config[self.extra_width]
@@ -685,10 +686,11 @@ class PathModeSwitch(QComboBox):
         self.config.group_chose(mode="Launcher", widget=self.name, obj=None)
         self.height_f = atuple('Launcher', self.name, 'Size', 'height')
         self.font_f = atuple('Launcher', self.name, 'font', 'main')
-        UIUpdater.set(alist(self.height_f, self.font_f), self._loadconfig, alist(None, 'font'))
         self._load()
         self._initUI()
+        UIUpdater.set(alist(self.height_f, self.font_f), self._loadconfig, alist(None, 'font'))
         self.currentIndexChanged.connect(self._index_change)
+        self._index_change()
     
     def _loadconfig(self, height_f, font_f):
         self.setFixedHeight(height_f)
@@ -740,7 +742,7 @@ class PathModeSwitch(QComboBox):
         font_metrics = QFontMetrics(self.font())
         min_length = font_metrics.boundingRect(self.mode_list[0]).width() + 60  
         w_f = max(font_metrics.boundingRect(mode_n).width() + 60  ,min_length)
-        self.setFixedSize(w_f, self.gem[-1])
+        self.setFixedWidth(w_f)
     
 class TopButton(QWidget, QObject):
     button_click = Signal(str)  # Literal['minimum', 'maximum', 'close']
@@ -903,11 +905,11 @@ class SearchButton(YohoPushButton):
 
 class ShortcutEntry(YohoPushButton):
     click_sinal = Signal(str)
-    def __init__(self, config:Config_Manager):
+    def __init__(self, parent):
         self.name = 'shortcut_entry'
         icon_f = atuple('MainWindow', self.name, 'icon')
         size_f = atuple('MainWindow', self.name, 'Size', 'button_size')
-        super().__init__(icon_f, size_f, "shake")
+        super().__init__(icon_f, size_f, "shake",parent=parent)
 
     def _click(self):
         self.click_sinal.emit('entry')
@@ -916,6 +918,7 @@ class ShortcutButton(QWidget):
     launch_signal = Signal(str)
     def __init__(self, parent: QMainWindow, config:Config_Manager) -> None:
         super().__init__(parent)
+        self.ctrl_pressed = False
         self.name = "shortcut_obj"
         self.up = parent
         self.config = config.deepcopy().group_chose(mode="Launcher", widget=self.name)
@@ -931,6 +934,7 @@ class ShortcutButton(QWidget):
         self.manager:ShortcutsPathManager = self.up.shortcut_data
         self.v_num = self.config[atuple('Launcher', 'shortcut_obj', 'vertical_button_num')]
         self.h_num = self.config[atuple('Launcher', 'shortcut_obj', 'horizontal_button_num')]
+        self.icon_proportion = atuple('Launcher', 'shortcut_obj', 'Size', 'icon_proportion')
         self.num_exp = self.v_num * self.h_num
 
         self.df = self.manager.df
@@ -961,7 +965,7 @@ class ShortcutButton(QWidget):
                 icon = self.config.get('default_button_icon', obj='path')
                 path = ''
                 layout_i = QVBoxLayout()
-                button_i = YohoPushButton(icon, self.size_i, an_type="resize", an_time=90)
+                button_i = YohoPushButton(icon, self.size_i, an_type="resize", an_time=150, icon_proportion=self.icon_proportion)
                 button_i.setProperty('path', path)
                 label_i = AutoLabel(name, self.font_i)
                 button_i.setStyleSheet(f'''  QPushButton {{
@@ -1002,7 +1006,15 @@ class ShortcutButton(QWidget):
                 label_i.setText(name)
                 index_f += 1
 
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Control:
+            self.ctrl_pressed = True
+    def keyReleaseEvent(self, event):
+        if event.key() == Qt.Key_Control:
+            self.ctrl_pressed = False
     def wheelEvent(self, event):
+        if not self.ctrl_pressed:
+            return
         # use wheel to resize the button
         if event.angleDelta().y() > 0:
             factor_i = 1.1
@@ -1645,9 +1657,9 @@ class NameEdit(QLineEdit):
                  background_colors:List[str]=['#FFFFFF', '#FF5733'],):
         super().__init__()
         self.colors = background_colors
-        UIUpdater.set(text_f, partial(self.setText,self=self))
-        UIUpdater.set(font, partial(self.setFont,self=self), 'font')
-        UIUpdater.set(height, partial(self.setFixedHeight,self=self))
+        UIUpdater.set(text_f, self.setText)
+        UIUpdater.set(font, self.setFont, 'font')
+        UIUpdater.set(height, self.setFixedHeight)
         UIUpdater.set(background_colors, self._loadColor)
         self._setStlye(0)
     
@@ -1673,10 +1685,10 @@ class SheetControl(QTabBar):
                  tab_height:int,):
         super().__init__(parent)
         self.up = parent
-        UIUpdater.set(font_f, partial(self.setFont, self=self), 'font')
+        UIUpdater.set(font_f, self.setFont, 'font')
 
-        UIUpdater.set(tabbar_height, partial(self.setFixedHeight,self=self))
-        UIUpdater.set(alist(color_l, icon_f, tab_height), self._setStyle, alist(None,'icon',None))
+        UIUpdater.set(tabbar_height, self.setFixedHeight)
+        UIUpdater.set(alist(color_l, icon_f, tab_height), self._setStyle, alist(None,None,None))
         self.setMovable(True) 
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.open_context_menu)
@@ -1687,8 +1699,6 @@ class SheetControl(QTabBar):
         event.ignore()
     
     def _setStyle(self, color_l:List[str], icon_f:str, height_f:int):
-        if isinstance(icon_f, AIcon):
-            icon_f = icon_f.file_path
         icon_f = icon_f.replace('\\', '/')
         style_sheet = f"""
         QTabBar{{
@@ -1871,8 +1881,7 @@ class UILauncherSetting(BaseLauncherSetting):
         self.frame_layout.setContentsMargins(0, 0, 0, 0)
         self.frame.setLayout(self.frame_layout)
         self.frame.setObjectName("OuterFrame")
-        _frameStyleF = partial(self._frameStyle, self=self)
-        UIUpdater.set(alist(self.frame_color, self.frame_thickness), _frameStyleF, alist())
+        UIUpdater.set(alist(self.frame_color, self.frame_thickness), self._frameStyle, alist())
         
         self.scroll_area = QScrollArea()
         self.scroll_area.setObjectName("myScrollArea")
@@ -1999,7 +2008,7 @@ class UILauncherSetting(BaseLauncherSetting):
         add_obj(nummber_w, icon_w, name_label, chname_label, exe_edit, folder_button, parent_f=layout_i)
         self.widget_l.append(widget_i)
         if insert:
-            self.obj_layout.insertWidget(self.obj_layout.count()-1, widget_i)
+            self.obj_layout.insertWidget(self.obj_layout.count()-2, widget_i)
         else:
             self.obj_layout.addWidget(widget_i)
         #return nummber_w, icon_w, name_label, chname_label, exe_edit, folder_button
@@ -2010,9 +2019,9 @@ class UILauncherSetting(BaseLauncherSetting):
 
     def _init_add_line(self):
         self.add_button = YohoPushButton(icon_i=self.add_button_icon, 
-                                         size_f=self.line_height,
                                          an_type='resize', 
                                         )
+        UIUpdater.set(self.line_height, self.add_button.setFixedHeight)
         UIUpdater.set(self.add_button_colors, self._addbutton_style)
         self.add_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.add_button.clicked.connect(self._insert_line)
@@ -2089,6 +2098,8 @@ class LauncherSetting(UILauncherSetting):
                 self.objs_l[i]['icon'].setIcon(QIcon(self.df_n.iloc[i, -1]))
             else:
                 icon_d = self.manager.get_app_icon(self.df_n.iloc[i, 0], self.df_l[index_f][0])
+                if isinstance(icon_d, atuple):
+                    icon_d = self.config.get(icon_d,'')
                 self.objs_l[i]['icon'].setIcon(AIcon(icon_d))
             self.line_num += 1
         for i in range(len(self.widget_l)):

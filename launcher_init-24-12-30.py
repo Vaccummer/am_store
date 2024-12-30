@@ -204,7 +204,7 @@ class UILauncher(BaseLauncher):
         self.switch_button = SwitchButton(self, self.config)
         self.MODE = self.switch_button.mode_list[0]
         self.switch_button.currentIndexChanged.connect(self._change_mode)
-        self.shortcut_entry = ShortcutEntry(self)
+        self.shortcut_entry = ShortcutEntry(self.config)
         self.top_buttons = TopButton(self, self.config)._initbuttons()
         self.layout_top.addWidget(self.switch_button)
         self.layout_top.addStretch()

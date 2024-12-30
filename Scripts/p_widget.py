@@ -5,6 +5,7 @@ import random
 from toolbox import *
 from typing import Literal, Optional, Tuple, Union, List, OrderedDict, Dict
 from abc import abstractmethod
+from service_manager import *
 
 class Asize(QSize):
     def __init__(self, width:int, height:int):
@@ -14,6 +15,24 @@ class Asize(QSize):
     def q(self):
         return QSize(self.width(), self.height())
 
+class AIcon(QIcon):
+    def __init__(self, file_path):
+        if isinstance(file_path, atuple):
+            self.file_path = UIUpdater.config.get(file_path,'')
+            super().__init__(self.file_path)
+        elif isinstance(file_path, str):
+            self.file_path = file_path
+            super().__init__(file_path)
+        elif isinstance(file_path, QIcon):
+            super().__init__(file_path)
+        else:
+            super().__init__()
+        
+    def get_file_path(self):
+        return self.file_path
+    def q(self):
+        QIcon(self.file_path)
+
 class YohoPushButton(QPushButton):
     def __init__(self, icon_i:Union[str, AIcon, Tuple],
                  size_f:Union[int, QSize, Tuple]=None, 
@@ -21,16 +40,19 @@ class YohoPushButton(QPushButton):
                  an_time:int=180,
                  change_size:float=0.6,
                  change_period:float=0.7,
-                 style_assign:str=None):
-        super().__init__()
-    
+                 icon_proportion:float=0.95,
+                 parent=None):
+        if parent is None:
+            super().__init__()
+        else:
+            super().__init__(parent)
+        UIUpdater.set(icon_proportion, self._loadIconProportion)
         # 设置按钮图标
         UIUpdater.set(icon_i, self.setIcon, type_f='icon')
         UIUpdater.set(size_f, self.setFixedSize, type_f='size')
         self.an_time = an_time
         self.change_size = change_size
         self.change_period = change_period
-        self._set_style(style_assign)
 
         if an_type == "shake":
             self.clicked.connect(self.shake_icon)
@@ -52,41 +74,38 @@ class YohoPushButton(QPushButton):
     def resize_icon(self):
         self.animation = QPropertyAnimation(self, b"iconSize")
         self.animation.setDuration(self.an_time)
-        size_n = QSize(int(self.change_size*self.size_f.width()), int(self.change_size*self.size_f.height()))
-        self.animation.setStartValue(self.size_f)
-        self.animation.setKeyValueAt(self.change_period, size_n)  
-        self.animation.setEndValue(self.size_f.q() if isinstance(self.size_f, Asize) else self.size_f)  
+        size_n = self.iconSize()
+        size_t = QSize(int(self.change_size*size_n.width()), int(self.change_size*size_n.height()))
+        self.animation.setStartValue(size_n)
+        self.animation.setKeyValueAt(self.change_period, size_t)  
+        self.animation.setEndValue(size_n)  
         self.animation.start()
 
-    def _set_style(self, style_str:str):
-        if not style_str:
-            self.setStyleSheet("""
-                QPushButton {
-                    border: none;
-                    background-color: transparent;
-                    text-align: center; 
-                }
-            """)
-        else:
-            self.setStyleSheet(style_str)
+    def _loadIconProportion(self,icon_proportion:float):
+        self.icon_proportion = icon_proportion
 
     def resizeEvent(self, event):
         # automatically resize the icon to fit the button size
-        print('resize')
         super().resizeEvent(event)
         new_size = self.size()
         w, h = new_size.width(), new_size.height()
         rf = min(w, h)
-        self.setIconSize(QSize(rf, rf))
+        self.setIconSize(QSize(int(rf*self.icon_proportion), int(rf*self.icon_proportion)))
     
     def _resize(self, size_f:Union[int, QSize, list]):
+        if isinstance(self.icon_proportion, float):
+            res_factor = self.icon_proportion
+        elif isinstance(self.icon_proportion, atuple):
+            res_factor = UIUpdater.config.get(self.icon_proportion, 0.9)
+        else:
+            res_factor = 0.9
         if isinstance(size_f, int):
             size_f = QSize(size_f, size_f)
         elif isinstance(size_f, list):
             size_f = QSize(size_f[0], size_f[1])
         self.size_f = size_f
         self.setFixedSize(size_f)
-        self.setIconSize(int(size_f.width()*0.9), int(size_f.height()*0.9))
+        self.setIconSize(QSize(int(size_f.width()*res_factor), int(size_f.height()*res_factor)))
 
 class ColorfulButton(QPushButton):
     def __init__(self, text_f:str, colors:List[str], font:QFont, height:int=None, width:int=None):
