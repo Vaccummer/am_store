@@ -13,20 +13,13 @@ class BaseLauncher(QMainWindow):
     HOST_TYPE = "Local"
     CONNECT = True
     CON_ERROR = ''
-    def __init__(self, config:dict, app:QApplication):
+    def __init__(self, config:Config_Manager, app:QApplication):
         super().__init__()
-        self.wkdir = os.getcwd()
-        self.config = Config_Manager(wkdir=self.wkdir, 
-                                     config=config, 
-                                     mode_name=None,
-                                     widget_name=None,
-                                     obj_name=None,)
+        self.config = config
         self.app = app
         self._init_para()
         self.createTrayIcon()
         self._mainwindow_set()
-        tip = InfoTip(self, "Info", "Test OK", {}, self.config.deepcopy())
-        tip.close()
         self._load_data()
     # For mouse control
     def mousePressEvent(self, event):
@@ -209,8 +202,9 @@ class UILauncher(BaseLauncher):
     
     def _mainwindowUI(self):
         self.switch_button = SwitchButton(self, self.config)
+        self.MODE = self.switch_button.mode_list[0]
         self.switch_button.currentIndexChanged.connect(self._change_mode)
-        self.shortcut_entry = ShortcutEntry(self, self.config)
+        self.shortcut_entry = ShortcutEntry(self.config)
         self.top_buttons = TopButton(self, self.config)._initbuttons()
         self.layout_top.addWidget(self.switch_button)
         self.layout_top.addStretch()
@@ -218,6 +212,7 @@ class UILauncher(BaseLauncher):
     
     def _initLauncherUI(self):
         self.path_switch_button = PathModeSwitch(self, config=self.config)
+        self.HOST = self.path_switch_button.mode_list[0]
         self.path_switch_button.currentIndexChanged.connect(self._change_host)
         self.input_box = InputBox(self, self.config)
         self.search_togle_button =SearchTogleButton(self, self.config)
@@ -233,19 +228,13 @@ class UILauncher(BaseLauncher):
         add_obj(self.path_switch_button, self.input_box, parent_f=self.input_box_layout)
         # spacer = QSpacerItem(10, self.progress_bar.height(), QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.progress_layout = amlayoutH(align_h='l')
-        #self.progress_bar_layout.addSpacing(30)
+
         self.progress_layout.addWidget(self.progress_bar)
         self.progress_stack = QStackedWidget(self)
-        
-        #self.progress_bar_layout.addSpacing(30)
-        #self.input_box_layout.addLayout(self.progress_bar_layout)
+    
 
         add_obj(self.input_box_layout, self.progress_layout, parent_f=self.layout_input)
-        #add_obj(self.path_switch_button, self.input_box_widget, parent_f=self.layout_input)
-        # self.layout_input.addWidget(self.path_switch_button)
-        # self.layout_input.addWidget(self.input_box_widget)
-        # self.layout_input.addWidget(self.shortcut_entry)
-        
+
     def _initFuncUI(self):
         # first layer content
         self.launcher_manager = LauncherPathManager(self.config)
@@ -280,6 +269,7 @@ class ControlLauncher(UILauncher):
         self._obj_connect()
     
     def _change_mode(self, index_n:int):
+        self.MODE = self.switch_button.mode_list[index_n]
         self.stack_ass.setCurrentIndex(index_n)
     
     def _change_host(self, index_n:int):
@@ -363,12 +353,31 @@ class ControlLauncher(UILauncher):
         else:
             self.path_switch_button._setStyle(0)
 
+    @Slot(dict)
+    def _updateUI(self, dict_f:dict):
+        try:
+            action_i = dict_f['action']
+            type_i = dict_f['type']
+            value_new = dict_f['value_new']
+            match type_i:
+                case 'unpack' | 'margin':
+                    action_i(*value_new)
+                case _:
+                    action_i(value_new)
+            return True, ''
+        except Exception as e:
+            return False, e
 
 if __name__ == "__main__":
     # QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
     app = QApplication([])
-    config  = yml.read(r'launcher_cfg_new.yaml')
+    path_t = os.path.abspath('./launcher_cfg_new.yaml')
+    Config_Manager.set_config_path(path_t)
+    config = Config_Manager(wkdir=os.getcwd())
+    UIUpdater._primary_init(config)
+    uiupdater = UIUpdater()
     launcher = ControlLauncher(config, app)
+    uiupdater.update_task.connect(launcher._updateUI)
     launcher.show()
     sys.exit(app.exec_())

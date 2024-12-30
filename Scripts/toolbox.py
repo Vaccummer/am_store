@@ -17,6 +17,7 @@ from sympy import symbols, sympify
 from am_store.common_tools import yml, AMPATH
 import paramiko
 import stat
+import ctypes
 import asyncssh
 import aiofiles
 import asyncio
@@ -24,7 +25,6 @@ import pathlib
 from pathlib import Path
 import time
 from abc import ABC, abstractmethod
-
 
 def is_path(string_f, exist_check:bool=False):
     # To judge whether a variable is Path or not
@@ -262,7 +262,7 @@ def is_url(str_f:str):
     )
     match_f = url_pattern.match(str_f)
     return bool(match_f)
-def get_screen_size(target: Literal['pixel', 'physical', "dpi"]="pixel"):
+def get_screen_size2(target: Literal['pixel', 'physical', "dpi"]="pixel"):
     app = QApplication.instance() if QApplication.instance() else QApplication([])
     allowed_values = ["pixel", "physical","dpi"]
     assert target in allowed_values, f"Invalid value: {target}. Allowed values are: {allowed_values}"
@@ -283,6 +283,12 @@ def get_screen_size(target: Literal['pixel', 'physical', "dpi"]="pixel"):
         case "dpi":
             app.quit()
             return screen.physicalDotsPerInch()
+def get_screen_size(target: Literal['pixel', 'physical', "dpi"]="pixel"):
+    user32 = ctypes.windll.user32
+    user32.SetProcessDPIAware()  # 使程序支持高 DPI
+    width = user32.GetSystemMetrics(0)
+    height = user32.GetSystemMetrics(1)
+    return width, height
 def excel_to_df(excel_path_f:str, region:str, sheet_name_f:Union[int, str, list]='Sheet1'):  
     # Read XLSX doc and transform it into dataframe
     # region format : 'A1:Z7'
@@ -318,6 +324,10 @@ def font_get(para_dict_f={"Family":None,
                         'Stretch':None,
                         'StrikeOut':None}):
     # produce font with family and size
+    if not para_dict_f:
+        return QFont()
+    if isinstance(para_dict_f, list):
+        para_dict_f = {i[0]:i[1] for i in para_dict_f}
     font_f = QFont()
     font_f.setStyleStrategy(QFont.PreferAntialias)
     allowed_keys = ["Family", "PointSize", "Bold", "Italic", "Weight", "Underline", "StrikeOut", 
@@ -366,6 +376,14 @@ def parse_ssh_config(file_path, fliter:Literal['all'] | None | List[str]):
     except Exception as e:
         return {}
 
+def extract_icon(exe_icon_getter, exe_path, target_icon_path):
+    commands = [exe_icon_getter, exe_path, target_icon_path]
+    try:
+        result = subprocess.check_output(commands, cwd=os.path.dirname(exe_icon_getter)).decode('gbk')
+        return result and "图标已保存为" in result
+    except subprocess.CalledProcessError:
+        return False
+        
 def amlayoutH(align_h:Literal['l','r','c']=None, align_v:Literal['t','b','c']=None, spacing:int=None)->QHBoxLayout:
     lo = QHBoxLayout()
     match align_h:
@@ -419,6 +437,41 @@ def add_obj(*args, parent_f:Union[QHBoxLayout, QVBoxLayout]):
             parent_f.addWidget(arg_i)
     return parent_f
 
+class AIcon(QIcon):
+    def __new__(cls, file_path):
+        if isinstance(file_path, QIcon):
+            return file_path
+        else:
+            cls.file_path = file_path
+            return super().__new__(cls, file_path)
+    def get_file_path(self):
+        return self.file_path
+    def q(self):
+        QIcon(self.file_path)
+
+class alist(list):
+    def __init__(cls, *args):
+        if len(args) == 1:
+            return super().__init__(*args)
+        else:
+            return super().__init__(args)
+    def __eq__(self, value):
+        if not isinstance(value, list):
+            return None
+        elif len(self) != len(value):
+            return None
+        else:
+            for i in range(len(self)):
+                if self[i] != value[i]:
+                    return False
+            return True
+
+class atuple(tuple):
+    def __new__(cls, *args):
+        if len(args) == 1 and isinstance(args[0], list):
+            return super().__new__(cls, *args)
+        else:
+            return super().__new__(cls, args)
 
 class dicta:
     @staticmethod
@@ -543,30 +596,49 @@ class SSHConductor(object):
 
 class Config_Manager(object):
     @classmethod
-    def set_shared_config(cls, config:dict):
+    def set_config_path(cls,yaml_path:str):
         if not hasattr(cls, 'config'):
+            config = yml.read(yaml_path)
             cls.config = dicta.flatten_dict(config)
+            cls.yaml_path = yaml_path
     
     def __init__(self, 
                  wkdir:str,
-                 config:dict=None, 
                  mode_name:str=None, 
                  widget_name:str=None, 
                  obj_name:str=None,
                  copy:bool=False):
         self.wkdr = wkdir
-        self.set_shared_config(config)
         self.mode = mode_name
         self.widget = widget_name
         self.obj = obj_name
+        self.pre = []
         if not copy:
-            self._calculate_size()
+            self.config = self._calSize(self.config)
     
     def deepcopy(self):
-        new_copy = Config_Manager(self.wkdr, self.config, None, None, None, True)
+        new_copy = Config_Manager(self.wkdr, None, None, None, True)
         return new_copy
+    @staticmethod
+    def _calSize(config:dict):
+        scr_x, scr_y = get_screen_size('pixel')
+        res_x = math.sqrt(scr_x*scr_y/(2560*1600))
+        res_y = res_x
+        # resize 
+        targets = ['win_x', "win_y", "gap", "het", "srh_r"]
+        default_size = [1600,900,60,60,80]
+        base_d = {}
+        for i, target_i in enumerate(targets):
+            value_i = config.get(('Common','Size',target_i),default_size[i])
+            value_f = int(res_x*value_i)
+            base_d[target_i] = value_f
+        base_d = base_d | {'scr_x':scr_x, 'scr_y':scr_y, 'res_x':res_x, 'res_y':res_y}
+        for key_i, value_i in config.items():
+            if "Size" in key_i:
+                config[key_i] = Config_Manager._str2int(value_i, base_d)
+        return config
     
-    def _calculate_size(self):
+    def _calculate_legacy(self):
         self.scr_x, self.scr_y = get_screen_size('pixel')
         res_x = math.sqrt(self.scr_x*self.scr_y/(2560*1600))
         res_y = res_x
@@ -582,16 +654,17 @@ class Config_Manager(object):
             if "Size" in key_i:
                 self.config[key_i] = self._str2int(value_i)
 
-    def _str2int(self, input_f:Union[list, str]):
+    @staticmethod
+    def _str2int(input_f:Union[list, str], base_d:dict):
         scr_x, scr_y, win_x, win_y, gap, het, srh_r= symbols('scr_x scr_y win_x win_y gap het srh_r')
         values = {
-                scr_x: self.scr_x,
-                scr_y: self.scr_y,
-                win_x: self.win_x,
-                win_y: self.win_y,
-                gap: self.gap,
-                het: self.het,
-                srh_r:self.srh_r,
+                scr_x: base_d['scr_x'],
+                scr_y: base_d['scr_y'],
+                win_x: base_d['win_x'],
+                win_y: base_d['win_y'],
+                gap: base_d['gap'],
+                het: base_d['het'],
+                srh_r: base_d['srh_r'],
                 }
         if isinstance(input_f, list):
             results = [int(sympify(expr).evalf(subs=values)) for expr in input_f]
@@ -622,9 +695,20 @@ class Config_Manager(object):
             return self.after_process(args_a, out_a)
         else:
             return out_a
+
+    def get2(self, paras:tuple)->tuple:
+        para_t = self.pre
+        for para_i in paras:
+            para_t.append(para_i)
+        return tuple(para_t)
+    
+    def set_pre(self, paras:tuple):
+        self.pre = []
+        for para_i in paras:
+            self.pre.append(para_i)
     
     def __getitem__(self, key):
-        if isinstance(key, tuple):
+        if isinstance(key, atuple):
             out_a = self.config.get(key, None)
             if out_a is None:
                 return out_a 
@@ -702,8 +786,9 @@ class LauncherPathManager(object):
         #self.df['EXE Path'] = self.df['EXE Path'].apply(lambda x: x if os.path.exists(x) else "")
     
     def _load_icon_dict(self):
-        self.default_app_icon_path = self.config.get('default_app_icon', mode="Launcher", widget='associate_list', obj="path")
-        self.default_app_icon = QIcon(self.default_app_icon_path)
+        #self.default_app_icon_path = self.config.get('default_app_icon', mode="Launcher", widget='associate_list', obj="path")
+        self.default_app_icon_path = atuple('Launcher', 'associate_list', 'path','default_app_icon')
+        self.default_app_icon = self.default_app_icon_path
         self.app_icon_folder = self.config.get('app_icon_folder', mode="Launcher", widget='associate_list', obj="path")
         self.app_icon_d = {name:{} for name in self.df.keys()}
         for name_i in os.listdir(self.app_icon_folder):
@@ -721,40 +806,41 @@ class LauncherPathManager(object):
                     self.app_icon_d[group][app_name] = path_i
         self.exe_icon_getter = self.config.get('exe_icon_getter', mode="Launcher", widget='associate_list', obj="path").replace('\\', '/')
     
-    def get_icon(self, name:str, group:str=None)->QIcon:
+    def get_app_icon(self, name, group=None)->Union[str, atuple]:
         if group:
-            icon_l = self.app_icon_d[group].get(name, "")
+            icon_path = self.app_icon_d[group].get(name, "")
         else:
-            icon_l = ""
-            for group_i, app_d in self.app_icon_d.items():
-                icon_l = app_d.get(name, "")
-                if icon_l:
-                    group = group_i
-                    break
-        if icon_l:
-            return QIcon(icon_l)
-        else:
-            if not group:
-                return QIcon(self.default_app_icon)
-            exe_t = self.df[group][self.df[group]['Name']==name]
-            if len(exe_t) == 0:
-                return self.default_app_icon
-            exe_t = exe_t.iloc[0]['EXE Path']
-            name_t = group+self.sign_for_separate+name
-            target_icon_path = os.path.join(self.app_icon_folder, name_t).replace('\\', '/')
-            if exe_t.endswith('.exe') and (name not in self.conduct_l):
-                self.conduct_l.append(name)
-                commands_f = [self.exe_icon_getter, exe_t, target_icon_path+'.png']
-                result = subprocess.check_output(commands_f, cwd=os.path.dirname(self.exe_icon_getter)).decode('gbk')
-                if result and "图标已保存为" in result:
-                    self.app_icon_d[group][name] = (target_icon_path+'.png').replace('/', '\\')
-                    return QIcon(target_icon_path+'.png')
-                else:
-                    self.app_icon_d[group][name] = self.default_app_icon_path
-                    return self.default_app_icon               
+            icon_path, group = self._find_icon_in_all_groups(name)
+        if icon_path:
+            return icon_path
+        if not group:
+            return self.default_app_icon
+
+        exe_entry = self.df[group][self.df[group]['Name'] == name]
+        if exe_entry.empty:
+            return self.default_app_icon
+
+        exe_path = exe_entry.iloc[0]['EXE Path']
+        icon_key = f"{group}{self.sign_for_separate}{name}"
+        target_icon_path = os.path.join(self.app_icon_folder, icon_key).replace('\\', '/')+'.png'
+
+        if exe_path.endswith('.exe') and name not in self.conduct_l:
+            self.conduct_l.append(name)
+            if extract_icon(self.exe_icon_getter, exe_path, target_icon_path):
+                self.app_icon_d[group][name] = target_icon_path
+                return AIcon(self.app_icon_d[group][name])
             else:
                 self.app_icon_d[group][name] = self.default_app_icon_path
-                return self.default_app_icon
+
+        return self.default_app_icon
+
+    def _find_icon_in_all_groups(self, name):
+        for group, app_dict in self.app_icon_d.items():
+            icon_path = app_dict.get(name, "")
+            if icon_path:
+                return icon_path, group
+        return "", None
+
 
 class ShortcutsPathManager(object):
     def __init__(self, config:Config_Manager):
@@ -781,48 +867,32 @@ class ShortcutsPathManager(object):
                 continue
             name_i = path_i.stem
             self.icon_dict[name_i] = str(path_i)
-        self.default_icon = QIcon(self.config.get("default_button_icon", mode="Launcher", widget="shortcut_obj", obj="path"))
+        #self.default_icon = QIcon(self.config.get("default_button_icon", mode="Launcher", widget="shortcut_obj", obj="path"))
+        self.default_icon = atuple('Launcher', 'shortcut_obj', 'path', 'default_button_icon')
         self.conduct_l = []
         self.exe_icon_getter = self.config.get('exe_icon_getter', mode="Launcher", widget='associate_list', obj="path").replace('\\', '/')
     
-    def geticon(self, name:str, str_format:bool=False)->QIcon:
+    def geticon(self, name:str)->Union[str, atuple]:
         path_t = self.icon_dict.get(name, "")
         if path_t:
-            if str_format:
-                return path_t
-            else:
-                return QIcon(path_t)
+            return path_t
         else:
             exe_paths = self.df[self.df['Display_Name']==name]['EXE_Path'].values
             if not exe_paths:
-                if str_format:
-                    return self.default_icon
-                else:
-                    return QIcon(self.default_icon)
+                return self.default_icon
             exe_path = exe_paths[0]
             if exe_path.endswith('.exe')and (name not in self.conduct_l):
-                target_icon_path = os.path.join(self.icon_dir, name).replace('\\', '/')
-                commands_f = [self.exe_icon_getter, exe_path, target_icon_path+'.png']
-                result = subprocess.check_output(commands_f, cwd=os.path.dirname(self.exe_icon_getter)).decode('gbk')
-                self.conduct_l.append(name) 
-                if result and "图标已保存为" in result:
-                    self.icon_dict[name] = (target_icon_path+'.png').replace('/', '\\')
-                    if str_format:
-                        return target_icon_path+'.png'
-                    else:
-                        return QIcon(target_icon_path+'.png')
+                target_icon_path = os.path.join(self.icon_dir, name).replace('\\', '/')+'.png'
+                if extract_icon(self.exe_icon_getter, exe_path, target_icon_path):
+                    self.icon_dict[name] = (target_icon_path).replace('/', '\\')
+                    return self.icon_dict[name]
                 else:
                     self.icon_dict[name] = self.default_icon
-                    if str_format:
-                        return self.default_icon
-                    else:
-                        return QIcon(self.default_icon)     
+                    return self.default_icon
             else:
                 self.icon_dict[name] = self.default_icon
-                if str_format:
-                    return self.default_icon
-                else:
-                    return QIcon(self.default_icon) 
+                return self.default_icon
+
                           
     def save(self):
         self.df.to_excel(self.data_path, index=False)
@@ -1109,17 +1179,29 @@ class TransferMaintainer(QThread):
     def __init__(self,config:Config_Manager):
         super().__init__()
         self.name = "TransferMaintainer"
-        self.config = config.deepcopy().group_chose(mode='Settings', widget=self.name,obj=None)
-        self._load()
-    
-    def _load(self):
-        self.local_min_chunck = self.config.get('local_min_chunck')*1024**2
-        self.local_max_chunck = self.config.get('local_max_chunck')*1024**2
-        self.remote_min_chunck = self.config.get('remote_min_chunck')*1024**2
-        self.remote_max_chunck = self.config.get('remote_max_chunck')*1024**2
+        config = config.deepcopy().group_chose(mode='Settings', widget=self.name,obj=None)
+        pre = ['Settings', self.name]
+        self.l_max = atuple(pre+['local_min_chunck'])
+        self.l_min = atuple(pre+['local_max_chunck'])
+        self.r_max = atuple(pre+['remote_min_chunck'])
+        self.r_min = atuple(pre+['remote_max_chunck'])
+        UIUpdater.set(alist(self.l_min, self.l_max, self.r_min, self.r_max), self._loadconfig, 
+                      alist())
         self.task_queue = []
         self.loop = None  # Event loop for asyncio
         self.state = 'Stop'
+    
+    def _loadconfig(self, l_min,l_max,r_min,r_max):
+        pre = ['Settings', self.name]
+        # self.local_min_chunck = config_f.get('local_min_chunck')*1024**2
+        self.local_min_chunck = int(l_min*1024**2)
+        # self.local_max_chunck = config_f.get('local_max_chunck')*1024**2
+        self.local_max_chunck = int(l_max*1024**2)
+        #self.remote_min_chunck = config_f.get('remote_min_chunck')*1024**2
+        self.remote_min_chunck = int(r_min*1024**2)
+        #self.remote_max_chunck = config_f.get('remote_max_chunck')*1024**2
+        self.remote_max_chunck = int(r_max*1024**2)
+
     
     def _load_task(self, task:List[dict]):
         self.task_queue.extend(task)
@@ -1191,9 +1273,7 @@ class TransferMaintainer(QThread):
         self.quit()
         self.wait()
 
-import asyncio
-import asyncssh
-from typing import List, Literal
+
 
 class FileTransfer:
     def __init__(self, remote_server):
@@ -1226,3 +1306,189 @@ class FileTransfer:
             print(f"文件传输失败: {e}")
             return False
 
+
+class UIUpdater(QObject):
+    ui_set_l = []
+    update_task=Signal(dict)
+    @classmethod
+    def _primary_init(cls,config:Config_Manager):
+        cls.config_manager:Config_Manager = config.deepcopy()
+        cls.config:dict = copy.deepcopy(cls.config_manager.config)
+    @classmethod
+    def set(cls, key_f:Union[atuple,alist],action_f:callable,
+             type_f:Union[alist[Literal[None, 'size', 'font', 'icon', 'config', 'height']], 
+                          Literal[None, 'size', 'font', 'icon', 'config', 'height','margin','unpack']]=None):
+        value_t = cls._getValue(key_f, cls.config)
+        if isinstance(key_f, atuple):
+            atuple_check = True
+        elif isinstance(key_f, alist):
+            atuple_check = True
+            for i in key_f:
+                if not isinstance(i, atuple):
+                    atuple_check = False
+                    break
+        else:
+            atuple_check = False
+        if not isinstance(value_t, alist):
+            if not type_f:
+                value_ae = value_t
+            else:
+                value_ae = cls._value_ae(cls, value_t, type_f)
+        else:
+            if not type_f:
+                value_ae = value_t
+            else:
+                value_ae = [cls._value_ae(cls, value_t[i], type_f[i]) for i in range(len(value_t))]
+        
+        match type_f:
+            case _ if isinstance(key_f, alist):
+                action_f(*value_ae)
+            case 'margin':
+                action_f(*value_ae)
+            case 'unpack':
+                action_f(*value_ae)
+            case _:
+                if value_ae:
+                    action_f(value_ae)
+        if atuple_check:
+            cls.ui_set_l.append({'index':len(cls.ui_set_l),'key':key_f, 'action':action_f, 'type':type_f, 'value':value_t})
+        return value_ae
+    
+    def __init__(self):
+        super().__init__()
+        self.init_watcher()
+
+    def init_watcher(self):
+        self.watcher = QFileSystemWatcher([self.config_manager.yaml_path])
+        self.watcher.fileChanged.connect(self.on_yaml_change)  
+    def on_yaml_change(self):
+        try:
+            yml_file = dicta.flatten_dict(yml.read(self.config_manager.yaml_path))
+            yml_file = self._calSize(yml_file)
+        except Exception as e:
+            warnings.warn(f"Yaml file read failed: {e}")
+            return
+        if not yml_file:
+            return
+        self._updateUI(yml_file)
+        #
+    def _calSize(self, config:dict):
+        config_r = copy.deepcopy(config)
+        scr_x, scr_y = get_screen_size('pixel')
+        res_x = math.sqrt(scr_x*scr_y/(2560*1600))
+        res_y = res_x
+        # resize 
+        targets = ['win_x', "win_y", "gap", "het", "srh_r"]
+        default_size = [1600,900,60,60,80]
+        base_d = {}
+        for i, target_i in enumerate(targets):
+            value_i = config.get(('Common','Size',target_i),default_size[i])
+            value_f = int(res_x*value_i)
+            base_d[target_i] = value_f
+        base_d = base_d | {'scr_x':scr_x, 'scr_y':scr_y, 'res_x':res_x, 'res_y':res_y}
+        for key_i, value_i in config.items():
+            if "Size" in key_i:
+                config_r[key_i] = self._str2int(value_i, base_d)
+        return config_r
+    def _str2int(self, input_f:Union[list, str], base_d:dict):
+        scr_x, scr_y, win_x, win_y, gap, het, srh_r= symbols('scr_x scr_y win_x win_y gap het srh_r')
+        values = {
+                scr_x: base_d['scr_x'],
+                scr_y: base_d['scr_y'],
+                win_x: base_d['win_x'],
+                win_y: base_d['win_y'],
+                gap: base_d['gap'],
+                het: base_d['het'],
+                srh_r: base_d['srh_r'],
+                }
+        if isinstance(input_f, list):
+            results = [int(sympify(expr).evalf(subs=values)) for expr in input_f]
+            return results
+        elif isinstance(input_f, str):
+            return int(sympify(input_f).evalf(subs=values))
+        else:
+            return input_f
+
+    def _updateUI(self, yml_file:dict):
+        for order_i, i in enumerate(self.ui_set_l):
+            # read the value from the new yaml file
+            if isinstance(i['key'], atuple):
+                value_new = yml_file.get(i['key'], 'sign_for_empty')
+                if value_new == 'sign_for_empty':
+                    warnings.warn(f"Key {i['key']} not found in new yaml file")
+                    continue
+                elif value_new == i['value']:
+                    continue
+            elif isinstance(i['key'], alist):
+                value_new = alist()
+                for i_f, key_i in enumerate(i['key']):
+                    vi = yml_file.get(key_i, None)
+                    if vi is None:
+                        warnings.warn(f"Key {key_i} not found in new yaml file")
+                    value_new.append(vi)
+            else:
+                warnings.warn(f"Invalid key type: {i['key']}")
+                continue
+            
+            if i['value'] == value_new:
+                continue
+
+            if isinstance(value_new, alist):
+                value_ae = alist()
+                for i_f, value_i in enumerate(value_new):
+                    if i['type']:
+                        value_ae.append(self._value_ae(value_i, i['type'][i_f]))
+                    else:
+                        value_ae.append(value_i)
+            else:
+                value_ae = self._value_ae(value_new, i['type'])
+            new_dict = i | {'value_ae':value_ae}
+            #self.update_task.emit(new_dict)
+            update_result = self._objUpdate(new_dict)
+            # if not update_result:
+            #     warnings.warn(f"Update {i['key']} failed: {update_result[1]}")
+            # else:
+            self.ui_set_l[order_i]['value'] = value_new
+
+    def _objUpdate(self, dict_f:dict):
+        try:
+            action_i = dict_f['action']
+            type_i = dict_f['type']
+            value_new = dict_f['value_ae']
+            match type_i:
+                case 'unpack' | 'margin':
+                    action_i(*value_new)
+                case _:
+                    action_i(value_new)
+            return True, ''
+        except Exception as e:
+            print(e)
+            return False, e
+
+    def _value_ae(self, value_i, type_f:Literal[None, 'size', 'font', 'icon', 'config', 'height','margin','unpack']):
+        match type_f:
+            case 'size':
+                match value_i:
+                    case _ if isinstance(value_i, int):
+                        return QSize(value_i, value_i)
+                    case _ if isinstance(value_i, list):
+                        return QSize(*value_i[:2])
+                    case _ if isinstance(value_i, QSize):
+                        return value_i
+                    case _:
+                        return None
+            case 'font':
+                return font_get(value_i)
+            case 'icon':
+                return AIcon(value_i)
+            case _:
+                return value_i
+    
+    @staticmethod
+    def _getValue(key_f, config_f):
+        if isinstance(key_f, atuple):
+            return config_f.get(key_f, None)
+        elif isinstance(key_f, alist):
+            return alist(UIUpdater._getValue(i, config_f) for i in key_f)
+        else:
+            return key_f

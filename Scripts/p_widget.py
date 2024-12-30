@@ -15,33 +15,18 @@ class Asize(QSize):
         return QSize(self.width(), self.height())
 
 class YohoPushButton(QPushButton):
-    def __init__(self, icon_i:Union[str, QIcon], 
-                 size_f:Union[int, Asize]=None, 
+    def __init__(self, icon_i:Union[str, AIcon, Tuple],
+                 size_f:Union[int, QSize, Tuple]=None, 
                  an_type:Literal["shake", 'resize', None]=None, 
                  an_time:int=180,
                  change_size:float=0.6,
                  change_period:float=0.7,
                  style_assign:str=None):
         super().__init__()
-
+    
         # 设置按钮图标
-        icon_i = icon_i if isinstance(icon_i, QIcon) else QIcon(icon_i)
-        self.setIcon(icon_i)
-        if size_f:
-            if isinstance(size_f, int):
-                size_f = QSize(size_f, size_f)
-            elif isinstance(size_f, QSize):
-                pass
-            elif isinstance(size_f, list):
-                size_f = QSize(*size_f)
-            # if isinstance(size_f, Asize):
-            #     #size_t = 1.1*size_f
-            #     self.size_f = size_f.q()
-            # else:
-            self.size_f = QSize(int(size_f.width()*0.9), int(size_f.width()*0.9))
-                #size_t = QSize(size_f.width(), size_f.height())
-            self.setIconSize(self.size_f)
-            self.setFixedSize(size_f)
+        UIUpdater.set(icon_i, self.setIcon, type_f='icon')
+        UIUpdater.set(size_f, self.setFixedSize, type_f='size')
         self.an_time = an_time
         self.change_size = change_size
         self.change_period = change_period
@@ -85,12 +70,31 @@ class YohoPushButton(QPushButton):
         else:
             self.setStyleSheet(style_str)
 
+    def resizeEvent(self, event):
+        # automatically resize the icon to fit the button size
+        print('resize')
+        super().resizeEvent(event)
+        new_size = self.size()
+        w, h = new_size.width(), new_size.height()
+        rf = min(w, h)
+        self.setIconSize(QSize(rf, rf))
+    
+    def _resize(self, size_f:Union[int, QSize, list]):
+        if isinstance(size_f, int):
+            size_f = QSize(size_f, size_f)
+        elif isinstance(size_f, list):
+            size_f = QSize(size_f[0], size_f[1])
+        self.size_f = size_f
+        self.setFixedSize(size_f)
+        self.setIconSize(int(size_f.width()*0.9), int(size_f.height()*0.9))
+
 class ColorfulButton(QPushButton):
-    def __init__(self, text_f:str, colors:List[str], font:QFont, height:int):
+    def __init__(self, text_f:str, colors:List[str], font:QFont, height:int=None, width:int=None):
         super().__init__()
         self.setText(text_f)
-        self.setFont(font)
-        self.setFixedHeight(height)
+        UIUpdater.set(font, self.setFont, type_f='font')
+        UIUpdater.set(height, self.setFixedHeight)
+        UIUpdater.set(width, self.setFixedWidth)
         self._setstyle(colors)
     
     def _setstyle(self, colors):
@@ -110,11 +114,15 @@ class ColorfulButton(QPushButton):
         self.setStyleSheet(style_sheet)
 
 class AutoLabel(QLabel):
-    def __init__(self, text:str, font:QFont, color:str="transparent"):
+    def __init__(self, text:str, font:Union[QFont,atuple], icon_f:Union[str,atuple,QIcon]=None, 
+                 height=None, width=None,color:Union[str,atuple]="transparent"):
         super().__init__()
-        self.setText(text)
-        self.setFont(font)
-        self.set_color(color)
+        UIUpdater.set(text, self.setText)
+        UIUpdater.set(height, self.setFixedHeight)
+        UIUpdater.set(width, self.setFixedWidth)
+        UIUpdater.set(font, self.setFont, type_f='font')
+        UIUpdater.set(color, self.set_color)
+        UIUpdater.set(icon_f, self.set_icon, type_f='icon')
         self.setAlignment(Qt.AlignCenter)
     def set_text(self, text:str):
         self.setText(text)
@@ -128,9 +136,30 @@ class AutoLabel(QLabel):
                             padding-top: 0px;    /* 上边距 */
                             padding-bottom: 0px; /* 下边距 */
                             background-color: {color};  /* 背景透明 */
+                            text-align: center;  /* 文字居中 */
                             }}
                     '''
         self.setStyleSheet(sheet_f)
+
+    def set_icon(self, icon:Union[str,QIcon]):
+        if isinstance(icon, str):
+            self.setPixmap(QPixmap(icon))
+        elif isinstance(icon, QIcon):
+            self.setPixmap(icon.pixmap(-1,-1))
+
+class AutoEdit(QLineEdit):
+    def __init__(self, text:atuple=None, placeholder:atuple=None, font:atuple=None, 
+                 height:atuple=None, width:atuple=None, background_color:atuple='#F7F7F7'):
+        super().__init__()
+        UIUpdater.set(text, self.setText)
+        UIUpdater.set(placeholder, self.setPlaceholderText)
+        UIUpdater.set(font, self.setFont, type_f='font')
+        UIUpdater.set(height, self.setFixedHeight)
+        UIUpdater.set(width, self.setFixedWidth)
+        UIUpdater.set(background_color, self._setColor)
+    
+    def _setColor(self, color:atuple):
+        self.setStyleSheet(f'background-color: {color};border-radius: 10px;padding : 5px')
 
 class PolygonWidget(QWidget):
     def __init__(self):
@@ -255,15 +284,11 @@ class ProgressBar(QProgressBar):
                  position_gradient:List[float]=[0, 1],
                  show_text:bool=False):
         super().__init__(parent)
-        self.height_f = height
         self.max_value = max_value
-        self.background_color = background_color
-        self.color_gradient = color_gradient
-        self.position_gradient = position_gradient
         self.setRange(0, max_value)  
         self.setValue(0)  
         self.progress=0
-        self.custom_ui()
+        UIUpdater.set(alist(height, background_color, color_gradient, position_gradient), self.custom_ui, alist())
         self.setTextVisible(show_text)  
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_progress)
@@ -271,27 +296,29 @@ class ProgressBar(QProgressBar):
     @abstractmethod
     def update_progress(self):
         pass
-    def custom_ui(self):
-        match len(self.color_gradient):
+    
+    def custom_ui(self, height_f, b_color, color_gradient, position_gradient):
+        len_t = min(len(color_gradient), len(position_gradient))
+        match len_t:
             case 2:
-                self.color_g = f"qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0, stop: {self.position_gradient[0]} {self.color_gradient[0]}, stop: {self.position_gradient[1]} {self.color_gradient[1]})"
+                color_g = f"qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0, stop: {position_gradient[0]} {color_gradient[0]}, stop: {position_gradient[1]} {color_gradient[1]})"
             case 3:
-                self.color_g = f"qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0, stop: {self.position_gradient[0]} {self.color_gradient[0]}, stop: {self.position_gradient[1]} {self.color_gradient[1]}, stop: {self.position_gradient[2]} {self.color_gradient[2]})"
+                color_g = f"qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0, stop: {position_gradient[0]} {color_gradient[0]}, stop: {position_gradient[1]} {color_gradient[1]}, stop: {position_gradient[2]} {color_gradient[2]})"
             case 4:
-                self.color_g = f"qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0, stop: {self.position_gradient[0]} {self.color_gradient[0]}, stop: {self.position_gradient[1]} {self.color_gradient[1]}, stop: {self.position_gradient[2]} {self.color_gradient[2]}, stop: {self.position_gradient[3]} {self.color_gradient[3]})"
+                color_g = f"qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0, stop: {position_gradient[0]} {color_gradient[0]}, stop: {position_gradient[1]} {color_gradient[1]}, stop: {position_gradient[2]} {color_gradient[2]}, stop: {position_gradient[3]} {color_gradient[3]})"
             case _:
-                self.color_g = "qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0, stop: 0 #DF461CC1, stop: 1 #069D40FF)"
-        self.setFixedHeight(self.height_f)
-        self.border_radius = self.height_f // 2
+                color_g = "qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0, stop: 0 #DF461CC1, stop: 1 #069D40FF)"
+        self.setFixedHeight(height_f)
+        self.border_radius = height_f // 2
         self.stylesheet = f'''
         QProgressBar {{
             border-radius: {self.border_radius}px;
-            background-color: {self.background_color};
+            background-color: {b_color};
             border: 0px solid ;
         }}
         QProgressBar::chunk {{
             border-radius: {self.border_radius}px;
-            background: {self.color_g};
+            background: {color_g};
         }}
         '''
         self.setStyleSheet(self.stylesheet)
@@ -382,6 +409,6 @@ class SmartStackWidget(QStackedWidget):
         self.removeWidget(widget_to_rm)
         widget_to_rm.deleteLater()
     
-        
+
 
     

@@ -56,17 +56,23 @@ Common:
   script_path: "./launcher_init.py"
   
 MainWindow:
-  Size:
-    switch_button: [gap,gap,0,1.2*het]
-    top_button: [win_x-0.5*gap-8*het, 0.5*gap, 8*het, 1.2*het]
   switch_button:
+    Size:
+      height: 1.2*het
     font: [[Family, *jetbrains], [PixelSize, 35]]
   top_button:
+    Size:
+      widget_height: 1.3*het
+      button_size: [1.2*het, 1.2*het]
     path:
       maximum: "./load/MainWindow/maximum.svg"
       minimum: "./load/MainWindow/minimum.svg"
       close: "./load/MainWindow/close.svg"
       middle: "./load/MainWindow/middle.svg"
+  shortcut_entry:
+    Size:
+      button_size: [0.8*het, 0.8*het]
+    icon: ""
   taskbar_icon:
     path: "./load/MainWindow/taskbar_icon.ico"
   Tip:
@@ -79,20 +85,19 @@ MainWindow:
       button: ["#F7F7F7", "#FFC300", "#FF5733"]
     Size:
       widget_size: [0.5*win_x, 0.5*win_y]
-      button_margin: [gap, gap]
+      button_margin: [gap,0,gap,0]
       button_size: [gap, het]
-      prompt_margin: [gap, gap]
+      prompt_margin: [gap,0,gap,0]
       title_height: het
     path:
-      Info_icon: "./load/MainWindow/info_icon.svg"
-      Error_icon: "./load/MainWindow/error_icon.svg"
-      Warning_icon: "./load/MainWindow/warning_icon.svg"
+      info_icon: "./load/MainWindow/info_icon.svg"
+      error_icon: "./load/MainWindow/error_icon.svg"
+      warning_icon: "./load/MainWindow/warning_icon.svg"
 
 Launcher:
   Size:
     main_window: [scr_x/2-win_x/2,scr_y/2-win_y/2,win_x,win_y]   # [x,y,w,h]
-    srh_icon: null
-    path_mode_switch: [0,het]
+    srh_icon: 1.7*gap
     input_box: [gap,1.5*gap+het,win_x-2*gap,het]
     opto_icon: null
     shortcut_entry: [win_x-gap-het,1.5*gap+1.1*het,0.8*het,0.8*het]
@@ -102,21 +107,22 @@ Launcher:
     opto_settings: null
     #search_togle_icon: [0.6*het, 0.6*het]
     search_togle_button: [0.6*het, 0.6*het]
-  
   path:
     settings_xlsx: "./load/Launcher/launcher_set.xlsx"
-  
   input_box:
+    Size:
+      height: het
     font: 
-      main: [[Family, *yahei], [PixelSize, 40]]
-  
+      main: [[Family, *yahei], [PixelSize, 40]] 
   path_mode_switch:
-    font: [[Family, *yahei], [PixelSize, 40]]
+    Size:
+      height: het
+    font: 
+      main: [[Family, *yahei], [PixelSize, 80]]
     hostname: "all" # fliter hosts in config, if is "all", include all, if is null, exclude all. Use list format to assign multi host
     color:
       box_background: ['rgba(255, 255, 255, 50)',"#FAC83F", '#FA8A8A']  # 连接正常,等待连接,连接失败三种颜色
       item_background: "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #73B1A7, stop:1 #EDFFFF)"
-
   associate_list:
     Size:
       item_height: 0.8*het
@@ -132,14 +138,13 @@ Launcher:
       default_app_icon: &default_button_icon './load/Launcher/shortcut_setting/default/default_button_icon.svg'
       default_folder_icon: &default_folder_icon './load/Launcher/shortcut_setting/default/default_button_icon.svg'
       default_file_icon: &default_file_icon './load/Launcher/shortcut_setting/default/default_button_icon.svg'
+      default_back_icon: ''
       download_save_dir: './load/Launcher/assoicate_list/download'
       filelog_default_path: 'F:\\Windows_Data\\Desktop_File'
       exe_icon_getter: './3rdparty/get_exe_icon/main.exe'
       file_icon_getter: "./3rdparty/get_file_icon/main.exe"
     color:
-      item_color_common: "#F7F7F7"
-      item_color_hover: "#FFC300" 
-      item_color_selected: "#FF5733"
+      item_colors: ["#F7F7F7", "#FFC300", "#FF5733"] # common, hover, selected
     max_exe_num: 10
     max_dir_num: 999
     max_length: 600
@@ -149,21 +154,22 @@ Launcher:
 
     remote_min_chunck: 4 # in MB
     remote_max_chunck: 100 # in MB
-  
   shortcut_obj:
     horizontal_button_num: 6
     vertical_button_num: 5
     Size:
-      entr_icon_r: 0.7*het
-      button_r: 1.6*het
+      title_height: 1.3*het
+      entry_icon_r: 0.7*het
+      button_r: 1.5*het
       button: [0.7*het, 0.7*het]
       line_height: 0.9*het
-      colname_margin: [20,35]
-      colwidth_0: ["3*gap", "3*gap"]
-      colwidth_1: ["1.3*gap", "1.3*gap"]
-      colwidth_2: ["5*gap", "5*gap"]
-      colwidth_3: ['0', '9999']
-      colwidth_4: ["1.3*gap", "1.3*gap"]
+      col_label_height: 1.6*het
+      colname_margin: [20,0, 35, 0] # left, top, right, bottom
+      colwidth_0: "3*gap"
+      colwidth_1: "1.3*gap"
+      colwidth_2: "5*gap"
+      colwidth_3: 999
+      colwidth_4: "1.3*gap"
     font:
       button_title: [[Family, *jetbrains], [PixelSize, 30], [Weight, 60]]
       window_title: [[Family, *yahei], [PixelSize, 60], [Weight, 70]]
@@ -176,6 +182,7 @@ Launcher:
       button_icons: &shortcut_button_icons './load/Launcher/shortcut_botton/button_icons'
       taskbar_icon: './load/Launcher/shortcut_setting/taskbar_icon.svg'
       setting_xlsx: &shortcut_setting_xlsx './load/Launcher/shortcut_obj/shortcut_set.xlsx'
+      default_app_icon: *default_button_icon # 和associate共享默认app_icon
       default_button_icon: *default_button_icon # 和associate共享默认app_icon
       default_folder_icon: './load/Launcher/shortcut_setting/default/default_folder_icon.svg'
       col_coordinate_icon: './load/Launcher/shortcut_setting/col_icon/col_coordinate_icon.svg'
@@ -199,8 +206,11 @@ Launcher:
       cancel2 : "#349179"
     name:
       window_title: Shortcut Settings
-
   search_togle_button:
+    # urls must contain '^{sign_for_exchange}$' to represent the substitute sign
+    # urls must have the same length as icons
+    Size:
+      button_size: [0.6*het, 0.6*het]
     urls: 
       - "https://www.bing.com/search?q=^{sign_for_exchange}$"
       - "baidu.com/s?ie=utf-8&f=8&rsv_bp=1&rsv_idx=1&tn=baidu&wd=^{sign_for_exchange}$&fenlei=256&rsv_pq=0xd73949d80006e0bb&rsv_t=3c845DZ6fB%2BS%2BQRyuXkVEjoJ6p2Svo2fkc3GilNyKwzIj9YJnRpHptz%2BVKfn&rqlang=en&rsv_enter=1&rsv_dl=tb&rsv_sug3=9&rsv_sug1=8&rsv_sug7=101&rsv_sug2=0&rsv_btyp"
@@ -210,7 +220,6 @@ Launcher:
       - "./load/MainWindow/maximum.svg"
       - "./load/MainWindow/middle.svg"
     sign: '^{sign_for_exchange}$'
-  
   progress_widget:
     Size:
       bar_height: 0.2*het
@@ -237,20 +246,30 @@ Terminal:
 Settings:
   LauncherSetting:
     font:
+      title: [[Family, *arial], [PointSize, 12], [Weight, 70]]
       name: [[Family, *arial], [PointSize, 12], [Weight, 70]]
       chname: [[Family, *yahei], [PointSize, 12], [Weight, 70]]
       exe: [[Family, *jetbrains], [PointSize, 12], [Weight, 70]]
       number: [[Family, *yahei], [PointSize, 12], [Weight, 90]]
+      save_button: [[Family, *yahei], [PointSize, 12], [Weight, 70]]
+      discard_button: [[Family, *yahei], [PointSize, 12], [Weight, 70]]
+      reset_button: [[Family, *yahei], [PointSize, 12], [Weight, 70]]
     Size:
-      col_margin: [125, 50]
-      add_button_margin: [190, 84]
+      col_margin: [125, 0, 50, 0]
+      frame_thickness: 5
+      add_button_margin: [190, 0, 84, 0]
       line_height: 0.85*het
+      numbercol_width: 1.7*het
+      number_width: 
+      layout_spacing: 0.2*het
       line_spacing: 0.2*het
-      namedit_max_length: 5*gap
-      exeedit_min_ledngth: 2*gap
+      nameedit_max_length: 5*gap
+      exeedit_min_length: 2*gap
       add_line_height: het
       tab_height: 0.7*het
-      bottom_margin: [0, 30]
+      tabbar_height: 0.6*het
+      bottom_margin: [0, 0, 30, 0]
+      min_handle_height: 30
     path:
       number_col_icon: './load/Settings/col_icons/opto_setting_window_icon.svg'
       icon_col_icon: './load/Settings/col_icons/opto_setting_window_icon.svg'
@@ -260,17 +279,14 @@ Settings:
       search_col_icon: './load/Settings/col_icons/opto_setting_window_icon.svg'
       searcher_icon: './load/Settings/col_icons/opto_setting_window_icon.svg'
       add_button_icon: './load/Settings/col_icons/opto_setting_window_icon.svg'
-      tab_delete:
-        - './load/Settings/col_icons/opto_setting_window_icon.svg'
-        - './load/Settings/col_icons/opto_setting_window_icon.svg'
-        - './load/Settings/col_icons/opto_setting_window_icon.svg'
-      add_sheet_button: './load/Settings/col_icons/opto_setting_window_icon.svg'
+      tab_delete_icon: ''
+      add_sheet_button_icon: ''
       tmp_icon_folder: './tmp/icon'
     color:
       col_background: transparent
-      scrollbar_color: "#C3C3C3"
-      scrollbar_color_hove: "#6B6B6B"
-      scrollbar_color_pressed: "#1F1F1F"
+      frame_color: "white"
+      title_bkg_color: "#F7F7F7"
+      handle_colors: ["#C3C3C3","#6B6B6B","#1F1F1F"] # normal, hover, pressed
       nameedit_background: ['#FFFFFF', '#FF5733']
       exeedit_background: ["#F7F7F7", "#FFC300", "#FF5733"] # 包括普通, 警告, 错误三种颜色
       add_button: ["black", "#9D8383", "#E99393"]  # 包括普通, 悬浮, 点击三种颜色
@@ -278,7 +294,7 @@ Settings:
       save_button: ["#F7F7F7", "#FFC300", "#FF5733"]  # 包括普通, 悬浮, 点击三种颜色
       discard_button: ["#F7F7F7", "#FFC300", "#FF5733"]  # 包括普通, 悬浮, 点击三种颜色
       reset_button: ["#F7F7F7", "#FFC300", "#FF5733"]  # 包括普通, 悬浮, 点击三种颜色
-    ori_line_num: 25
+    ori_line_num: 22
   PathManager:
     filename_flitter: ["$"] # filename or dirname starts with these characters will be moved to the end of the list
     separate_sign: "^--$"
