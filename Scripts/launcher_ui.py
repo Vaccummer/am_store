@@ -193,7 +193,14 @@ class BasicAS(QListWidget, QObject):
         
     def _load(self):
         # static load
+        self.pre = atuple('Launcher', self.name)
+        self.button_config = atuple('Launcher', self.name,'style','button')
+        self.label_config = atuple('Launcher', self.name, 'style', 'label')
+        self.main_config = atuple('Launcher', self.name, 'style', 'main')
+        self.item_config = atuple('Launcher', self.name, 'style', 'item')
+        self.scroll_bar_config = atuple('Launcher', self.name, 'style', 'scroll_bar')
         self.font_a = atuple('Launcher', self.name, 'font', 'main')
+
         # size
         pre = ['Launcher', self.name, 'Size']
         self.item_height = atuple(pre+['item_height'])
@@ -266,69 +273,85 @@ class BasicAS(QListWidget, QObject):
     
     def _get_prompt(self)->str:
         return self.up.input_box.text()
-    
 class UIAS(BasicAS):
     def __init__(self, config:Config_Manager, parent:Union[QMainWindow, QWidget],manager:LauncherPathManager):  
         super().__init__(config, parent, manager)
-        UIUpdater.set(alist(self.font_a, self.item_colors, self.item_height), self._setStyle, 
-                      alist('font',None,None))
+        UIUpdater.set(self.font_a, self.setFont, 'font')
+        UIUpdater.set(alist(self.main_config, self.item_config, self.scroll_bar_config), self.customStyle)
         self._inititems()
         self.setFocusPolicy(Qt.NoFocus)
 
-    def _setStyle(self, font_f, item_colors, height_f):
+    def customStyle(self, main_config:dict, item_config:dict, bar_config:dict):
         # dynamic style set
-        self.setFont(font_f)
+        main_bg = main_config.get('background', 'transparent')
+        main_border = main_config.get('border', 'none')
+        main_radius = main_config.get('border_radius', 20)
+
+
+        item_bg_colors = enlarge_list(item_config.get('background_colors', ['#F7F7F7']))
+        item_border = item_config.get('border', 'none')
+        item_border_radius = item_config.get('border_radius', 10)
+        item_padding = item_config.get('padding', [10,5,5,5])
+        height_f = item_config.get('height', 50)
+
+        bar_handle_colors = enlarge_list(bar_config.get('background_colors', ['#32CC99']))
+        orbit_color = bar_config.get('orbit_color', '#F7F7F7')
+        bar_radius = bar_config.get('border_radius', 7)
+        bar_width = bar_config.get('width', 15)
+        bar_height = bar_config.get('height', 30)
 
         style_sheet = f'''
         QListWidget {{
-                border: 3px solid black; /* 设置边框 */
+                border: {main_border};  
             }}
-            
         QListView {{
-            background: black;  /* 设置背景颜色 */
-            border: 10px solid #CCCCCC;  /* 设置边框 */
-            border-radius: 20px;  /* 设置边角弧度 */
+            background: {main_bg};  
+            border: {main_border};  
+            border-radius: {main_radius}px;  
         }}
-
         QListView::item {{
-            border: none;
-            padding-left: 5px;   /* 左边距 */
-            padding-right: 0px;  /* 右边距 */
-            padding-top: 0px;    /* 上边距 */
-            padding-bottom: 0px; /* 下边距 */
-            background-color: {item_colors[0]};  /* 设置背景颜色 */
-            border-radius: 10px;  /* 设置边角弧度 */
+            border: {item_border};
+            padding-left: {item_padding[0]}px;  
+            padding-right: {item_padding[1]}px;  
+            padding-top: {item_padding[2]}px;    
+            padding-bottom: {item_padding[3]}px; 
+            background-color: {item_bg_colors[0]};  
+            border-radius: {item_border_radius}px;  
             height: {height_f}px; 
         }}
-        
         QListView::item:hover {{
-            background-color: {item_colors[1]};  /* 设置悬停时的背景颜色 */
+            background-color: {item_bg_colors[1]};  
         }}
         QListView::item:selected {{
-            background-color: {item_colors[2]};  /* 设置选中时的背景颜色 */
+            background-color: {item_bg_colors[2]};  
         }}
         QListWidget QScrollBar:vertical {{
-                background: #F0F0F0;  /* 滚动条背景 */
-                width: 14px;  /* 滚动条宽度 */
-                margin: 3px;  /* 滚动条和内容之间的间距 */
-                border-radius: 7px;  /* 滚动条圆角 */
+                background: {orbit_color};  
+                width: {bar_width}px;  
+                margin: 3px;  
+                border-radius: {bar_radius}px;  
             }}
 
-            QListWidget QScrollBar::handle:vertical {{
-                background: #32CC99;  /* 滚动条手柄颜色 */
-                min-height: 30px;  /* 滚动条手柄的最小高度 */
-                border-radius: 7px;  /* 滚动条手柄圆角 */
-            }}
-
-            QListWidget QScrollBar::add-line:vertical,
-            QListWidget QScrollBar::sub-line:vertical {{
+            QListWidget QScrollBar::handle {{
+                background: {bar_handle_colors[0]}; 
+                min-height: {bar_height}px;  
+                border-radius: {bar_radius}px;  
+            }} 
+            QListWidget QScrollBar::handle::hover {{
+                background: {bar_handle_colors[1]};  
+            }} 
+            QListWidget QScrollBar::handle::selected {{
+                background: {bar_handle_colors[2]};  
+            }} 
+            QListWidget QScrollBar::add-line,
+            QListWidget QScrollBar::sub-line {{
                 background: none;  /* 去掉上下按钮背景 */
                 height: 0px;  /* 隐藏上下按钮 */
             }}
 
-            QListWidget QScrollBar::add-page:vertical,
-            QListWidget QScrollBar::sub-page:vertical {{
-                background: none;  /* 空白区域背景 */
+            QListWidget QScrollBar::add-page,
+            QListWidget QScrollBar::sub-page {{
+                background: none;  
             }}
         '''
         self.setStyleSheet(style_sheet)
@@ -339,8 +362,8 @@ class UIAS(BasicAS):
         label_font = self.font_a if label_font is None else label_font
         item_i = QListWidgetItem()
         item_i.setData(Qt.UserRole, int(index_f))
-        button_i = YohoPushButton(self.default_icon_d['dir'], button_size, an_type="shake")
-        label_i = AutoLabel(text="Default", font=label_font)
+        button_i = YohoPushButton(icon_i=self.default_icon_d['dir'], style_config=self.button_config, size_f=button_size)
+        label_i = AutoLabel(text="Default", font=label_font, style_config=self.label_config)
         label_i.setAlignment(Qt.AlignLeft)
         UIUpdater.set(button_size, label_i.setFixedHeight)
         layout_i = amlayoutH(align_v='l')
@@ -372,7 +395,6 @@ class UIAS(BasicAS):
     def _getbutton(self, item:QListWidgetItem) -> QPushButton:
         index_f = item.data(Qt.UserRole)
         return self.button_l[index_f]
-
 class AssociateList(UIAS):
     transfer_task = Signal(dict)
     def __init__(self, config:Config_Manager, parent:Union[QMainWindow, QWidget],manager:LauncherPathManager):  
@@ -627,9 +649,47 @@ class SwitchButton(QComboBox):
         self._initUI()
         self.font_f = atuple('MainWindow', self.name, 'font')
         self.height_f = atuple('MainWindow', self.name, 'Size', 'height')
+        self.style_config = atuple('MainWindow', self.name, 'style')
+        UIUpdater.set(self.style_config, self.customStyle)
         UIUpdater.set(alist(self.font_f, self.height_f), self._loadconfig, 
                       alist('font', None))
     
+    def customStyle(self, config:dict):
+        box_config = config.get('box', {})
+        menu_config = config.get('menu', {})
+        b_bg = box_config.get('background', 'rgba(255, 255, 255, 50)')
+        b_font_color = box_config.get('font_color', '#F7F7F7')
+        b_border = box_config.get('border', 'none')
+        b_radius = box_config.get('border_radius', 10)
+        b_padding = box_config.get('padding', [5,0,5,5])
+
+        m_font_color = menu_config.get('font_color', '#F7F7F7')
+        m_bg = menu_config.get('background', '#9DCDC8FF')
+        m_hover_bg = menu_config.get('line_hover_background', '#4CC1B5')
+        m_hover_font_color = menu_config.get('hover_font_color', 'black')
+        style_f = f"""
+        QComboBox {{
+            background: {b_bg};
+            color: {b_font_color};
+            border: {b_border};
+            border-radius: {b_radius}px;
+            padding-left: {b_padding[0]}px;
+            padding-right: {b_padding[1]}px;
+            padding-top: {b_padding[2]}px;
+            padding-bottom: {b_padding[3]}px;
+        }}
+        QComboBox::drop-down {{
+            border: none;  
+        }}
+        QComboBox QAbstractItemView {{
+        background-color:  {m_bg};
+        color: {m_font_color}; 
+        selection-background-color: {m_hover_bg}; 
+        selection-color: {m_hover_font_color};
+        }}
+        """
+        self.setStyleSheet(style_f)
+
     def _loadconfig(self, font_f, height_f):
         self.setFixedHeight(height_f)
         self.setFont(font_f)
@@ -700,6 +760,7 @@ class PathModeSwitch(QComboBox):
         self.path_manager:PathManager = self.up.path_manager
         self.hostd = self.path_manager.hostd
         self.mode_list = list(self.hostd.keys())
+        self.pre = atuple('Launcher', self.name)
     
     def _initUI(self):
         font_f = self.config.get("font", obj=None)
@@ -712,30 +773,45 @@ class PathModeSwitch(QComboBox):
         self.setFixedWidth(w_f)
         self._setStyle(0)
     
-    def _setStyle(self, index_f):
-        index_f = index_f % 3
-        button_style = f"""
-        QComboBox {{
-            background-color: {self.config.get('box_background', obj='color')[index_f]};
-            border: 0px solid #2980b9;
-            border-top-left-radius: 20px;
-            border-bottom-left-radius: 20px;
-            padding: 10px;
-            margin: 0px;
-        }}
-        QComboBox::drop-down {{
-            border: none;  /* 移除下拉箭头的边框 */
-        }}
-        QComboBox QAbstractItemView {{
-        border-radius: 0px;
-        background-color:  {self.config.get('item_background', obj='color')};
-        border: 0px solid #CCCCCC; /* 下拉列表的边框 */
-        color: black; /* 下拉列表的文本颜色 */
-        selection-background-color: #4CC1B5; /* 选中项的背景颜色 */
-        selection-color: black; /* 选中项的文本颜色 */
-        }}
-        """
-        self.setStyleSheet(button_style)
+    def _setStyle(self, config):
+        box_config = config.get('box', {})
+        menu_config = config.get('menu', {})
+        b_bg = box_config.get('normal_background', 'rgba(255, 255, 255, 50)')
+        b_font_color = box_config.get('font_color', '#F7F7F7')
+        b_border = box_config.get('border', 'none')
+        b_radius = box_config.get('border_radius', 10)
+        b_padding = box_config.get('padding', [5,0,5,5])
+
+        m_font_color = menu_config.get('font_color', '#F7F7F7')
+        m_bg = menu_config.get('background', '#9DCDC8FF')
+        m_hover_bg = menu_config.get('line_hover_background', '#4CC1B5')
+        m_hover_font_color = menu_config.get('hover_font_color', 'black')
+        self.box_style_dict = {
+            'QComboBox':{
+                'background': b_bg,
+                'color': b_font_color,
+                'border': b_border,
+                'border-radius': b_radius,
+                'padding-left': b_padding[0],
+                'padding-right': b_padding[1],
+                'padding-top': b_padding[2],
+                'padding-bottom': b_padding[3]
+            },
+            "QComboBox::drop-down":{
+                'border': 'none'
+            },
+            }
+        self.menu_style_dict = {
+            'QComboBox QAbstractItemView':{
+                'background-color': m_bg,
+                'color': m_font_color,
+                'selection-background-color': m_hover_bg,
+                'selection-color': m_hover_font_color
+            }
+        }
+        self.style_sheet_0 = style_make(self.box_style_dict)
+        self.style_sheet_1 = style_make(self.menu_style_dict)
+        self.setStyleSheet(self.style_sheet_0+'\n'+self.style_sheet_1)
 
     def _index_change(self):
         mode_n = self.currentText()
@@ -744,6 +820,14 @@ class PathModeSwitch(QComboBox):
         w_f = max(font_metrics.boundingRect(mode_n).width() + 60  ,min_length)
         self.setFixedWidth(w_f)
     
+    def _change_color(self, state_f:Literal['normal', 'error', 'warn']):
+        color = self.config[self.pre|atuple('style', 'box', f'{state_f}_color')]
+        if not color:
+            color = "rgba(255, 255, 255, 50)" 
+        self.box_style_dict['QComboBox']['background'] = color
+        self.style_sheet_0 = style_make(self.box_style_dict)
+        self.setStyleSheet(self.style_sheet_0+'\n'+self.style_sheet_1)
+
 class TopButton(QWidget, QObject):
     button_click = Signal(str)  # Literal['minimum', 'maximum', 'close']
     def __init__(self, parent: QMainWindow, config:Config_Manager) -> None:
@@ -757,22 +841,29 @@ class TopButton(QWidget, QObject):
         self.max_state = False
         
     def _initbuttons(self):
+        self.pre = atuple('MainWindow', self.name)
         size_i = atuple('MainWindow', self.name, 'Size', 'button_size')
         pre = ['MainWindow', self.name, 'path']
         self.max_path = atuple(pre+['maximum'])
         self.min_path = atuple(pre+['minimum'])
         self.middle_path = atuple(pre+['middle'])
         self.close_path = atuple(pre+['close'])
+        self.entry_path = atuple(pre+['entry'])
+        style_f = self.pre|atuple('style')
 
-        self.max_button = YohoPushButton(self.max_path, size_i, 'shake')
+        self.max_button = YohoPushButton(self.max_path, style_f, size_i)
         self.max_button.clicked.connect(lambda: self._b_click('maximum'))
-        self.min_button = YohoPushButton(self.min_path, size_i, 'shake')
-        self.min_button.clicked.connect(lambda: self._b_click('minimum'))
-        self.close_button = YohoPushButton(self.close_path, size_i, 'shake')
+        self.min_button = YohoPushButton(self.min_path, style_f, size_i)
+        self.min_button.clicked.connect(lambda: style_f, self._b_click('minimum'))
+        self.close_button = YohoPushButton(self.close_path, style_f, size_i)
         self.close_button.clicked.connect(lambda: self._b_click('close'))
-        return [self.min_button, self.max_button, self.close_button]
 
-    def _b_click(self, sign:Literal['minimum', 'maximum', 'close']):
+        self.enty_button = YohoPushButton(icon_i=self.entry_path, style_config=style_f, size_f=size_i)
+        self.enty_button.clicked.connect(lambda: self._b_click('entry'))
+
+        return [self.min_button, self.max_button, self.close_button, self.enty_button]
+
+    def _b_click(self, sign:Literal['minimum', 'maximum', 'close', 'entry']):
         self.button_click.emit(sign)
 
     @Slot(str)
@@ -782,18 +873,15 @@ class TopButton(QWidget, QObject):
         else:
             self.max_button.setIcon(self.middle_path)
 
-class InputBox(QLineEdit):   
+class InputBox(AutoEdit):   
     key_press = Signal(dict)
     def __init__(self, parent:QMainWindow, config:Config_Manager):
-        super().__init__(parent)
         self.up = parent
-        self.name = "input_box"
-        self.config = config.deepcopy()
         self.height_f = atuple('Launcher', self.name, 'Size', 'height')
         self.font_f = atuple('Launcher', self.name, 'font', 'main')
-        UIUpdater.set(alist(self.height_f, self.font_f), self._loadconfig, alist(None,'font'))
+        self.style_config = atuple('Launcher', self.name, 'style')
+        super().__init__(self.font_f, self.style_config, self.height_f)
         self.custom_keys = [Qt.Key_Tab, Qt.Key_Return, Qt.Key_Enter, Qt.Key_Up, Qt.Key_Down]
-        # self.returnPressed.connect(self.clear)
     
     def event(self, event:QEvent):
         match event.type():
@@ -828,19 +916,6 @@ class InputBox(QLineEdit):
             case _:
                 return super().event(event)
     
-    def _loadconfig(self, height_f, font_f):
-        # dynamic config load and set
-        self.setFixedHeight(height_f)
-        self.setFont(font_f)
-        sty_sheet = f'''
-                border-top-right-radius: 20px;
-                border-bottom-right-radius: 20px;
-                padding-left: 20px;
-                padding-right: 15px;
-                margin: 0px;
-        '''
-        self.setStyleSheet(sty_sheet)  #
-
 class SearchTogleButton(YohoPushButton):
     search_signal=Signal(dict) #{'url':str, 'sign':str}
     def __init__(self, parent, config:Config_Manager):
@@ -851,17 +926,19 @@ class SearchTogleButton(YohoPushButton):
         urls = atuple('Launcher', self.name, 'urls')
         sign = atuple('Launcher', self.name, 'sign')
         size = atuple('Launcher', self.name, 'Size', 'button_size')
+        style_d = atuple('Launcher', self.name, 'style')
+
         self.url = config[urls][0]
         button_size = atuple('Launcher', self.name, 'Size', 'button_size')
         super().__init__(icon_i=config[icons][0], 
-                        size_f=button_size, an_type="resize")
+                         style_config=style_d,
+                        size_f=button_size)
         UIUpdater.set(alist(icons, urls, size, sign), self._setStyle, alist())
         self.clicked.connect(self._click)
     
-    def _setStyle(self, icons:atuple, urls:atuple, size_f:atuple, sign:atuple):
+    def _setStyle(self, icons:atuple, urls:atuple, sign:atuple):
         self.urls = urls
         self.icons = icons[:len(urls)]
-        self.setFixedSize(*size_f)
         self.sign = sign
         if self.url in self.urls:
             return 
@@ -882,38 +959,6 @@ class SearchTogleButton(YohoPushButton):
     def _click(self):
         self.search_signal.emit({'url':self.url, 'sign':self.sign})
 
-class SearchButton(YohoPushButton):
-    def __init__(self, http_icon_tuple:tuple[str, QIcon], 
-                 size:Union[int, QSize], 
-                 an_type:Literal["shake", 'resize', None]=None, 
-                 an_time:int=180,
-                 change_size:float=0.6,
-                 change_period:float=0.7):
-        self.icon_add_l = http_icon_tuple
-        self.http_n = self.icon_add_l[0]
-        self.icon_n = self.icon_add_l[1]
-        super(SearchButton, self).__init__(self.icon_n, size, an_type, an_time, change_size, change_period)
-    def wheelEvent(self, event):
-        self.index_n = [i[0] for i in self.icon_add_l].index(self.http_n)
-        if event.angleDelta().y() > 0:
-            self.index_n += 1
-        else:
-            self.index_n -= 1
-        self.index_n = self.index_n % len(self.icon_add_l)
-        self.http_n, self.icon_n = self.icon_add_l[self.index_n]
-        self.setIcon(self.icon_n)
-
-class ShortcutEntry(YohoPushButton):
-    click_sinal = Signal(str)
-    def __init__(self, parent):
-        self.name = 'shortcut_entry'
-        icon_f = atuple('MainWindow', self.name, 'icon')
-        size_f = atuple('MainWindow', self.name, 'Size', 'button_size')
-        super().__init__(icon_f, size_f, "shake",parent=parent)
-
-    def _click(self):
-        self.click_sinal.emit('entry')
-
 class ShortcutButton(QWidget):
     launch_signal = Signal(str)
     def __init__(self, parent: QMainWindow, config:Config_Manager) -> None:
@@ -927,7 +972,6 @@ class ShortcutButton(QWidget):
         self._initpara()
         self._initUI()
         self.refresh()
-        UIUpdater.set(self.color_i, self._setColor)
         #self.setFixedSize(*self.config.get(None, widget="Size", obj=self.name)[-2:], )
 
     def _initpara(self):
@@ -945,7 +989,9 @@ class ShortcutButton(QWidget):
 
         self.font_i = atuple(pre+['font', 'button_title'])
         self.color_i = atuple(pre+['color', 'button_hover'])
-    
+        self.style_d = atuple(pre+['style', 'shortcut_button'])
+        self.button_label_style = atuple(pre+['style', 'button_label'])
+        
     def _launch(self):
         button = self.sender()
         path = button.property('path')
@@ -965,15 +1011,9 @@ class ShortcutButton(QWidget):
                 icon = self.config.get('default_button_icon', obj='path')
                 path = ''
                 layout_i = QVBoxLayout()
-                button_i = YohoPushButton(icon, self.size_i, an_type="resize", an_time=150, icon_proportion=self.icon_proportion)
+                button_i = YohoPushButton(icon_i=icon, style_config=self.style_d, size_f=self.size_i, an_time=150, icon_proportion=self.icon_proportion)
                 button_i.setProperty('path', path)
-                label_i = AutoLabel(name, self.font_i)
-                button_i.setStyleSheet(f'''  QPushButton {{
-                                            border-radius: 20px; 
-                                            background-color: transparent; 
-                                            border: 0px solid #BFBFBF; }} 
-                                            QPushButton:hover {{ 
-                                            background-color: {self.color_i}; }}''')
+                label_i = AutoLabel(text=name, font=self.font_i, style_config=self.button_label_style)
                 button_i.clicked.connect(self._launch)
                 self.buttonlabel_list.append((button_i, label_i))
                 layout_i.addWidget(button_i)
@@ -982,15 +1022,6 @@ class ShortcutButton(QWidget):
                 index_f += 1
             self.layout_0.addLayout(layout_if)                    
 
-    def _setColor(self, color:atuple):
-        for button_i, _ in self.buttonlabel_list:
-            button_i.setStyleSheet(f'''  QPushButton {{
-                                            border-radius: 20px; 
-                                            background-color: transparent; 
-                                            border: 0px solid #BFBFBF; }} 
-                                            QPushButton:hover {{ 
-                                            background-color: {color}; }}''')
-    
     def refresh(self):
         index_f = 0
         for v_i in range(self.v_num):
@@ -1119,7 +1150,12 @@ class UIShortcutSetting(QWidget):
         self.app_name_label_font = atuple(pre+['app_name_label'])
         self.exe_lineedit_font = atuple(pre+['exe_lineedit'])
         self.option_button_font = atuple(pre+['option_button'])
-        
+        self.title_style = atuple('Launcher', self.name, 'style', 'setting_title')
+        self.col_style = atuple('Launcher', self.name, 'style', 'column_label')
+        self.cor_style = atuple('Launcher', self.name, 'style', 'coordinate_label')
+        self.icon_button_style = atuple('Launcher', self.name, 'style', 'icon_button')
+        self.app_name_edit_style = atuple('Launcher', self.name, 'style', 'app_name_edit')
+        self.exe_lineedit_style = atuple('Launcher', self.name, 'style', 'exe_lineedit')
         # init path
         pre = ['Launcher', self.name, 'path']
         self.manager:ShortcutsPathManager = self.up.shortcut_data
@@ -1162,8 +1198,7 @@ class UIShortcutSetting(QWidget):
         self.setLayout(self.layout_0)
 
     def _init_title(self):
-        title_label = AutoLabel(self.title_i, self.window_title_font)
-        UIUpdater.set(self.title_height, title_label.setFixedHeight)
+        title_label = AutoLabel(text=self.title_i, font=self.window_title_font, style_config=self.title_style, height=self.title_height)
         title_label.setAlignment(Qt.AlignCenter)
         self.layout_0.addWidget(title_label)
     
@@ -1181,11 +1216,11 @@ class UIShortcutSetting(QWidget):
         for name_i, size_i in col_names_size.items():
             icon_f = getattr(self, f"col_{name_i}_icon")
             if name_i != 'path':
-                col_label = AutoLabel(text='', font=self.app_name_label_font, icon_f=icon_f,
-                                    height=self.col_label_height, width=size_i)
+                col_label = AutoLabel(text='', font=self.app_name_label_font, style_config=self.col_style, 
+                                      icon_f=icon_f,height=self.col_label_height, width=size_i)
             else:
-                col_label = AutoLabel(text='', font=self.app_name_label_font, icon_f=icon_f,
-                                    height=self.col_label_height)
+                col_label = AutoLabel(text='', font=self.app_name_label_font, style_config=self.col_style,
+                                      icon_f=icon_f,height=self.col_label_height)
             # self._set_w(col_label, size_i)
             col_label.setAlignment(Qt.AlignCenter)
             self.layout_col.addWidget(col_label)
@@ -1205,33 +1240,21 @@ class UIShortcutSetting(QWidget):
         # coordinate define
         coordinate_name = f"({(index+1)%self.h_num},{(index+1)//self.h_num+1})"
         
-        cor_label = AutoLabel(coordinate_name, self.coordinate_label_font)
-        cor_label.setStyleSheet('''background-color: transparent;
-                                        border:none''')  # 设置标题透明背景
-        UIUpdater.set(self.line_height, cor_label.setFixedHeight)
-        UIUpdater.set(self.colwidth_0, cor_label.setFixedWidth)
+        cor_label = AutoLabel(text=coordinate_name, font=self.coordinate_label_font,style_config=self.cor_style, 
+                              width=self.colwidth_0, height=self.line_height)
         output.append(cor_label)
 
-        icon_button = YohoPushButton(icon_if, self.line_height, an_type='resize')
-        icon_button.setStyleSheet('''QPushButton {
-                                    background-color: transparent;
-                                    border: none;
-                                    padding: 10px 20px;
-                                    }
-                                    QPushButton:pressed {
-                                        padding: 8px 18px;
-                                    }
-                                    ''')
+        icon_button = YohoPushButton(icon_i=icon_if, style_config=self.icon_button_style)
         UIUpdater.set(self.line_height, icon_button.setFixedWidth)
         icon_button.setProperty('path', '')
         output.append(icon_button)
         
         name_if = name_if if isinstance(name_if, str) else ''
-        name_edit =AutoEdit(text=name_if, font=self.app_name_label_font, 
+        name_edit =AutoEdit(text=name_if, font=self.app_name_label_font, style_d=self.app_name_edit_style,
                             height=self.line_height, width=self.colwidth_2)
         output.append(name_edit)
 
-        exe_edit = ExePathLine(self.line_height, exe_f, self.exe_lineedit_font)
+        exe_edit = ExePathLine(style_d=self.exe_lineedit_style, height_f=self.line_height, place_holder=exe_f, font=self.exe_lineedit_font)
         output.append(exe_edit)
         
         folder_button = YohoPushButton(self.default_folder_icon, self.line_height, an_type='resize')
@@ -1593,23 +1616,21 @@ class ProgressWidgetManager(QStackedWidget):
         self.addWidget(widget)
         return widget
    
-class ExePathLine(QLineEdit):
-    def __init__(self, height_f:int, place_holder:str,font:QFont,
-                 colors:List[str] = ["#F7F7F7", "#F0F411","#EE1515"]):
-        # super().__init__(height_f, scrollbar_color, scrollbar_color_hover, scrollbar_color_pressed)
-        super().__init__()
+class ExePathLine(AutoEdit):
+    def __init__(self, style_d, height_f:int, place_holder:str,font:QFont,):
+        super().__init__(text='', font=font, style_d=style_d, height_f=height_f)
         self.setPlaceholderText(place_holder)
         self.place_holder = place_holder
 
-        UIUpdater.set(height_f, self.setFixedHeight)
-        UIUpdater.set(font, self.setFont, 'font')
-        UIUpdater.set(colors, self._loadColor)
+        UIUpdater.set(style_d, self._loadColor)
         self._setstyle()
         self.textChanged.connect(self._text_change)
     
-    def _loadColor(self, colors:atuple):
-        self.background_color, self.warning_color, self.error_color = colors
-    
+    def _loadColor(self, style_d:atuple):
+        self.background_color = style_d['background']
+        self.warning_color = style_d['background_warning']
+        self.error_color = style_d['background_error']
+
     def _setstyle(self):
         self.setToolTip(self.place_holder)  # 鼠标悬停时显示完整文本
         self.style_sheet = f'''
@@ -1636,21 +1657,9 @@ class ExePathLine(QLineEdit):
             color_n = self.warning_color
         else:
             color_n = self.error_color
-        self.style_sheet = f'''
-        QLineEdit{{
-        background-color: {color_n};  
-        border-radius: 10px;
-        }}
-        QToolTip {{
-        background-color: {self.background_color};  
-        color: #161616;           
-        font-family:: Consolas;
-        font-size: 40px;         
-        border-radius: 6px;      
-        padding: 8px;            
-        }}
-        '''
-        self.setStyleSheet(self.style_sheet)
+        self.style_dict['QLineEdit']['background-color'] = color_n
+        self.style_n = style_make(self.style_dict)
+        self.setStyleSheet(self.style_n)
 
 class NameEdit(QLineEdit):
     def __init__(self, text_f:str, font:QFont, height:int,
@@ -1696,7 +1705,25 @@ class SheetControl(QTabBar):
         self.tabMoved.connect(self.up.sort_tab)
     
     def wheelEvent(self, event):
-        event.ignore()
+        if event.angleDelta().y() > 0:
+            self.win_move(0)
+        else:
+            self.win_move(1)
+        event.accept()
+    
+    def win_move(self, index):
+        scroll_buttons = self.findChildren(QToolButton)
+        left_button = None
+        right_button = None
+        for button in scroll_buttons:
+            if button.arrowType() == Qt.LeftArrow:
+                left_button = button
+            elif button.arrowType() == Qt.RightArrow:
+                right_button = button
+        if index == 0:
+            left_button.click()
+        else:
+            right_button.click()
     
     def _setStyle(self, color_l:List[str], icon_f:str, height_f:int):
         icon_f = icon_f.replace('\\', '/')

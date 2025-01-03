@@ -35,8 +35,8 @@ class AIcon(QIcon):
 
 class YohoPushButton(QPushButton):
     def __init__(self, icon_i:Union[str, AIcon, Tuple],
+                 style_config:atuple,
                  size_f:Union[int, QSize, Tuple]=None, 
-                 an_type:Literal["shake", 'resize', None]=None, 
                  an_time:int=180,
                  change_size:float=0.6,
                  change_period:float=0.7,
@@ -47,18 +47,21 @@ class YohoPushButton(QPushButton):
         else:
             super().__init__(parent)
         UIUpdater.set(icon_proportion, self._loadIconProportion)
+        UIUpdater.set(style_config, self.customStyle, type_f='style')
         # 设置按钮图标
         UIUpdater.set(icon_i, self.setIcon, type_f='icon')
         UIUpdater.set(size_f, self.setFixedSize, type_f='size')
         self.an_time = an_time
+        self.an_type = None
         self.change_size = change_size
         self.change_period = change_period
+        self.clicked.connect(self.start_animation)
 
-        if an_type == "shake":
-            self.clicked.connect(self.shake_icon)
-        elif an_type == "resize":
-            self.clicked.connect(self.resize_icon)
-
+    def start_animation(self):
+        if self.an_type == "shake":
+            self.shake_icon()
+        elif self.an_type == "resize":
+            self.resize_icon()
     def shake_icon(self):
         self.animation = QPropertyAnimation(self, b"geometry")
         start_rect = self.geometry()
@@ -107,6 +110,26 @@ class YohoPushButton(QPushButton):
         self.setFixedSize(size_f)
         self.setIconSize(QSize(int(size_f.width()*res_factor), int(size_f.height()*res_factor)))
 
+    def customStyle(self, format_dict:dict):
+        self.an_type = format_dict.get('animation_type', None)
+        bg_colors = enlarge_list(format_dict.get('bg_colors', ['transparent']))
+        border_radius = format_dict.get('border_radius', 10)
+        border = format_dict.get('border', 'none')
+        style_sheet = f'''
+        QPushButton {{
+            background-color: {bg_colors[0]};
+            border-radius: {border_radius}px;
+            border: {border};
+        }}
+        QPushButton:hover {{
+            background-color: {bg_colors[1]};
+        }}
+        QPushButton:pressed {{
+            background-color: {bg_colors[2]};
+        }}
+        '''
+        self.setStyleSheet(style_sheet)
+
 class ColorfulButton(QPushButton):
     def __init__(self, text_f:str, colors:List[str], font:QFont, height:int=None, width:int=None):
         super().__init__()
@@ -133,16 +156,36 @@ class ColorfulButton(QPushButton):
         self.setStyleSheet(style_sheet)
 
 class AutoLabel(QLabel):
-    def __init__(self, text:str, font:Union[QFont,atuple], icon_f:Union[str,atuple,QIcon]=None, 
-                 height=None, width=None,color:Union[str,atuple]="transparent"):
+    def __init__(self, text:str, font:Union[QFont,atuple], style_config:atuple, icon_f:Union[str,atuple,QIcon]=None, 
+                 height=None, width=None):
         super().__init__()
         UIUpdater.set(text, self.setText)
         UIUpdater.set(height, self.setFixedHeight)
         UIUpdater.set(width, self.setFixedWidth)
         UIUpdater.set(font, self.setFont, type_f='font')
-        UIUpdater.set(color, self.set_color)
         UIUpdater.set(icon_f, self.set_icon, type_f='icon')
+        UIUpdater.set(style_config, self.customStyle)
         self.setAlignment(Qt.AlignCenter)
+    
+    def customStyle(self, format_dict:dict):
+        bg_color = format_dict.get('background', 'transparent')
+        border_radius = format_dict.get('border_radius', 10)
+        border = format_dict.get('border', 'none')
+        padding = format_dict.get('padding', [10,0,5,5])
+        style_sheet = f'''
+        QLabel {{
+            background-color: {bg_color};
+            border-radius: {border_radius}px;
+            border: {border};
+            padding-left: {padding[0]}px;  
+            padding-right: {padding[1]}px;  
+            padding-top: {padding[2]}px;    
+            padding-bottom: {padding[3]}px; 
+ 
+        }}
+        '''
+        self.setStyleSheet(style_sheet)
+
     def set_text(self, text:str):
         self.setText(text)
         self.adjustSize()
@@ -167,18 +210,60 @@ class AutoLabel(QLabel):
             self.setPixmap(icon.pixmap(-1,-1))
 
 class AutoEdit(QLineEdit):
-    def __init__(self, text:atuple=None, placeholder:atuple=None, font:atuple=None, 
-                 height:atuple=None, width:atuple=None, background_color:atuple='#F7F7F7'):
+    def __init__(self, text='', font:atuple=None, style_d={}, icon_f=None, height:atuple=None, width:atuple=None):
         super().__init__()
-        UIUpdater.set(text, self.setText)
-        UIUpdater.set(placeholder, self.setPlaceholderText)
+        self.setText(text)
         UIUpdater.set(font, self.setFont, type_f='font')
         UIUpdater.set(height, self.setFixedHeight)
         UIUpdater.set(width, self.setFixedWidth)
-        UIUpdater.set(background_color, self._setColor)
+        UIUpdater.set(style_d, self.customStyle)
+        UIUpdater.set(icon_f, self._setICon, 'icon')
+    
+    def _setICon(self, icon_f):
+        if isinstance(icon_f, str):
+            self.setPixmap(QPixmap(icon_f))
+        elif isinstance(icon_f, QIcon):
+            self.setPixmap(icon_f.pixmap(-1,-1))
     
     def _setColor(self, color:atuple):
         self.setStyleSheet(f'background-color: {color};border-radius: 10px;padding : 5px')
+    
+    def customStyle(self, style_dict:dict):
+        bg_color = style_dict.get('background', 'transparent')
+        font_color = style_dict.get('font_color', 'black')
+        border_radius = style_dict.get('border_radius', 10)
+        border = style_dict.get('border', 'none')
+        padding = style_dict.get('padding', [10,0,5,5])
+        style_dict_i = {
+            'QLineEdit': {
+                'background-color': bg_color,
+                'color': font_color,
+                'border-radius': f'{border_radius}px',
+                'border': border,
+                'padding-left': f'{padding[0]}px',
+                'padding-right': f'{padding[1]}px',
+                'padding-top': f'{padding[2]}px',
+                'padding-bottom': f'{padding[3]}px'
+            }
+        }
+        text_s_color = style_dict.get('text_selected_color')
+        text_s_font_color = style_dict.get('text_selected_font_color')
+        placeholder_style = style_dict.get('placeholder_font_style')
+        placeholder_color = style_dict.get('placeholder_color')
+        if text_s_color is not None:
+            style_dict_i['QLineEdit']['selection-background-color'] = text_s_color
+        if text_s_font_color is not None:
+            style_dict_i['QLineEdit']['selection-color'] = text_s_font_color
+        if placeholder_style is not None:
+            style_dict_i.setdefault('QLineEdit::placeholder',{})
+            style_dict_i['QLineEdit::placeholder']['font-style'] = placeholder_style
+        if placeholder_color is not None:
+            style_dict_i.setdefault('QLineEdit::placeholder',{})
+            style_dict_i['QLineEdit::placeholder']['color'] = placeholder_color
+        
+        self.style_dict = style_dict_i
+        self.style_n = style_make(style_dict_i)
+        self.setStyleSheet(self.style_n)
 
 class PolygonWidget(QWidget):
     def __init__(self):

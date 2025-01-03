@@ -1,0 +1,11 @@
+{
+    "MainWindow": {
+        "switch_button:":{
+            "Size": {
+                "height": "1.2*het",
+                "font": [["Family", "*jetbrains"], ["PixelSize", 35]]
+            }
+        
+        }
+    }
+}

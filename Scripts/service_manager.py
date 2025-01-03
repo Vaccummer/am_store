@@ -5,6 +5,8 @@ from PySide2.QtCore import *
 from toolbox import *
 import numpy as np
 from p_widget import AIcon
+from am_store.common_tools import *
+
 
 class SSHConductor(object):
     def __init__(self, sftp:Union[paramiko.SFTPClient]):
@@ -77,7 +79,9 @@ class Config_Manager(object):
         self.obj = obj_name
         self.pre = []
         if not copy:
-            self.config = self._calSize(self.config)
+            config_0 = self._calSize(self.config)
+            config_1 = dicta.unflatten_dict(config_0)
+            self.config = adict(config_1)
     
     def deepcopy(self):
         new_copy = Config_Manager(self.wkdr, None, None, None, True)
@@ -769,7 +773,6 @@ class FileTransfer:
         except Exception as e:
             print(f"文件传输失败: {e}")
             return False
-
 
 class UIUpdater(QObject):
     ui_set_l = []

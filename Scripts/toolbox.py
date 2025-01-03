@@ -28,6 +28,11 @@ from abc import ABC, abstractmethod
 
 def is_path(string_f, exist_check:bool=False):
     # To judge whether a variable is Path or not
+    if isinstance(string_f, pathlib.Path):
+        if exist_check:
+            return string_f.exists()
+        else:
+            return True
     if not isinstance(string_f, str):
         return False
     if not exist_check:
@@ -444,6 +449,39 @@ def setStyle(widget:QWidget, style_string:str, *args):
     """
     widget.setStyleSheet(style_string.format(*args))
 
+def enlarge_list(value_f, length_f:int):
+    if not isinstance(value_f, list):
+        return [value_f]*length_f
+    else:
+        return value_f + [value_f[-1]]*(length_f-len(value_f))
+
+def style_make(config:dict):
+    """
+    config must be a dict, key is obj name, value is a dict with key-value pairs
+    """
+    style = ""
+    for obj_name, style_dict in config.items():
+        style += f"{obj_name} {{\n"
+        for key, value in style_dict.items():
+            style += f"{key}: {value};\n"
+        style += "}"
+    return style
+
+class atuple(tuple):
+    def __new__(cls, *args):
+        if len(args) == 1 and isinstance(args[0], list):
+            return super().__new__(cls, *args)
+        else:
+            return super().__new__(cls, args)
+    
+    def __or__(self, other):
+        if isinstance(other, atuple):
+            return atuple(list(self) + list(other))
+        else:
+            return Atuple(list(self) + [other])
+
+    def __hash__(self):
+        return hash(tuple(Atuple('Atuple') | self))
 
 class alist(list):
     def __init__(cls, *args):
@@ -451,6 +489,7 @@ class alist(list):
             return super().__init__(*args)
         else:
             return super().__init__(args)
+    
     def __eq__(self, value):
         if not isinstance(value, list):
             return None
@@ -462,80 +501,17 @@ class alist(list):
                     return False
             return True
 
-class atuple(tuple):
-    def __new__(cls, *args):
-        if len(args) == 1 and isinstance(args[0], list):
-            return super().__new__(cls, *args)
-        else:
-            return super().__new__(cls, args)
-
-class dicta:
-    @staticmethod
-    def flatten_dict(dict_f:dict):
-        # flatten dict, keys of multi layers stored in tuple
-        sep_f = "$==>>$"
-        def flatten_dict_core(d, parent_key='', sep=sep_f):
-            items = []
-            for k, v in d.items():
-                new_key = f"{parent_key}{sep}{k}" if parent_key else k
-                if isinstance(v, dict):
-                    items.extend(flatten_dict_core(v, new_key, sep=sep).items())
-                else:
-                    items.append((new_key, v))
-            return dict(items)
-        dict_ori = flatten_dict_core(dict_f)
-        dict_out = OrderedDict()
-        for key, value in dict_ori.items():
-            key_list = key.split(sep_f)
-            dict_out[tuple(key_list)] = value
-        return dict_out
+class adict(dict):
+    def __init__(self, dict_f:dict):
+        self.dict_t = dict_f
     
-    @staticmethod
-    def edit(dict_f:dict, edit_info:dict, force=False):
-        # edit_info can be common dict or flatten dict(keys stored in tuple)
-        edit_info_format = {}
-        for key_i, value_i in edit_info.items():
-            if isinstance(key_i, tuple):
-                edit_info_format[key_i] = value_i
-            else:
-                edit_info_format.update(dicta.flatten_dict({key_i:value_i}))
-        
-        if not force:
-            for key_tuple, value in edit_info_format.items():
-                if len(key_tuple) == 1:
-                    if dict_f.get(key_tuple[0]):
-                        dict_f[key_tuple[0]] = value
-                    continue
-                sign_f = True
-                for index_f, key in enumerate(key_tuple[:-1]):
-                    if index_f == 0:
-                        if not dict_f.get(key):
-                            sign_f = False
-                            break
-                        else:
-                            data_n = dict_f[key]
-                    else:
-                        if data_n.get(key):
-                            data_n = data_n[key]
-                        else:
-                            sign_f = False
-                            break
-                if sign_f:
-                    data_n[key_tuple[-1]] = value    
+    def __getitem__(self, key):
+        if not isinstance(key, atuple):
+            return self.dict_t.get(key, None)
         else:
-            for key_tuple, value in edit_info_format.items():
-                if len(key_tuple) == 1:
-                    dict_f[key_tuple[0]] = value
-                    continue
-                for index_f, key in enumerate(key_tuple[:-1]):
-                    if index_f == 0:
-                        if not dict_f.get(key):
-                            dict_f[key] = {}
-                        data_n = dict_f[key]
-                    else:
-                        if not data_n.get(key):
-                            data_n[key] = {}
-                        data_n = data_n[key]
-                data_n[key_tuple[-1]] = value
-        return data_n
-
+            dict_n = self.dict_t
+            for key_i in key:
+                dict_n = dict_n.get(key_i, None)
+                if dict_n is None:
+                    return None
+            return dict_n

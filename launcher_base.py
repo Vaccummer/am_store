@@ -6,7 +6,7 @@ from PySide2.QtCore import QTimer, QPropertyAnimation, QEasingCurve, QSequential
 from PySide2.QtGui import QPixmap, QPalette, QIcon, QFont, QScreen, QFontMetrics, QWindow, QKeySequence
 from PySide2.QtGui import QPainter, QColor, QBrush, QPen, QLinearGradient, QTextCharFormat, QTextCursor
 from Scripts.toolbox import *
-from am_store.common_tools import *
+from am_store2.common_tools import *
 from Scripts.launcher_ui import *
 
 class BaseLauncher(QMainWindow):
