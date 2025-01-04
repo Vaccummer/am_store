@@ -25,6 +25,8 @@ import pathlib
 from pathlib import Path
 import time
 from abc import ABC, abstractmethod
+import numpy
+import yaml
 
 def is_path(string_f, exist_check:bool=False):
     # To judge whether a variable is Path or not
@@ -453,7 +455,21 @@ def enlarge_list(value_f, length_f:int):
     if not isinstance(value_f, list):
         return [value_f]*length_f
     else:
+        if len(value_f) >= length_f:
+            return value_f
         return value_f + [value_f[-1]]*(length_f-len(value_f))
+
+def pxstr(value_f, length=4):
+    str_f = ''
+    if isinstance(value_f, (int, str)):
+        for i in range(length):
+            str_f += f"{value_f}px "
+    elif isinstance(value_f, list):
+        value_f = enlarge_list(value_f, length)
+        for value_i in value_f:
+            str_f += f"{value_i}px "
+    return str_f
+        
 
 def style_make(config:dict):
     """
@@ -469,8 +485,8 @@ def style_make(config:dict):
 
 class atuple(tuple):
     def __new__(cls, *args):
-        if len(args) == 1 and isinstance(args[0], list):
-            return super().__new__(cls, *args)
+        if len(args) == 1 and isinstance(args[0], (list, tuple)):
+            return super().__new__(cls, args[0])
         else:
             return super().__new__(cls, args)
     
@@ -478,10 +494,17 @@ class atuple(tuple):
         if isinstance(other, atuple):
             return atuple(list(self) + list(other))
         else:
-            return Atuple(list(self) + [other])
+            return atuple(list(self) + [other])
 
     def __hash__(self):
-        return hash(tuple(Atuple('Atuple') | self))
+        return hash(tuple(atuple('Atuple') | self))
+
+    def __getitem__(self, index):
+        result = super().__getitem__(index)
+        if isinstance(index, slice):
+            return atuple(result)
+        else:
+            return result
 
 class alist(list):
     def __init__(cls, *args):
@@ -503,15 +526,195 @@ class alist(list):
 
 class adict(dict):
     def __init__(self, dict_f:dict):
-        self.dict_t = dict_f
-    
+        super().__init__()
+        self.update(dict_f)
+
     def __getitem__(self, key):
         if not isinstance(key, atuple):
-            return self.dict_t.get(key, None)
+            return self.get(key, None)
         else:
-            dict_n = self.dict_t
+            dict_n = self
             for key_i in key:
                 dict_n = dict_n.get(key_i, None)
                 if dict_n is None:
                     return None
             return dict_n
+        
+class dicta:
+    @staticmethod
+    def flatten_dict(dict_f:dict, max_depth:int=numpy.inf):
+        # flatten dict, keys of multi layers stored in tuple
+        depth_f = 0
+        def flatten_dict_core(d, parent_key=None):
+            nonlocal depth_f
+            depth_f+=1
+            items = []
+            for k, v in d.items():
+                if not parent_key:
+                    if isinstance(k, atuple):
+                        new_key = k
+                    else:
+                        new_key = atuple([k])
+                else:
+                    new_key  = parent_key | k
+                if isinstance(v, dict):
+                    if depth_f < max_depth:
+                        items.extend(flatten_dict_core(v, new_key).items())
+                    else:
+                        items.append((new_key, v))
+                else:
+                    items.append((new_key, v))
+            return dict(items)
+        dict_out = flatten_dict_core(dict_f)
+        return dict_out
+    @staticmethod
+    def unflatten_dict(dict_f:dict):
+        # unflatten dict, keys of multi layers stored in Atuple
+        out_dict = {}
+        for key, value in dict_f.items():
+            if not isinstance(key, atuple):
+                out_dict[key] = value
+                continue
+            tar_dict = out_dict
+            for key_i in key[:-1]:
+                tar_dict.setdefault(key_i, {})
+                tar_dict = tar_dict[key_i]
+            tar_dict[key[-1]] = value
+        return out_dict
+    @staticmethod
+    def edit(dict_f:dict, edit_info:dict, force=False):
+        # edit_info can be common dict or flatten dict(keys stored in tuple)
+        edit_info_format = {}
+        for key_i, value_i in edit_info.items():
+            if isinstance(key_i, tuple):
+                edit_info_format[key_i] = value_i
+            else:
+                edit_info_format.update(dicta.flatten_dict({key_i:value_i}))
+        
+        if not force:
+            for key_tuple, value in edit_info_format.items():
+                if len(key_tuple) == 1:
+                    if dict_f.get(key_tuple[0]):
+                        dict_f[key_tuple[0]] = value
+                    continue
+                sign_f = True
+                for index_f, key in enumerate(key_tuple[:-1]):
+                    if index_f == 0:
+                        if not dict_f.get(key):
+                            sign_f = False
+                            break
+                        else:
+                            data_n = dict_f[key]
+                    else:
+                        if data_n.get(key):
+                            data_n = data_n[key]
+                        else:
+                            sign_f = False
+                            break
+                if sign_f:
+                    data_n[key_tuple[-1]] = value    
+        else:
+            for key_tuple, value in edit_info_format.items():
+                if len(key_tuple) == 1:
+                    dict_f[key_tuple[0]] = value
+                    continue
+                for index_f, key in enumerate(key_tuple[:-1]):
+                    if index_f == 0:
+                        if not dict_f.get(key):
+                            dict_f[key] = {}
+                        data_n = dict_f[key]
+                    else:
+                        if not data_n.get(key):
+                            data_n[key] = {}
+                        data_n = data_n[key]
+                data_n[key_tuple[-1]] = value
+        return data_n
+
+class yml:
+    @staticmethod
+    def read(yaml_path:str)->dict:
+        # yaml read function
+        if os.path.exists(yaml_path) and (yaml_path.endswith('.yaml') or yaml_path.endswith('.yml')):
+            with open(yaml_path, 'r', encoding='utf-8') as data_f:
+                return yaml.safe_load(data_f)
+        else:
+            warnings.warn(f'yml.read function(read mode) get a illegal path: {yaml_path}')
+            return
+    
+    @staticmethod
+    def write(yaml_path:str, data_f:dict)->None:
+        # yaml create function
+        # get both yaml file path and dict input, write dict to path provided
+
+        if yaml_path.endswith('.yaml') or yaml_path.endswith('.yml'):
+            with open(yaml_path, 'w', encoding='utf-8') as file_f:
+                yaml.dump(data_f, file_f, default_flow_style=False, sort_keys=False)
+            return
+        else:
+            warnings.warn(f'yml.write function detected no valid path')
+    
+    @staticmethod
+    def edit(yaml_path:str, edit_info:dict, force=False):
+        '''
+        # yaml edit function
+        # get both yaml file path and dict input, edit data of path provided
+        # edit_info can be common dict or flatten dict(keys stored in tuple)
+        # if force is True, the function will create keys that not exist in the yaml file
+        # Warning: this function will overwrite the original yaml file'''
+        yaml_data = yml.read(yaml_path)
+        if not yaml_data:
+            return
+        dict_n = dicta.edit(yaml_data, edit_info, force)
+        yml.write(yaml_path, dict_n)
+
+    @staticmethod
+    def format(dict_or_yaml_path:Union[str, dict]):
+        if isinstance(dict_or_yaml_path, dict):
+            return yaml.dump(dict_or_yaml_path, default_flow_style=False, sort_keys=False)
+        elif isinstance(dict_or_yaml_path, str):
+            dict_f = yml.read(dict_or_yaml_path)
+            if not dict_f:
+                return
+            else:
+                return yaml.dump(dict_f)
+    
+    @staticmethod
+    def yaml_obj_edit(ori_data, data_f:dict, mktree:bool=False):
+        if not all(isinstance(key, atuple) for key in data_f.keys()):
+            data_f = dicta.flatten_dict(data_f)
+        for key, value_i in data_f.items():
+            data_temp = ori_data
+            for key_i in key[:-1]: 
+                tmp_data = data_temp.get(key_i, 'sign_for_yaml_obj_edit')
+                if tmp_data == 'sign_for_yaml_obj_edit':
+                    if mktree:
+                        data_temp[key_i] = {}
+                        data_temp = data_temp[key_i]
+                    else:
+                        break
+                elif not isinstance(tmp_data, dict):
+                    break
+                else:
+                    data_temp = data_temp[key_i]
+            t_data_ori = data_temp.get(key[-1], 'sign_for_yaml_obj_edit')
+            if t_data_ori == 'sign_for_yaml_obj_edit':
+                if mktree:
+                    data_temp[key[-1]] = value_i
+            elif isinstance(t_data_ori, dict):
+                ## You can't edit if terminal node is a dict
+                pass
+            else:
+                data_temp[key[-1]] = value_i
+        return ori_data
+
+    @staticmethod
+    def intactwrite(path_f, data_f:dict, mktree:bool=False):
+        from ruamel.yaml import YAML as Ryaml
+        ryaml = Ryaml()
+        with open(path_f, "r", encoding="utf-8") as f:
+            ori_data = ryaml.load(f)
+        new_data = yml.yaml_obj_edit(ori_data, data_f, mktree)
+        with open(path_f, "w", encoding="utf-8") as f:
+            ryaml.dump(new_data, f)
+    
+

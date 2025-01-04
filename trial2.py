@@ -1,46 +1,59 @@
-from PySide2.QtWidgets import QApplication, QMainWindow, QComboBox, QVBoxLayout, QWidget
-from PySide2.QtGui import QPalette, QColor
-from PySide2.QtCore import Qt
+from PySide2.QtWidgets import (
+    QApplication,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+    QGraphicsOpacityEffect,
+)
+from PySide2.QtCore import QPropertyAnimation, QEasingCurve
 
-class MainWindow(QMainWindow):
+class OpacityWidget(QWidget):
     def __init__(self):
         super().__init__()
-        self.initUI()
+        self.init_ui()
 
-    def initUI(self):
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        layout = QVBoxLayout(central_widget)
+    def init_ui(self):
+        # 创建按钮
+        self.fade_in_button = QPushButton("Fade In", self)
+        self.fade_out_button = QPushButton("Fade Out", self)
 
-        combo = QComboBox()
-        combo.addItems(["Option 1", "Option 2", "Option 3"])
-        
-        # First set stylesheet for border, radius etc
-        combo.setStyleSheet("""
-            QComboBox {
-                background-color: #4CC1B5;
-                border: 2px solid #4CC1B5;
-                border-radius: 5px;
-                padding: 5px;
-            }
-            QComboBox::drop-down {
-                border: none;
-            }
-            QComboBox::down-arrow {
-                width: 20px;
-                height: 20px;
-            }
-        """)
-        
-        # Then use QPalette for background color
-        palette = combo.palette()
-        palette.setColor(QPalette.Button, QColor('red'))
-        palette.setColor(QPalette.Base, QColor('black'))
-        combo.setPalette(palette)
-        layout.addWidget(combo)
+        # 布局
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.fade_in_button)
+        layout.addWidget(self.fade_out_button)
+        self.setLayout(layout)
+
+        # 设置透明效果
+        self.opacity_effect = QGraphicsOpacityEffect(self)
+        self.setGraphicsEffect(self.opacity_effect)
+        self.opacity_effect.setOpacity(1.0)  # 初始透明度
+
+        # 绑定事件
+        self.fade_in_button.clicked.connect(self.fade_in)
+        self.fade_out_button.clicked.connect(self.fade_out)
+
+    def fade_in(self):
+        """部件渐显"""
+        animation = QPropertyAnimation(self.opacity_effect, b"opacity")
+        animation.setDuration(1000)  # 动画持续时间（毫秒）
+        animation.setStartValue(0.5)  # 起始透明度
+        animation.setEndValue(1.0)  # 结束透明度
+        animation.setEasingCurve(QEasingCurve.InOutQuad)  # 缓动效果
+        animation.start()
+
+    def fade_out(self):
+        """部件渐隐"""
+        animation = QPropertyAnimation(self.opacity_effect, b"opacity")
+        animation.setDuration(1000)  # 动画持续时间（毫秒）
+        animation.setStartValue(1.0)  # 起始透明度
+        animation.setEndValue(0.5)  # 结束透明度
+        animation.setEasingCurve(QEasingCurve.InOutQuad)  # 缓动效果
+        animation.start()
 
 if __name__ == "__main__":
     app = QApplication([])
-    window = MainWindow()
-    window.show()
+    widget = OpacityWidget()
+    widget.setWindowTitle("Widget Opacity Example")
+    widget.resize(300, 200)
+    widget.show()
     app.exec_()

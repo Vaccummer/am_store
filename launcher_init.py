@@ -73,7 +73,7 @@ class BaseLauncher(QMainWindow):
     def createTrayIcon(self):
         # create taskbar hide icon
         self.tray_icon = QSystemTrayIcon(self)
-        self.tray_icon.setIcon(QIcon(self.config.get(None, "MainWindow", "taskbar_icon", "path")))
+        self.tray_icon.setIcon(QIcon(self.config.get(None, "MainWindow", "task_bar_icon")))
         self.tray_icon.setToolTip("Super Launcher")
 
         show_action = QAction("Show", self)
@@ -116,11 +116,11 @@ class BaseLauncher(QMainWindow):
         # self.ass = Associate(self.config)
     
     def _mainwindow_set(self):
-        self.setGeometry(*self.config.get('main_window', mode='Launcher', widget=None, obj="Size"))
+        self.setGeometry(*self.config.get('main_window', mode='MainWindow', widget=None, obj="Size"))
         self.setWindowFlags(self.windowFlags() | Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setWindowTitle("Super Launcher")
-        self.setWindowIcon(QIcon(self.config.get(None, "MainWindow", "taskbar_icon", "path")))
+        self.setWindowIcon(QIcon(self.config.get(None, "MainWindow", "task_bar_icon")))
     
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -162,7 +162,7 @@ class BaseLauncher(QMainWindow):
         QApplication.instance().quit()
     
     def restart_program(self, script_path):
-        os.system(f"python {script_path}")
+        subprocess.Popen([sys.executable, script_path])
         self.programm_exit()
     
     @staticmethod
@@ -196,7 +196,7 @@ class UILauncher(BaseLauncher):
         # input widget
         self.layout_input = amlayoutV()
         # associate & shortcut widget
-        self.stack_ass = QStackedWidget(self)
+        self.stack_ass = SmartStackWidget(self)
         #self.layout_ass = amlayoutH()
         add_obj(self.layout_top, self.layout_input, self.stack_ass, parent_f=self.layout_0)
     
@@ -208,7 +208,7 @@ class UILauncher(BaseLauncher):
         self.top_buttons = TopButton(self, self.config)._initbuttons()
         self.layout_top.addWidget(self.switch_button)
         self.layout_top.addStretch()
-        add_obj(self.shortcut_entry, *self.top_buttons, parent_f=self.layout_top)
+        add_obj(*self.top_buttons, parent_f=self.layout_top)
     
     def _initLauncherUI(self):
         self.path_switch_button = PathModeSwitch(self, config=self.config)

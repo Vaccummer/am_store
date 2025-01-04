@@ -59,10 +59,32 @@ Common:
   script_path: "./launcher_init.py"
   
 MainWindow:
+  Size:
+    main_window: [scr_x/2-win_x/2, scr_y/2-win_y/2, win_x, win_y]
+  task_bar_icon: "./load/MainWindow/taskbar_icon.ico"
   switch_button:
     Size:
       height: 1.2*het
-    font: [[Family, *jetbrains], [PixelSize, 35]]
+    font: [[Family, *jetbrains], [PixelSize, 45], [Weight, 70]]
+    style:
+      box:
+        font_color: "#FFFFFF"
+        background: "rgba(255, 255, 255, 50)"
+        border: "none"
+        border_radius: 20 # top-left, top-right, bottom-right, bottom-left */
+        padding: [10,10,5,5]
+      menu:
+        animation_time: 200
+        border: "none"
+        background: "#F7F7F7"
+        border_radius: 20
+        padding: [10,5,5,5]
+      item:
+        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"]  # common, hover, pressed
+        border: "1px solid #F7F7F7"
+        border_radius: 10
+        padding: [10,5,5,5]
+
   top_button:
     Size:
       widget_height: 1.3*het
@@ -72,12 +94,13 @@ MainWindow:
       minimum: "./load/MainWindow/minimum.svg"
       close: "./load/MainWindow/close.svg"
       middle: "./load/MainWindow/middle.svg"
-  shortcut_entry:
-    Size:
-      button_size: [0.8*het, 0.8*het]
-    icon: ""
-  taskbar_icon:
-    path: "./load/MainWindow/taskbar_icon.ico"
+      entry: ""
+    style:
+      background_colors: ["#F7F7F7", "#FFC300", "#FF5733"] # common, hover, pressed
+      border: "none"
+      border_radius: 10
+      animation_type: 'resize' # 'shake' or 'resize'
+      
   Tip:
     font: 
       title: [[Family, *jetbrains], [PixelSize, 40]]
@@ -98,25 +121,18 @@ MainWindow:
       warning_icon: "./load/MainWindow/warning_icon.svg"
 
 Launcher:
-  Size:
-    main_window: [scr_x/2-win_x/2,scr_y/2-win_y/2,win_x,win_y]   # [x,y,w,h]
-    srh_icon: 1.7*gap
-    input_box: [gap,1.5*gap+het,win_x-2*gap,het]
-    opto_icon: null
-    shortcut_entry: [win_x-gap-het,1.5*gap+1.1*het,0.8*het,0.8*het]
-    shortcut_button: [(win_x+gap)/2, 1.8*gap+2*het,(win_x-3*gap)/2,win_y-2.8*gap-2*het]
-    shortcut_setting: ["0", "0", (15*win_x)/16, (16*win_y)/15]
-    associate_list: [gap,1.8*gap+2*het,win_x/2-gap,win_y-2.8*gap-2*het]
-    opto_settings: null
-    #search_togle_icon: [0.6*het, 0.6*het]
-    search_togle_button: [0.6*het, 0.6*het]
-  path:
-    settings_xlsx: "./load/Launcher/launcher_set.xlsx"
+  settings_xlsx_path: "./load/Launcher/launcher_set.xlsx"
   input_box:
     Size:
       height: het
     font: 
       main: [[Family, *yahei], [PixelSize, 40]] 
+    style:
+      background: "#F7F7F7"
+      border: "none"
+      border_radius: 20
+      padding: [10,0,5,5]
+
   path_mode_switch:
     Size:
       height: het
@@ -126,6 +142,21 @@ Launcher:
     color:
       box_background: ['rgba(255, 255, 255, 50)',"#FAC83F", '#FA8A8A']  # 连接正常,等待连接,连接失败三种颜色
       item_background: "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #73B1A7, stop:1 #EDFFFF)"
+    style:
+      box:
+        font_color: "#F7F7F7"
+        normal_background: "rgba(255, 255, 255, 50)"
+        warn_background: "#FFC300"
+        error_background: "#FF5733"
+        border: "none"
+        border_radius: 20
+        padding: [5,0,5,5]
+      menu:
+        font_color: "#F7F7F7"
+        background: "#F7F7F7"
+        line_hover_background: "#F7F7F7"
+        hover_font_color: "#F7F7F7"
+  
   associate_list:
     Size:
       item_height: 0.8*het
@@ -146,21 +177,42 @@ Launcher:
       filelog_default_path: 'F:\\Windows_Data\\Desktop_File'
       exe_icon_getter: './3rdparty/get_exe_icon/main.exe'
       file_icon_getter: "./3rdparty/get_file_icon/main.exe"
-    color:
-      item_colors: ["#F7F7F7", "#FFC300", "#FF5733"] # common, hover, selected
+    style:
+      main:
+        background: "transparent"
+        border: "none"
+        border_radius: 20
+      item:
+        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"]  # common, hover, pressed
+        border: "1px solid #F7F7F7"
+        border_radius: 10
+        padding: [10,5,5,5]
+        height: 60
+      scroll_bar:
+        orbit_color: "#F7F7F7"
+        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"]  # common, hover, pressed
+        border_radius: 5
+        width: 15
+        min_height: 30
+      label:
+        background: "#F7F7F7"
+        padding: [10, 10, 10, 10] # left, right, top, bottom
+        border: "1px solid #F7F7F7"
+        border_radius: 10
+      button:
+        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"]  # common, hover, pressed
+        border_radius: 10
+        animation_type: 'shake' # 'shake' or 'resize', default is None
+
     max_exe_num: 10
     max_dir_num: 999
     max_length: 600
 
-    local_min_chunck: 256 # in MB
-    local_max_chunck: 2048 # in MB
-
-    remote_min_chunck: 4 # in MB
-    remote_max_chunck: 100 # in MB
   shortcut_obj:
     horizontal_button_num: 6
     vertical_button_num: 5
     Size:
+      setting_window_size: [0.5*win_x, 0.5*win_y]
       title_height: 1.3*het
       entry_icon_r: 0.7*het
       icon_proportion: 0.8
@@ -181,6 +233,7 @@ Launcher:
       app_name_label: [[Family, *jetbrains], [PixelSize, 60], [Weight, 70]]
       exe_lineedit: [[Family, *yahei], [PixelSize, 60], [Weight, 70]]
       option_button: [[Family, *jetbrains], [PixelSize, 60], [Weight, 70]]
+      tab: [[Family, *jetbrains], [PixelSize, 60], [Weight, 70]]
     path:
       entry_icon: './load/Launcher/entry_button.svg'
       button_icons: &shortcut_button_icons './load/Launcher/shortcut_botton/button_icons'
@@ -194,6 +247,9 @@ Launcher:
       col_icon_icon: './load/Launcher/shortcut_setting/col_icon/col_icon_icon.svg'
       col_path_icon: "./load/Launcher/shortcut_setting/col_icon/col_path_icon.svg"
       col_search_icon: "./load/Launcher/shortcut_setting/col_icon/col_search_icon.svg"
+      close_icon0: ''   # 0: normal, 1: hover, 2: pressed
+      close_icon1: ''
+      close_icon2: ''
     color:
       button_hover: "#619F99"
       launcher0 : "#008080"
@@ -210,6 +266,113 @@ Launcher:
       cancel2 : "#349179"
     name:
       window_title: Shortcut Settings
+    style:
+      shortcut_button:
+        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"]  # common, hover, pressed
+        border_radius: 20
+        animation_type: 'resize' # 'shake' or 'resize', default is None
+      button_label:
+        background: 'transparent'
+        font_color: "#000000"
+        border: "none"
+        border_radius: 0
+        padding: [0,0,0,0]
+      setting_title:
+        background: "transparent"
+        font_color: "#000000"
+      column_label:
+        background: "transparent"
+        font_color: "#000000"
+      coordinate_label:
+        background: "#F7F7F7"
+        font_color: "#000000"
+      icon_button:
+        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"]  # common, hover, pressed
+        border_radius: 10
+        animation_type: 'resize' # 'shake' or 'resize', default is None
+      app_name_edit:
+        background: "#F7F7F7"
+        background_error: "#FF5733"
+        font_color: "#000000"
+        text_selected_color: "#FF5733"
+        text_selected_background: "#F7F7F7"
+        border: "1px solid #F7F7F7" 
+        border_radius: 10
+        padding: [10, 10, 10, 10]
+      exe_lineedit:
+        background: "#F7F7F7"
+        background_warning: "#FFC300"
+        background_error: "#FF5733"
+        placeholder_color: "#C2BEB9"
+        placeholder_font_style: "italic"  # "italic" or "normal"
+        font_color: "#000000"
+        text_selected_color: "#FF5733"
+        text_selected_background: "#F7F7F7"
+        border: "1px solid #F7F7F7"
+        border_radius: 10
+        padding: [10, 10, 10, 10]
+      exe_tip:
+        background: "#F7F7F7"
+        font_color: "#000000"
+        border: "none"
+        border_radius: 15
+        padding: [10, 5, 5, 5]
+        font_family: *yahei
+        font_pt: 12
+        opacity: 220
+      outer_frame:
+        border: "5px solid gray"
+        border_radius: 20
+      scroll_bar:
+        orbit_color: "transparent"
+        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"]  # common, hover, pressed
+        border: 'none'
+        border_radius: 7  # share with orbit
+        width: 15
+        min_height: 30
+      folder_search_button:
+        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"]  # common, hover, pressed
+        border_radius: 20
+        animation_type: 'resize' # 'shake' or 'resize', default is None
+      add_button:
+        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"]  # common, hover, pressed
+        border_radius: 20
+        animation_type: 'resize' # 'shake' or 'resize', default is None
+      colorful_button:
+        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"]  # common, hover, pressed
+        border: "1px solid #F7F7F7"
+        border_radius: 10
+      sheet_control:
+        main_height: 60
+        main_border : 'none'
+        main_background: 'transparent'
+        main_border_radius: 20
+        height: 50
+        padding: [5, 10, 5, 10]
+        border: 'none'
+        border_radius: 20
+        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"]  # common, hover, pressed
+        font_colors: ["#000000", "#000000", "#000000"]  # common, hover, pressed
+      menu:
+        background: "#F7F7F7"
+        background_hover: "#FFC300"
+        font_color: "#000000"
+        font_color_hover: "#FF5733"
+        border: "none"
+        padding: [10,5,5,5]
+      tab_add_button:
+        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"]  # common, hover, pressed
+        border_radius: 20
+        animation_type: 'resize' # 'shake' or 'resize', default is None
+      save_button:
+        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"]  # common, hover, pressed
+        border_radius: 20
+        animation_type: null
+      reset_button:
+        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"]  # common, hover, pressed
+        border_radius: 20
+        animation_type: null
+
   search_togle_button:
     # urls must contain '^{sign_for_exchange}$' to represent the substitute sign
     # urls must have the same length as icons
@@ -224,6 +387,12 @@ Launcher:
       - "./load/MainWindow/maximum.svg"
       - "./load/MainWindow/middle.svg"
     sign: '^{sign_for_exchange}$'
+    style:
+      background_colors: ["#F7F7F7", "#FFC300", "#FF5733"]  # common, hover, pressed
+      border: "none"
+      border_radius: 10
+      animation_type: 'resize' # 'shake' or 'resize', default is None
+  
   progress_widget:
     Size:
       bar_height: 0.2*het
@@ -238,7 +407,32 @@ Launcher:
     path:
       arrow_icon: "./load/Launcher/progress_widget/arrow_icon.png"
       close_icon: "./load/Launcher/progress_widget/close_icon.png"
-
+    style:
+      bar:
+        background: "#F7F7F7"
+        border_radius: 10
+        border: "1px solid #F7F7F7"
+        orbit_color: "#F7F7F7"
+      src_label:
+        background: "#F7F7F7"
+        font_color: "#000000"
+        border_radius: 10
+        border: "1px solid #F7F7F7"
+      arrow_label:
+        background: "#F7F7F7"
+        font_color: "#000000"
+        border: "1px solid #F7F7F7"
+        border_radius: 10
+      dst_label:
+        background: "#F7F7F7"
+        border_radius: 10
+        border: "1px solid #F7F7F7"
+      close_button:
+        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"]  # common, hover, pressed
+        border_radius: 10
+        animation_type: 'shake' # 'shake' or 'resize', default is None
+        border: null
+      
 Terminal:
   font: 
     main: [[Family, *jetbrains], [PointSize, 60], [Weight, 70]]
@@ -246,6 +440,16 @@ Terminal:
     text: "#C2BEB9"
     background: "#1E1F22"
     scroll_bar: "#1E1F22"
+  style:
+    main:
+      background: "#1E1F22"
+      border: "1px solid #1E1F22"
+      border_radius: 10
+    bar:
+      background_colors: ["#1E1F22", "#1E1F22", "#1E1F22"]  # common, hover, pressed
+      border: "1px solid #1E1F22"
+      border_radius: 10
+      min_height: 10
 
 Settings:
   LauncherSetting:
@@ -258,6 +462,7 @@ Settings:
       save_button: [[Family, *yahei], [PointSize, 12], [Weight, 70]]
       discard_button: [[Family, *yahei], [PointSize, 12], [Weight, 70]]
       reset_button: [[Family, *yahei], [PointSize, 12], [Weight, 70]]
+      tab: [[Family, *yahei], [PointSize, 12], [Weight, 70]]
     Size:
       col_margin: [125, 0, 50, 0]
       frame_thickness: 5
@@ -286,19 +491,93 @@ Settings:
       tab_delete_icon: ''
       add_sheet_button_icon: ''
       tmp_icon_folder: './tmp/icon'
-    color:
-      col_background: transparent
-      frame_color: "grey"
-      title_bkg_color: "#F7F7F7"
-      handle_colors: ["#C3C3C3","#6B6B6B","#1F1F1F"] # normal, hover, pressed
-      nameedit_background: ['#FFFFFF', '#FF5733']
-      exeedit_background: ["#F7F7F7", "#FFC300", "#FF5733"] # 包括普通, 警告, 错误三种颜色
-      add_button: ["black", "#9D8383", "#E99393"]  # 包括普通, 悬浮, 点击三种颜色
-      tab_button: ["#F7F7F7", "#FFC300", "#FF5733"]  # 包括普通, 悬浮, 点击三种颜色
-      save_button: ["#F7F7F7", "#FFC300", "#FF5733"]  # 包括普通, 悬浮, 点击三种颜色
-      discard_button: ["#F7F7F7", "#FFC300", "#FF5733"]  # 包括普通, 悬浮, 点击三种颜色
-      reset_button: ["#F7F7F7", "#FFC300", "#FF5733"]  # 包括普通, 悬浮, 点击三种颜色
+      tab_close_icon0: ''
+      tab_close_icon1: ''
+      tab_close_icon2: ''
     ori_line_num: 22
+    style:
+      title:
+        background: 'transparent'
+        font_color: "#000000"
+      outer_frame:
+        border: "3px solid grey"
+        border_radius: 20
+      icon_button:
+        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"]  # common, hover, pressed
+        border: "none"
+        border_radius: 10
+        animation_type: 'resize' # 'shake' or 'resize', default is None
+      number_label:
+        background: 'transparent'
+        font_color: "#000000"
+        border: "none"
+        border_radius: 0
+      name_edit:
+        background: "#F7F7F7"
+        background_error: "#FF5733"
+        font_color: "#000000"
+        text_selected_color: "#FF5733"
+        text_selected_background: "#F7F7F7"
+        border: "1px solid #F7F7F7" 
+        border_radius: 10
+        padding: [10, 10, 10, 10]
+      exe_edit:
+        background: "#F7F7F7"
+        background_warning: "#FFC300"
+        background_error: "#FF5733"
+        font_color: "#000000"
+        text_selected_color: "#FF5733"
+        text_selected_background: "#F7F7F7"
+        border: "1px solid #F7F7F7"
+        border_radius: 10
+        padding: [10, 10, 10, 10]
+      exe_tip:
+        font: [[Family, *arial], [PixelSize, 40]]
+        background: "#F7F7F7"
+        font_color: "#000000"
+        border: "1px solid #F7F7F7"
+        border_radius: 10
+        padding: [10, 5, 5, 5]
+        font_style: "normal"  # "italic" or "normal"
+      folder_search_button:
+        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"]  # common, hover, pressed
+        border_radius: 10
+        border: "none"
+        animation_type: 'shake' # 'shake' or 'resize', default is None
+      add_line_button:
+        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"]  # common, hover, pressed
+        border: "none"
+        border_radius: 10
+        animation_type: 'shake' # 'shake' or 'resize', default is None
+      scroll_bar:
+        orbit_color: "#F7F7F7"
+        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"]  # common, hover, pressed
+        width: 15
+        border_radius: 7  # share with orbit
+        min_height: 30
+      sheet_control:
+        main_height: 60
+        main_border: 'none'
+        main_background: 'transparent'
+        main_border_radius: 10
+
+        tab_margin_right: 10
+        padding: [0, 10, 0, 10]
+        tab_height: 50
+        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"]  # common, hover, pressed
+        font_colors: ["#000000", "#000000", "#000000"]  # common, hover, pressed
+        tab_border: "none"
+        tab_border_radius: 10
+      tab_add_button:
+        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"]  # common, hover, pressed
+        border: "1px solid #F7F7F7"
+        border_radius: 10
+      reset_button:
+        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"]  # common, hover, pressed
+        border_radius: 15
+      save_button:
+        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"]  # common, hover, pressed
+        border_radius: 20
   PathManager:
     filename_flitter: ["$"] # filename or dirname starts with these characters will be moved to the end of the list
     separate_sign: "^--$"
@@ -307,11 +586,9 @@ Settings:
     wsl:
       - ["ubuntu-24.04", "//wsl.localhost/Ubuntu-24.04", "am"] # ["hostname", "address", "username"]
     connection_check_interval: 30
+  
   TransferMaintainer:
     local_min_chunck: 256 # in MB
     local_max_chunck: 2048 # in MB
     remote_min_chunck: 4 # in MB
     remote_max_chunck: 100 # in MB
-
-  
-

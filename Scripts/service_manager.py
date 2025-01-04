@@ -5,7 +5,7 @@ from PySide2.QtCore import *
 from toolbox import *
 import numpy as np
 from p_widget import AIcon
-from am_store.common_tools import *
+# from am_store.common_tools import *
 
 
 class SSHConductor(object):
@@ -66,7 +66,10 @@ class Config_Manager(object):
             config = yml.read(yaml_path)
             cls.config = dicta.flatten_dict(config)
             cls.yaml_path = yaml_path
-    
+            config_0 = cls._calSize(cls.config)
+            config_1 = dicta.unflatten_dict(config_0)
+            cls.config = adict(config_1)
+            a = 1
     def __init__(self, 
                  wkdir:str,
                  mode_name:str=None, 
@@ -78,10 +81,6 @@ class Config_Manager(object):
         self.widget = widget_name
         self.obj = obj_name
         self.pre = []
-        if not copy:
-            config_0 = self._calSize(self.config)
-            config_1 = dicta.unflatten_dict(config_0)
-            self.config = adict(config_1)
     
     def deepcopy(self):
         new_copy = Config_Manager(self.wkdr, None, None, None, True)
@@ -152,12 +151,8 @@ class Config_Manager(object):
         widget = widget if widget!="_" else self.widget
         obj = obj if obj!="_" else self.obj
         args_a = [i for i in [mode, widget, obj, name_f] if i != None]
-        if default_v != '^default_for_get_func$':
-            out_a = self.config.get(tuple(args_a), default_v)
-        else:
-            out_a = self.config.get(tuple(args_a), None)
-            if out_a is None:
-                return out_a
+        args_a = atuple(args_a)
+        out_a = self.config[args_a]
         if ae:
             return self.after_process(args_a, out_a)
         else:
@@ -176,7 +171,7 @@ class Config_Manager(object):
     
     def __getitem__(self, key):
         if isinstance(key, atuple):
-            out_a = self.config.get(key, None)
+            out_a = self.config[key]
             if out_a is None:
                 return out_a 
             else:
@@ -210,7 +205,7 @@ class Config_Manager(object):
 class LauncherPathManager(object):
     def __init__(self, config:Config_Manager):
         self.config = config
-        self.data_path = AMPATH(self.config.get("settings_xlsx", mode="Launcher", widget="path", obj=None))
+        self.data_path = AMPATH(self.config[atuple('Launcher', 'settings_xlsx_path')])
         self.permit_col = ['Name', 'Chinese Name', 'EXE Path']
 
         self.conduct_l = []
@@ -830,15 +825,18 @@ class UIUpdater(QObject):
         self.watcher.fileChanged.connect(self.on_yaml_change)  
     def on_yaml_change(self):
         try:
-            yml_file = dicta.flatten_dict(yml.read(self.config_manager.yaml_path))
-            yml_file = self._calSize(yml_file)
+            yml_file0 = yml.read(self.config_manager.yaml_path)
+            yml_file1 = dicta.flatten_dict(yml_file0)
+            yml_file2 = self._calSize(yml_file1)
+            yml_file3 = dicta.unflatten_dict(yml_file2)
         except Exception as e:
             warnings.warn(f"Yaml file read failed: {e}")
             return
-        if not yml_file:
+        if not yml_file3:
             return
-        self._updateUI(yml_file)
-        #
+        self._updateUI(adict(yml_file3))
+        
+    
     def _calSize(self, config:dict):
         config_r = copy.deepcopy(config)
         scr_x, scr_y = get_screen_size('pixel')
@@ -849,7 +847,7 @@ class UIUpdater(QObject):
         default_size = [1600,900,60,60,80]
         base_d = {}
         for i, target_i in enumerate(targets):
-            value_i = config.get(('Common','Size',target_i),default_size[i])
+            value_i = config.get(atuple('Common','Size',target_i),default_size[i])
             value_f = int(res_x*value_i)
             base_d[target_i] = value_f
         base_d = base_d | {'scr_x':scr_x, 'scr_y':scr_y, 'res_x':res_x, 'res_y':res_y}
@@ -880,16 +878,16 @@ class UIUpdater(QObject):
         for order_i, i in enumerate(self.ui_set_l):
             # read the value from the new yaml file
             if isinstance(i['key'], atuple):
-                value_new = yml_file.get(i['key'], 'sign_for_empty')
-                if value_new == 'sign_for_empty':
-                    warnings.warn(f"Key {i['key']} not found in new yaml file")
+                value_new = yml_file[i['key']]
+                if value_new is None:
+                    warnings.warn(f"Key {i['key']} , func {i['action']}not found in new yaml file")
                     continue
                 elif value_new == i['value']:
                     continue
             elif isinstance(i['key'], alist):
                 value_new = alist()
                 for i_f, key_i in enumerate(i['key']):
-                    vi = yml_file.get(key_i, None)
+                    vi = yml_file[key_i]
                     if vi is None:
                         warnings.warn(f"Key {key_i} not found in new yaml file")
                     value_new.append(vi)
@@ -956,7 +954,7 @@ class UIUpdater(QObject):
     @staticmethod
     def _getValue(key_f, config_f):
         if isinstance(key_f, atuple):
-            return config_f.get(key_f, None)
+            return config_f[key_f]
         elif isinstance(key_f, alist):
             return alist(UIUpdater._getValue(i, config_f) for i in key_f)
         else:
