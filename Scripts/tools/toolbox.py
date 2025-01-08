@@ -47,7 +47,6 @@ def is_path(string_f, exist_check:bool=False):
         return bool(re.match(pattern_f, string_f))
     else:
         return os.path.exists(string_f)
-
 def path_format(string_f:str):
     # turn a string into a formal path of OS
     if not isinstance(string_f, str):
@@ -434,7 +433,7 @@ def amlayoutV(align_h:Literal['l','r','c']=None, align_v:Literal['t','b','c']=No
         lo.setSpacing(int(spacing))
     return lo
 
-def add_obj(*args, parent_f:Union[QHBoxLayout, QVBoxLayout]):
+def add_obj(*args, parent_f:Union[QHBoxLayout, QVBoxLayout])->None:
     for arg_i in args:
         if isinstance(arg_i, QHBoxLayout):
             parent_f.addLayout(arg_i)
@@ -444,14 +443,14 @@ def add_obj(*args, parent_f:Union[QHBoxLayout, QVBoxLayout]):
             parent_f.addWidget(arg_i)
     return parent_f
 
-def setStyle(widget:QWidget, style_string:str, *args):
+def setStyle(widget:QWidget, style_string:str, *args)->None:
     """ widget is the target widget, style_string is the style string with format {}
     num of {} in style_string should be equal to args num
     **use partial to fix the widget and style_string
     """
     widget.setStyleSheet(style_string.format(*args))
 
-def enlarge_list(value_f, length_f:int):
+def enlarge_list(value_f, length_f:int)->list:
     if not isinstance(value_f, list):
         return [value_f]*length_f
     else:
@@ -459,7 +458,7 @@ def enlarge_list(value_f, length_f:int):
             return value_f
         return value_f + [value_f[-1]]*(length_f-len(value_f))
 
-def pxstr(value_f, length=4):
+def pxstr(value_f, length=4)->str:
     str_f = ''
     if isinstance(value_f, (int, str)):
         for i in range(length):
@@ -470,8 +469,7 @@ def pxstr(value_f, length=4):
             str_f += f"{value_i}px "
     return str_f
         
-
-def style_make(config:dict):
+def style_make(config:dict)->str:
     """
     config must be a dict, key is obj name, value is a dict with key-value pairs
     """
@@ -482,6 +480,19 @@ def style_make(config:dict):
             style += f"{key}: {value};\n"
         style += "}"
     return style
+
+def cre_ssh_con(host_paras:dict, timeout:int=10)->tuple[paramiko.SSHClient, paramiko.SFTPClient]:
+    server = paramiko.SSHClient()
+    server.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    server.connect(host_paras['HostName'], 
+                    port=int(host_paras.get('port', 22)), 
+                    username=host_paras.get('User', os.getlogin()), 
+                    password=host_paras.get('Password', ''),
+                    timeout=timeout)
+    stfp = server.open_sftp()
+    return (server, stfp)
+
+
 
 class atuple(tuple):
     def __new__(cls, *args):
@@ -668,7 +679,7 @@ class yml:
         yml.write(yaml_path, dict_n)
 
     @staticmethod
-    def format(dict_or_yaml_path:Union[str, dict]):
+    def format(dict_or_yaml_path:str|dict):
         if isinstance(dict_or_yaml_path, dict):
             return yaml.dump(dict_or_yaml_path, default_flow_style=False, sort_keys=False)
         elif isinstance(dict_or_yaml_path, str):

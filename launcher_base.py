@@ -7,7 +7,7 @@ from PySide2.QtGui import QPixmap, QPalette, QIcon, QFont, QScreen, QFontMetrics
 from PySide2.QtGui import QPainter, QColor, QBrush, QPen, QLinearGradient, QTextCharFormat, QTextCursor
 from Scripts.toolbox import *
 from am_store2.common_tools import *
-from Scripts.launcher_ui import *
+from Scripts.launcher_ori import *
 
 class BaseLauncher(QMainWindow):
     MODE = "Launcher"

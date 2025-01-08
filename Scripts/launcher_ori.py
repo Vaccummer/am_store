@@ -1,6 +1,6 @@
 import os
 import sys
-from Scripts.tools.toolbox import *
+from toolbox import *
 from Scripts.manager.paths_transfer import *
 from PySide2.QtWidgets import QListWidget, QMainWindow, QWidget,QListWidgetItem,QPushButton, QHBoxLayout, QVBoxLayout, QLabel
 from PySide2.QtGui import QFontMetrics, QIcon
@@ -12,9 +12,9 @@ import pandas
 import pathlib
 import aiofiles
 import asyncio
-from typing import List, Literal, Union 
 import asyncssh
 from typing import List, Literal, Union, OrderedDict
+
 async def copy_file_chunk(src:str, dst:str, chunk_size:int, bar:QProgressBar):
     async with aiofiles.open(src, 'rb') as fsrc, aiofiles.open(dst, 'wb') as fdst:
         while True:
@@ -26,7 +26,7 @@ async def copy_file_chunk(src:str, dst:str, chunk_size:int, bar:QProgressBar):
 
 class Associate:
     def __init__(self, nums:int, 
-                 program_info_df:dict[str, pandas.DataFrame],
+                 program_info_df:Dict[str, pandas.DataFrame],
                  path_manager:PathManager,):
         self.num = nums
         self.df = program_info_df
@@ -2378,7 +2378,7 @@ class InfoTip(QDialog):
     def __init__(self,
                  type_f:Literal['Info', 'Warning', 'Error'], 
                  prompt_f:str, 
-                 buttons:OrderedDict[str,Union[str, dict[Literal['colors', 'value',], Union[bool, str, List[str]]]]],
+                 buttons:OrderedDict[str,Union[str, Dict[Literal['colors', 'value',], Union[bool, str, List[str]]]]],
                  config:Config_Manager=None,):
         super().__init__()
         self.VALUE = -10

@@ -1,12 +1,14 @@
 from PySide2.QtWidgets import QApplication
 from sympy import Q
-from Scripts.toolbox import QApplication
-# from launcher_base import BaseLauncher
-from Scripts.toolbox import *
-from Scripts.launcher_ui import *
-from am_store.common_tools import *
+from Scripts.tools.toolbox import *
+from Scripts.ui.launcherUI import *
+from Scripts.ui.settingUI import *
+from Scripts.ui.custom_widget import *
+from Scripts.ui.mainwindowUI import *
+from Scripts.tools.toolbox import *
+from Scripts.manager.config_ui import *
 from abc import abstractmethod
-
+from Scripts.manager.paths_transfer import *
 class BaseLauncher(QMainWindow):
     MODE = "Launcher"
     HOST = 'Local'
@@ -201,9 +203,10 @@ class UILauncher(BaseLauncher):
         add_obj(self.layout_top, self.layout_input, self.stack_ass, parent_f=self.layout_0)
     
     def _mainwindowUI(self):
+        # self.switch_button = CustomComboBox()
         self.switch_button = SwitchButton(self, self.config)
-        self.MODE = self.switch_button.mode_list[0]
-        self.switch_button.currentIndexChanged.connect(self._change_mode)
+        self.MODE = self.switch_button.modes[0]
+        self.switch_button.index_changed.connect(self._change_mode)
         # self.shortcut_entry = ShortcutEntry(self)
         self.top_buttons = TopButton(self, self.config)._initbuttons()
         self.layout_top.addWidget(self.switch_button)
@@ -213,7 +216,7 @@ class UILauncher(BaseLauncher):
     def _initLauncherUI(self):
         self.path_switch_button = PathModeSwitch(self, config=self.config)
         self.HOST = self.path_switch_button.mode_list[0]
-        self.path_switch_button.currentIndexChanged.connect(self._change_host)
+        self.path_switch_button.index_changed.connect(self._change_host)
         self.input_box = InputBox(self, self.config)
         self.search_togle_button =SearchTogleButton(self, self.config)
         button_action = QWidgetAction(self)
@@ -268,11 +271,11 @@ class ControlLauncher(UILauncher):
         self._obj_connect()
     
     def _change_mode(self, index_n:int):
-        self.MODE = self.switch_button.mode_list[index_n]
+        self.MODE = self.switch_button.modes[index_n]
         self.stack_ass.setCurrentIndex(index_n)
     
     def _change_host(self, index_n:int):
-        host_n = self.path_switch_button.itemText(index_n)
+        host_n = self.path_switch_button.getMode(index_n)
         result_i, type_i, error = self.path_manager.change_host(host_n)
         self.HOST = host_n
         self.HOST_TYPE = type_i
@@ -302,7 +305,7 @@ class ControlLauncher(UILauncher):
         self.path_manager.con_res.connect(self._connection_check)
     
     @Slot(dict)
-    def _input_box_signal_process(self, input_f:Dict[Literal['key', 'text', 'type'], str]):
+    def _input_box_signal_process(self, input_f:dict[Literal['key', 'text', 'type'], str]):
         event_type = input_f['type']
         text = input_f['text']
         if event_type == 'key_press':
