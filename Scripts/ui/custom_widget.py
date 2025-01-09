@@ -31,12 +31,13 @@ class YohoPushButton(QPushButton):
         UIUpdater.set(icon_proportion, self._loadIconProportion)
         UIUpdater.set(style_config, self.customStyle)
         # 设置按钮图标
-        UIUpdater.set(icon_i, self.setIcon, type_f='icon')
-        UIUpdater.set(size_f, self.setFixedSize, type_f='size')
+        if icon_i is not None:
+            UIUpdater.set(icon_i, self.setIcon, type_f='icon')
+        if size_f is not None:
+            UIUpdater.set(size_f, self.setFixedSize, type_f='size')
         self.change_size = change_size
         self.change_period = change_period
         self.clicked.connect(self.start_animation)
-
     def start_animation(self):
         if self.an_type == "shake":
             self.shake_icon()
@@ -148,7 +149,10 @@ class AutoLabel(QLabel):
     def __init__(self, text:str, font:Union[QFont,atuple], style_config:atuple, icon_f:Union[str,atuple,QIcon]=None, 
                  height=None, width=None):
         super().__init__()
-        UIUpdater.set(text, self.setText)
+        if isinstance(text, str):
+            self.setText(text)
+        else:
+            UIUpdater.set(text, self.setText)
         UIUpdater.set(height, self.setFixedHeight)
         UIUpdater.set(width, self.setFixedWidth)
         UIUpdater.set(font, self.setFont, type_f='font')
@@ -157,40 +161,50 @@ class AutoLabel(QLabel):
         self.setAlignment(Qt.AlignCenter)
     
     def customStyle(self, format_dict:dict):
-        bg_color = format_dict.get('background', 'transparent')
-        border_radius = format_dict.get('border_radius', 10)
+        bg_color = enlarge_list(format_dict.get('background', 'transparent'), 3)
+        border_radius = enlarge_list(format_dict.get('border_radius', 10), 4)
         border = format_dict.get('border', 'none')
-        padding = format_dict.get('padding', [10,0,5,5])
-        style_sheet = f'''
-        QLabel {{
-            background-color: {bg_color};
-            border-radius: {border_radius}px;
-            border: {border};
-            padding-left: {padding[0]}px;  
-            padding-right: {padding[1]}px;  
-            padding-top: {padding[2]}px;    
-            padding-bottom: {padding[3]}px; 
- 
-        }}
-        '''
-        self.setStyleSheet(style_sheet)
+        padding = pxstr(enlarge_list(format_dict.get('padding', [10,0,5,5]), 4))
+        text_align = format_dict.get('text_align', 'left')
+        self.style_dict = {
+            'QLabel': {
+                'background-color': bg_color[0],
+                'border-top-left-radius': f'{border_radius[0]}px',
+                'border-top-right-radius': f'{border_radius[1]}px',
+                'border-bottom-right-radius': f'{border_radius[2]}px',
+                'border-bottom-left-radius': f'{border_radius[3]}px',
+                'border': border,
+                'padding': padding,
+                'text-align': text_align,
+            },
+            'QLabel::hover': {
+                'background-color': bg_color[1],
+            },
+            'QLabel::pressed': {
+                'background-color': bg_color[2],
+            }
+        }
+        self.style_sheet = style_make(self.style_dict)
 
-    def set_text(self, text:str):
-        self.setText(text)
-        self.adjustSize()
-    def set_color(self, color:str, border_radius:int=5):
-        sheet_f = f'''
-                    QLabel {{
-                            border-radius: {border_radius}px;  /* 边角弧度 */
-                            padding-left: 5px;   /* 左边距 */
-                            padding-right: 5px;  /* 右边距 */
-                            padding-top: 0px;    /* 上边距 */
-                            padding-bottom: 0px; /* 下边距 */
-                            background-color: {color};  /* 背景透明 */
-                            text-align: center;  /* 文字居中 */
-                            }}
-                    '''
-        self.setStyleSheet(sheet_f)
+        self.setStyleSheet(self.style_sheet)
+
+    # def set_text(self, text:str):
+    #     self.setText(text)
+    #     self.adjustSize()
+    
+    # def set_color(self, color:str, border_radius:int=5):
+    #     sheet_f = f'''
+    #                 QLabel {{
+    #                         border-radius: {border_radius}px;  /* 边角弧度 */
+    #                         padding-left: 5px;   /* 左边距 */
+    #                         padding-right: 5px;  /* 右边距 */
+    #                         padding-top: 0px;    /* 上边距 */
+    #                         padding-bottom: 0px; /* 下边距 */
+    #                         background-color: {color};  /* 背景透明 */
+    #                         text-align: center;  /* 文字居中 */
+    #                         }}
+    #                 '''
+    #     self.setStyleSheet(sheet_f)
 
     def set_icon(self, icon:Union[str,QIcon]):
         if isinstance(icon, str):
@@ -199,14 +213,24 @@ class AutoLabel(QLabel):
             self.setPixmap(icon.pixmap(-1,-1))
 
 class AutoEdit(QLineEdit):
-    def __init__(self, text='', font:atuple=None, style_d={}, height:atuple=None, width:atuple=None):
+    def __init__(self, text='', font:atuple=None, style_d={}, height:atuple=None, width:atuple=None, disable_scroll:bool=True):
         super().__init__()
+        self.scroll_step = 10  # 基础滚动步长
+        self.scroll_acceleration = 1.5  # 滚动加速度
+        self.max_scroll_step = 30  # 最大滚动步长
+        self.disable_scroll = disable_scroll
+        # 平滑滚动
+        self.scroll_timer = QTimer(self)
+        self.scroll_timer.timeout.connect(self._smooth_scroll)
+        self.target_position = 0
+        self.current_velocity = 0
         self.setText(text)
         UIUpdater.set(font, self.setFont, type_f='font')
         UIUpdater.set(height, self.setFixedHeight)
         if width is not None:
             UIUpdater.set(width, self.setFixedWidth)
         UIUpdater.set(style_d, self.customStyle)
+        self.cursor_paint_time = 0
 
     def customStyle(self, style_dict:dict):
         bg_color = style_dict.get('background', 'transparent')
@@ -214,6 +238,8 @@ class AutoEdit(QLineEdit):
         border_radius = enlarge_list(style_dict.get('border_radius', 10), 4)
         border = style_dict.get('border', 'none')
         padding = style_dict.get('padding', [10,0,5,5])
+        # caret_color = style_dict.get('caret_color', 'white')
+        # caret_width = style_dict.get('caret_width', 3)
         style_dict_i = {
             'QLineEdit': {
                 'background-color': bg_color,
@@ -226,7 +252,7 @@ class AutoEdit(QLineEdit):
                 'padding-left': f'{padding[0]}px',
                 'padding-top': f'{padding[1]}px',
                 'padding-right': f'{padding[2]}px',
-                'padding-bottom': f'{padding[3]}px'
+                'padding-bottom': f'{padding[3]}px',
             }
         }
         text_s_color = style_dict.get('text_selected_color')
@@ -247,7 +273,69 @@ class AutoEdit(QLineEdit):
         self.style_dict = style_dict_i
         self.style_n = style_make(style_dict_i)
         self.setStyleSheet(self.style_n)
+    
+    def wheelEvent(self, event: QWheelEvent):
+        if self.disable_scroll:
+            super().wheelEvent(event)
+            return
+        text_width = self.fontMetrics().width(self.text())
+        visible_width = self.width() - self.textMargins().left() - self.textMargins().right()
+        if text_width <= visible_width:
+            super().wheelEvent(event)
+            return
+        delta = event.angleDelta().y()
+        scroll_amount = self.scroll_step * (1 if delta < 0 else -1)
+        current_pos = self.cursorPosition()
+        self.target_position = max(0, min(len(self.text()), 
+                                        current_pos + scroll_amount))
+        
+        if not self.scroll_timer.isActive():
+            self.scroll_timer.start(16)  
+        event.accept()
+    
+    def _smooth_scroll(self):
+        current_pos = self.cursorPosition()
+    
+        if current_pos == self.target_position:
+            self.scroll_timer.stop()
+            self.current_velocity = 0
+            return
+            
+        # 计算新位置
+        direction = 1 if self.target_position > current_pos else -1
+        self.current_velocity = min(self.max_scroll_step, 
+                                  abs(self.current_velocity + self.scroll_acceleration)) * direction
+        
+        new_pos = int(current_pos + self.current_velocity)
+        new_pos = max(0, min(len(self.text()), new_pos))
+        
+        # 更新位置
+        self.setCursorPosition(new_pos)
+        
+        # 如果接近目标位置，直接设置到目标位置
+        if abs(new_pos - self.target_position) < abs(self.current_velocity):
+            self.setCursorPosition(self.target_position)
+            self.scroll_timer.stop()
+            self.current_velocity = 0
+            
+    def setText(self, text: str):
+        super().setText(text)
+        self.setCursorPosition(0)  
 
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if self.hasFocus():
+            self.cursor_paint_time +=1
+            if self.cursor_paint_time % 2 == 0:
+                color = '#943126' 
+            else:
+                color = 'transparent'
+            painter = QPainter(self)
+            rect = self.cursorRect()
+            painter.fillRect(
+                QRect(rect.x(), rect.y(), 5, rect.height()),
+                color
+            )
 class WheelEdit(AutoEdit):
     wheel_signal = Signal(int)
     def __init__(self, text='', font:atuple=None, style_d={}, height:atuple=None, width:atuple=None):
@@ -834,14 +922,14 @@ class SmartStackWidget(QStackedWidget):
         self.setGraphicsEffect(self.opacity_effect)
         self.opacity_effect.setOpacity(1)  # 初始透明度
 
-    def wheelEvent(self, event):
-        current_index = self.currentIndex()
-        num_pages = self.count()
-        if event.angleDelta().y() > 0:  # 向上滚动
-            new_index = (current_index + 1) % num_pages
-        else:  
-            new_index = (current_index - 1 + num_pages) % num_pages
-        self.setCurrentIndex(new_index)
+    # def wheelEvent(self, event):
+    #     current_index = self.currentIndex()
+    #     num_pages = self.count()
+    #     if event.angleDelta().y() > 0:  # 向上滚动
+    #         new_index = (current_index + 1) % num_pages
+    #     else:  
+    #         new_index = (current_index - 1 + num_pages) % num_pages
+    #     self.setCurrentIndex(new_index)
 
     def remove_page(self, index:int):
         index_n = self.currentIndex()
@@ -912,11 +1000,11 @@ class SmartStackWidget(QStackedWidget):
     def animation_end(self):
         self.in_animation = False
 
-    def wheelEvent(self, event):
-        if event.angleDelta().y() > 0:
-            self.setIndex(self.currentIndex()-1)
-        else:
-            self.setIndex(self.currentIndex()+1)
+    # def wheelEvent(self, event):
+    #     if event.angleDelta().y() > 0:
+    #         self.setIndex(self.currentIndex()-1)
+    #     else:
+    #         self.setIndex(self.currentIndex()+1)
 
     def setIndex(self, index):
         index = min(max(0, index), self.count()-1)

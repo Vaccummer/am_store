@@ -14,7 +14,7 @@ import aiofiles
 import asyncio
 import asyncssh
 from typing import List, Literal, Union, OrderedDict
-from Scripts.manager.ui import *    
+from Scripts.manager.config_ui import *    
 
 class Terminal(QTextEdit):
     def __init__(self, config:Config_Manager, parent:QMainWindow):

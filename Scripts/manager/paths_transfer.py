@@ -56,8 +56,8 @@ class LauncherPathManager(object):
     
     def _load_icon_dict(self):
         #self.default_app_icon_path = self.config.get('default_app_icon', mode="Launcher", widget='associate_list', obj="path")
-        self.default_app_icon_path = atuple('Launcher', 'associate_list', 'path','default_app_icon')
-        self.default_app_icon = self.default_app_icon_path
+        self.default_app_icon = atuple('Launcher', 'associate_list', 'path','default_app_icon')
+        # self.default_app_icon = self.default_app_icon_path
         self.app_icon_folder = self.config.get('app_icon_folder', mode="Launcher", widget='associate_list', obj="path")
         self.app_icon_d = {name:{} for name in self.df.keys()}
         for name_i in os.listdir(self.app_icon_folder):
@@ -77,17 +77,24 @@ class LauncherPathManager(object):
     
     def get_app_icon(self, name, group=None)->Union[str, atuple]:
         if group:
-            icon_path = self.app_icon_d[group].get(name, "")
+            group_check = self.df.get(group, False)
+            if group_check is False:
+                return UIUpdater.config[self.default_app_icon]
+            else:
+                icon_path = self.app_icon_d[group].get(name, "")
         else:
             icon_path, group = self._find_icon_in_all_groups(name)
         if icon_path:
-            return icon_path
+            if isinstance(icon_path, atuple):
+                return UIUpdater.config[icon_path]
+            else:
+                return icon_path
         if not group:
-            return self.default_app_icon
+            return UIUpdater.config[self.default_app_icon]
 
         exe_entry = self.df[group][self.df[group]['Name'] == name]
         if exe_entry.empty:
-            return self.default_app_icon
+            return UIUpdater.config[self.default_app_icon]
 
         exe_path = exe_entry.iloc[0]['EXE Path']
         icon_key = f"{group}{self.sign_for_separate}{name}"
@@ -99,9 +106,9 @@ class LauncherPathManager(object):
                 self.app_icon_d[group][name] = target_icon_path
                 return AIcon(self.app_icon_d[group][name])
             else:
-                self.app_icon_d[group][name] = self.default_app_icon_path
+                self.app_icon_d[group][name] = self.default_app_icon
 
-        return self.default_app_icon
+        return UIUpdater.config[self.default_app_icon]
 
     def get_icon(self, name, group=None)->Union[str, atuple]:
         return self.get_app_icon(name, group)

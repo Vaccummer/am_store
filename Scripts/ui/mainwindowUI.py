@@ -128,7 +128,7 @@ class SwitchButton(CustomComboBox):
         self.modes = self.config[atuple('Common', 'mode_list')]
 
 class TopButton(QWidget, QObject):
-    button_click = Signal(str)  # Literal['minimum', 'maximum', 'close']
+    button_click = Signal(str)  # Literal['minimum', 'maximum', 'close', 'entry']
     def __init__(self, parent: QMainWindow, config:Config_Manager) -> None:
         super().__init__(parent)
         self.name = "top_button"
@@ -138,6 +138,7 @@ class TopButton(QWidget, QObject):
         self.geom = atuple('MainWindow', self.name, 'Size', 'widget_height')
         UIUpdater.set(self.geom, self.setFixedHeight)
         self.max_state = False
+        self._initbuttons()
         
     def _initbuttons(self):
         self.pre = atuple('MainWindow', self.name)
@@ -160,7 +161,11 @@ class TopButton(QWidget, QObject):
         self.enty_button = YohoPushButton(icon_i=self.entry_path, style_config=style_f, size_f=size_i)
         self.enty_button.clicked.connect(lambda: self._b_click('entry'))
 
-        return [self.enty_button, self.min_button, self.max_button, self.close_button]
+        self.layout_0 = amlayoutH()
+        self.setLayout(self.layout_0)
+        UIUpdater.set(self.pre|atuple('Size', 'layout_margin'), self.layout_0.setContentsMargins, type_f='margin')
+        UIUpdater.set(self.pre|atuple('Size', 'button_spacing'), self.layout_0.setSpacing)
+        add_obj(self.enty_button, self.min_button, self.max_button, self.close_button, parent_f=self.layout_0)
 
     def _b_click(self, sign:Literal['minimum', 'maximum', 'close', 'entry']):
         self.button_click.emit(sign)

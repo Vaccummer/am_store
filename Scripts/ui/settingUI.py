@@ -139,10 +139,16 @@ class UIShortcutSetting(QWidget):
     def showWin(self):
         up_geom = self.up.geometry()
         x, y, w, h = up_geom.x(), up_geom.y(), up_geom.width(), up_geom.height()
-        w_1, h_1 = self.config[atuple('Launcher', self.name, 'Size', 'setting_window_size')]
-        x_t = x + w//2 - w_1//2
-        y_t = y + h//2 - h_1//2
-        self.setGeometry(x_t, y_t, w_1, h_1)
+        w_1, h_1 = UIUpdater.config[atuple('Launcher', self.name, 'Size', 'setting_window_size')]
+        try:
+            x_t = x + w//2 - w_1//2
+            y_t = y + h//2 - h_1//2
+            self.setGeometry(x_t, y_t, w_1, h_1)
+        except Exception as e:
+            warnings.warn(f"UIShortcutSetting.showWin error: {e}")
+            x_t = x + w//2 - 1200
+            y_t = y + h//2 - 600
+            self.setGeometry(x_t, y_t, 1200, 600)
         self.show()
         self.raise_()
     
@@ -337,8 +343,9 @@ class UIShortcutSetting(QWidget):
         button_layout.addWidget(shortcut_button)
         button_layout.addWidget(confirm_button)
         button_layout.addWidget(cancel_button)
-        self.layout_0.addLayout(button_layout)
+        self.layout_0.addLayout(button_layout)   
 class ShortcutSetting(UIShortcutSetting):
+    refresh_signal = Signal()
     def __init__(self, parent:QMainWindow, config:Config_Manager):
         super().__init__(parent, config)
         self.up = parent
@@ -435,7 +442,7 @@ class ShortcutSetting(UIShortcutSetting):
         self.hide()
         self._read_data()
         self.manager.save()
-        self.up.shortcut_button.refresh()
+        self.refresh_signal.emit()
         self.close()
 
 class Terminal(QTextEdit):
@@ -489,8 +496,8 @@ class Terminal(QTextEdit):
         pass
 
 class ExePathLine(AutoEdit):
-    def __init__(self, style_d, tooltip_style, height_f:int, place_holder:str,font:QFont,):
-        super().__init__(text='', font=font, style_d=style_d, height=height_f)
+    def __init__(self, style_d, tooltip_style, height_f:int, place_holder:str,font:QFont, disable_scroll:bool=False):
+        super().__init__(text='', font=font, style_d=style_d, height=height_f, disable_scroll=disable_scroll)
         self.setPlaceholderText(place_holder)
         self.place_holder = place_holder
 
@@ -708,8 +715,43 @@ class SheetControl(QTabBar):
         self.setTabText(index, name_n)
     
     def _delete(self, index:int):
-        self.removeTab(index)
+        if isinstance(index, str):
+            index = self.get_texts().index(index)
         
+        self.removeTab(index)
+
+class AddButton(QPushButton):
+    def __init__(self, style_d:dict, icon_f:str, height_f:int):
+        super().__init__()
+        UIUpdater.set(icon_f, self.setIcon, type_f='icon')
+        UIUpdater.set(height_f, self.setFixedHeight)
+        UIUpdater.set(style_d, self.customStyle)
+    
+    def customStyle(self, style_d:dict):
+        border_f = style_d.get('border', 'none')
+        border_radius_f = enlarge_list(style_d.get('border_radius', 10), 4)
+        background_colors = enlarge_list(style_d.get('background_colors', ['#F7F7F7', '#FFC300', '#FF5733']), 3)
+        self.style_dict = {
+            'QPushButton': {
+                'border': border_f,
+                'border-top-left-radius': border_radius_f[0],
+                'border-top-right-radius': border_radius_f[1],
+                'border-bottom-left-radius': border_radius_f[2],
+                'border-bottom-right-radius': border_radius_f[3],
+                'background-color': background_colors[0],
+            },
+            'QPushButton::hover': {
+                'background-color': background_colors[1],
+            },
+            'QPushButton::pressed': {
+                'background-color': background_colors[2],
+            },
+        }
+        self.style_n = style_make(self.style_dict)
+        self.setStyleSheet(self.style_n)
+        icon_proportion = style_d.get('icon_proportion', 0.9)
+        self.setIconSize(QSize(int(self.height()*icon_proportion), int(self.height()*icon_proportion)))
+
 class BaseLauncherSetting(QWidget):
     def __init__(self, config:Config_Manager, parent:QMainWindow, manager:LauncherPathManager):
         super().__init__(parent)
@@ -724,17 +766,13 @@ class BaseLauncherSetting(QWidget):
     
     def _process_ori_df(self):
         self.df:dict[str:pandas.DataFrame] = self.manager.df
-        self.df_l = []
-        permit_col = ['Name', 'Chinese Name', 'EXE Path']
+        self.data_dict = {}
         for name_i, df_i in self.df.items():
-            target_df = df_i.copy(deep=True)
-            for col in target_df.columns:
-                if col not in permit_col:
-                    target_df.drop(col, axis=1, inplace=True)
-            target_df.reset_index(drop=True, inplace=True)
-            target_df.loc[:,'IconID'] = None
-            self.df_l.append([name_i, target_df])
-        self.df_n = self.df_l[0][1]
+            index_i = 0
+            for _, row in df_i.iterrows():
+                self.data_dict.setdefault(name_i, {})
+                self.data_dict[name_i][index_i] = row.to_dict() | {'IconPath':''}
+                index_i += 1
 
     def _load_var(self):
         self.num = int(self.config.get('ori_line_num', obj=None))
@@ -763,7 +801,8 @@ class BaseLauncherSetting(QWidget):
         self.line_height = atuple(pre+['line_height'])
         self.add_button_margin = atuple(pre+['add_button_margin'])
         self.col_margin = atuple(pre+['col_margin'])
-        self.nameedit_length = atuple(pre+['nameedit_max_length'])
+        self.nameedit_length = atuple(pre+['nameedit_length'])
+        self.chnameedit_length = atuple(pre+['chnameedit_length'])
         self.exeedit_min_length = atuple(pre+['exeedit_min_length'])
         self.bottom_margin = atuple(pre+['bottom_margin'])
         self.tab_height = atuple(pre+['tab_height'])
@@ -819,7 +858,7 @@ class UILauncherSetting(BaseLauncherSetting):
         self.obj_layout.addStretch()
         add_obj(self.title_layout, self.scroll_area,parent_f=self.layout_0)
         self.layout_0.addLayout(self.bottom_layout)
-        self._line_fresh(0)
+        self._line_fresh(next(iter(self.data_dict.keys())))
     
     def _init_layout(self):
         self.obj_layout = amlayoutV()
@@ -948,16 +987,18 @@ class UILauncherSetting(BaseLauncherSetting):
         name_label = NameEdit(text_f=name, style_d=self.nameedit_style, height=self.line_height, font=self.name_font)
         name_label.setProperty('index', index_i)
         name_label.setProperty('type', 'name')
-        UIUpdater.set(self.nameedit_length, name_label.setMaximumWidth)
+        UIUpdater.set(self.nameedit_length, name_label.setFixedWidth)
         name_label.textChanged.connect(self.name_edit_change)
-        chname_label = NameEdit(text_f=chname, style_d=self.nameedit_style, height=self.line_height, font=self.name_font)
+        chname_label = NameEdit(text_f=chname, style_d=self.nameedit_style, height=self.line_height, font=self.chname_font)
         chname_label.setProperty('index', index_i)
         chname_label.setProperty('type', 'chname')
+        UIUpdater.set(self.chnameedit_length, chname_label.setFixedWidth)
         chname_label.textChanged.connect(self.name_edit_change)
         exe_edit = ExePathLine(style_d=self.exeedit_style,tooltip_style=self.tooltip_style, height_f=self.line_height, 
                                place_holder=exe_path, font=self.exe_font)
         exe_edit.setProperty('index', index_i)
         UIUpdater.set(self.exeedit_min_length, exe_edit.setMinimumWidth)
+        exe_edit.textChanged.connect(self.exe_edit_write)
         folder_button = YohoPushButton(icon_i=self.searcher_icon, size_f=self.line_height, style_config=self.folder_button_style)
         folder_button.clicked.connect(lambda: self._exe_search(index_f))
         self.objs_l[len(self.objs_l.keys())] = {'number':nummber_w, 'icon':icon_w, 'name':name_label, 'chname':chname_label, 'exe':exe_edit, 'search':folder_button}
@@ -979,11 +1020,12 @@ class UILauncherSetting(BaseLauncherSetting):
             self._init_single_line(i, default=True)
 
     def _init_add_line(self):
-        self.add_button = YohoPushButton(icon_i=self.add_button_icon, 
-                                         style_config=self.add_button_style,
-                                        )
-        UIUpdater.set(self.line_height, self.add_button.setFixedHeight)
-        self.add_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        # self.add_button = YohoPushButton(icon_i=self.add_button_icon, 
+        #                                  style_config=self.add_button_style,
+        #                                 )
+        # UIUpdater.set(self.line_height, self.add_button.setFixedHeight)
+        # self.add_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.add_button = AddButton(style_d=self.add_button_style, icon_f=self.add_button_icon, height_f=self.line_height)
         self.add_button.clicked.connect(self._insert_line)
         self.add_button_lo = amlayoutH()
         UIUpdater.set(self.add_button_margin, self.add_button_lo.setContentsMargins, 'margin')
@@ -1001,62 +1043,45 @@ class UILauncherSetting(BaseLauncherSetting):
     @abstractmethod
     def _exe_search(self):
         pass
+    @abstractmethod
+    def exe_edit_write(self):
+        pass
 class LauncherSetting(UILauncherSetting):
-    def __init__(self, config:Config_Manager, parent:QMainWindow, manager:LauncherPathManager):
+    def __init__(self, config:Config_Manager, parent:QMainWindow, manager:LauncherPathManager)->None:
         super().__init__(config, parent , manager)
     
-    def _writein_data(self, index_f:int):
-        name_l = []
-        chname_l = []
-        exe_l = []
-        icon_l = []
-        for i in range(self.line_num):
-            name_i = self.objs_l[i]['name'].text()
-            if not name_i or name_i in name_l:
-                continue
-            chname_i = self.objs_l[i]['chname'].text()
-            exe_i = self.objs_l[i]['exe'].text()
-            icon_i = self.objs_l[i]['icon'].property('icon_path')
-            name_l.append(name_i)
-            chname_l.append(chname_i)
-            exe_l.append(exe_i)
-            icon_l.append(icon_i)
-        df_data = [{'Name':name_l[i], 'Chinese Name':chname_l[i], 'EXE Path':exe_l[i], 'IconID':icon_l[i]} for i in range(len(name_l))]
-        self.df_l[index_f][1] = pandas.DataFrame(df_data)
-
-    def _line_fresh(self, index_f:int):
+    def _line_fresh(self, page_name:str)->None:
         self.line_num = 0
-        self.df_n = self.df_l[index_f][1]
-        for i in range(self.df_n.shape[0]):
+        self.data_dict.setdefault(page_name, {})
+        self.dict_n = self.data_dict[page_name]
+        for i in range(len(self.dict_n.keys())):
             if i >= self.num:
                 self._insert_line()
             self.widget_l[i].setVisible(True)
             self.objs_l[i]['number'].setText(str(i))
-            self.objs_l[i]['name'].setText(self.df_n.iloc[i, 0])
-            self.objs_l[i]['chname'].setText(self.df_n.iloc[i, 1])
-            self.objs_l[i]['exe'].setText(self.df_n.iloc[i, 3])
-            icon_c = self.df_n.iloc[i].loc['IconID']
+            self.objs_l[i]['name'].setText(self.dict_n.get(i, {}).get('Name', ''))
+            self.objs_l[i]['chname'].setText(self.dict_n.get(i, {}).get('Chinese Name', ''))
+            self.objs_l[i]['exe'].setText(self.dict_n.get(i, {}).get('EXE Path', ''))
+            icon_c = self.dict_n.get('IconPath', '')
             if icon_c:
-                print(icon_c)
-                self.objs_l[i]['icon'].setIcon(QIcon(self.df_n.iloc[i, -1]))
+                self.objs_l[i]['icon'].setIcon(QIcon(icon_c))
             else:
-                icon_d = self.manager.get_app_icon(self.df_n.iloc[i, 0], self.df_l[index_f][0])
-                if isinstance(icon_d, atuple):
-                    icon_d = self.config.get(icon_d,'')
+                icon_d = self.manager.get_app_icon(self.dict_n[i]['Name'], )
                 self.objs_l[i]['icon'].setIcon(AIcon(icon_d))
+                self.dict_n[i]['IconPath'] = icon_d
             self.line_num += 1
         for i in range(len(self.widget_l)):
-            if i >= self.df_n.shape[0]:
+            if i >= len(self.dict_n.keys()):
                 self.widget_l[i].setVisible(False)
     
-    def _init_bottom_control(self):
+    def _init_bottom_control(self)->None:
         self.bottom_layout = amlayoutH('c', spacing=25)
         self.tab_wdiget = QWidget()
         self.tab_layout = amlayoutH('l', spacing=10)
         self.tab_wdiget.setLayout(self.tab_layout)
         self.tab_bar = SheetControl(parent=self, font_f=self.tab_font, style_main=self.tab_style, style_menu=self.meunu_style)
         
-        for name_i in [i[0] for i in self.df_l]:
+        for name_i in self.data_dict.keys():
             self.tab_bar.addTab(name_i)
         
         self.tab_bar.currentChanged.connect(self.change_tab)
@@ -1077,12 +1102,9 @@ class LauncherSetting(UILauncherSetting):
         self.bottom_layout.addStretch()
         add_obj(self.save_button, self.reset_button, parent_f=self.bottom_layout)
         
-    def _insert_line(self):
+    def _insert_line(self)->None:
         page_text = self.tab_bar.get_current_text()
-        index_f = [i for i, j in enumerate(self.df_l) if j[0]==page_text]
-        if not index_f:
-            return
-        page_index = index_f[0]
+        self.data_dict[page_text][len(self.data_dict[page_text].keys())] = {'Name':'', 'Chinese Name':'', 'EXE Path':'', 'IconPath':''}
         #self.df_n.loc[len(self.df_n)] = ['', '', '', '', page_text, None]
         if self.line_num >= len(self.widget_l):
             self._init_single_line(self.line_num, default=True, insert=True)
@@ -1094,29 +1116,30 @@ class LauncherSetting(UILauncherSetting):
             self.objs_l[self.line_num]['exe'].setText('')
             self.objs_l[self.line_num]['icon'].setIcon(AIcon(self.config[self.default_app_icon]))
         self.line_num += 1
+        
         self.sroll_down()
     
-    def sroll_down(self):
-        self.scroll_content.updateGeometry()
-        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum()+96)
+    def sroll_down(self)->None:
+        bar = self.scroll_area.verticalScrollBar()
+        for i in range(10):
+            bar.triggerAction(QScrollBar.SliderSingleStepAdd)
 
-    def add_tab(self, name='new_sheet', refresh:bool=True):
+    def add_tab(self, name='new_sheet', refresh:bool=True)->None:
         text_l = self.tab_bar.get_texts()
         for i in range(99):
             name_t = f'{name}_{i}'
             if name_t not in text_l:
                 break
+        self.data_dict[name_t] = {0:{'Name':'', 'Chinese Name':'', 'EXE Path':'', 'IconPath':''}}
         self.tab_bar.addTab(name_t)
-        self.df_l.append([name_t, self._get_default_df(name_t)])
         if refresh:
             self.tab_bar.set_current_tab(name_t)
     
-    def change_tab(self, index_new:int):
-        self._writein_data(self.tab_index)
+    def change_tab(self, index_new:int)->None:
         self.tab_index = index_new
-        self._line_fresh(index_new)
+        self._line_fresh(self.tab_bar.get_texts()[index_new])
 
-    def rename_tab(self, index):
+    def rename_tab(self, index)->None:
         current_name = self.tab_bar.tabText(index)
         new_name, ok = QInputDialog.getText(self, "Rename Sheet", "Enter New Name:", text=current_name)
         if ok and new_name.strip():
@@ -1124,16 +1147,16 @@ class LauncherSetting(UILauncherSetting):
                 self.up.tip('Warning', 'Name already exists', {'OK':False}, False)
                 return
             self.tab_bar.setTabText(index, new_name)
-            self.df_l[index][0] = new_name
+            self.data_dict[new_name] = self.data_dict.pop(current_name)
     
-    def delete_tab(self, index):
-        tip_prompt = f'Are you sure to DELETE sheet "{self.tab_bar.tabText(index)}"?'
+    def delete_tab(self, page_name:str)->None:
+        tip_prompt = f'Are you sure to DELETE sheet "{page_name}"?'
         out_f = self.up.tip('Warning', tip_prompt, {'Yes':True, 'No':False}, False)
         if out_f:
-            self.tab_bar.removeTab(index)
-            self.df_l.pop(index)
+            self.data_dict.pop(page_name)
+            self.tab_bar._delete(page_name)
     
-    def sort_tab(self):
+    def sort_tab(self)->None:
         tab_text_l = self.tab_bar.get_texts()
         index_i = self.tab_bar.currentIndex()
         df_l = []
@@ -1144,7 +1167,7 @@ class LauncherSetting(UILauncherSetting):
         self.df_l = df_l
         self.tab_index = index_i
 
-    def _change_icon(self, index_f:int):
+    def _change_icon(self, index_f:int)->None:
         file_filter = "Images (*.svg *.png *.jpg *.jpeg *.ico)"
         file_path, _ = QFileDialog.getOpenFileName(self, "Select an image", "", file_filter)
         if not file_path:
@@ -1152,41 +1175,33 @@ class LauncherSetting(UILauncherSetting):
         icon_i = QIcon(file_path)
         self.objs_l[index_f]['icon'].setIcon(icon_i)
         self.objs_l[index_f]['icon'].setProperty('icon_path', file_path)
-        # _, ext = os.path.splitext(file_path)
-        # id_l = self.df_n.loc[:,'IconID'].to_list()
-        # name = self.objs_l[index_f]['name'].text()
-        # id_ls = [i.split('.')[0] for i in id_l if i]
-        # if name in id_ls:
-        #     for path_i in glob(os.path.join(self.tmp_icon_folder, f'{name}.*')):
-        #         os.remove(path_i)
-        
-        # self.df_n.loc[index_f, 'IconID'] = f'{name}{ext}'
-        # dst = os.path.join(self.tmp_icon_folder, f'{name}{ext}')
-        # shutil.copy(file_path, dst)
+        self.dict_n['IconPath'] = file_path
     
-    def name_edit_change(self):
+    def name_edit_change(self, text:str)->None:
         edit_f = self.sender()
-        text = edit_f.text()
-        # index_f = edit_f.property('index')
         type_f = edit_f.property('type')
-        # if type_f == 'name':
-        #     self.df_n.iloc[index_f, 0] = text
-        # else:
-        #     self.df_n.iloc[index_f, 1] = text
-        # if type_f == 'name':
-        #     names = self.df_n.loc[:,'Name'].to_list()
-        # else:
-        #     names = self.df_n.loc[:,'Chinese Name'].to_list()
+        index_f = edit_f.property('index')
+        if type_f == 'name':
+            self.dict_n[index_f]['Name'] = text
+        elif type_f == 'chname':
+            self.dict_n[index_f]['Chinese Name'] = text
         names = [i['name'].text() for i in self.objs_l.values()]
-        if names.count(text) > 1:
+        if not text:
+            edit_f._setStlye(True)
+        elif names.count(text) > 1:
             if type_f == 'name':
                 edit_f._setStlye(False)
             else:
                 pass
         else:
-            edit_f._setStlye(True)
+            edit_f._setStlye(True)     
 
-    def _exe_search(self, index_f:int):
+    def exe_edit_write(self, text:str)->None:
+        line_f = self.sender()
+        index_f = line_f.property('index')
+        self.dict_n[index_f]['EXE Path'] = text
+
+    def _exe_search(self, index_f:int)->None:
         options = QFileDialog.Options()
         file_name, _ = QFileDialog.getOpenFileName(self, "Open File", "",
                                                   "All Files (*);;Python Files (*.py)", options=options)
@@ -1194,49 +1209,58 @@ class LauncherSetting(UILauncherSetting):
             file_name = file_name.replace('/', '\\')
             self.objs_l[index_f]['exe'].setText(file_name)
     
-    def _reset(self):
-        title_f = 'Warning'
-        prompt_f = 'Are you sure to reset pages to last stage?'
-        value_d = {'Reset All':2, "Reset This Page":1, 'Cancel':-5}
-        out_f = self.up.tip(title_f, prompt_f, value_d, -5)
+    def _read_data(self, data_dict:dict, group_name:str)->None:
+        df_t = pandas.DataFrame()
+        df_list = []
+        for key, value in data_dict.items():
+            if not value['Name']:
+                continue
+            df_list.append(pandas.DataFrame([value | {'Group': group_name}]))
+        return pandas.concat(df_list, ignore_index=True) if df_list else pandas.DataFrame()
+
+    
+    def _reset(self)->None:
+        # title_f = 'Warning'
+        # prompt_f = 'Are you sure to reset pages to last stage?'
+        # value_d = {'Reset All':2, "Reset This Page":1, 'Cancel':-5}
+        # out_f = self.up.tip(title_f, prompt_f, value_d, -5)
+        out_f =2
         page_n = self.tab_bar.get_current_text()
-        page_index = self.tab_bar.currentIndex()
         match out_f:
             case 1:
                 if page_n not in self.df.keys():
-                    self.df_l[page_index][1] = self._get_default_df(page_n)
+                    self.data_dict[page_n] = {0:{'Name':'', 'Chinese Name':'', 'EXE Path':'', 'IconPath':''}}
                 else:
-                    self.df_l[page_index][1] = self.df[page_n].copy(deep=True)
-                    self.df_l[page_index][1].loc[:,'IconID'] = None
-                self._line_fresh(page_index)
+                    self.data_dict[page_n] = {}
+                    for i in range(self.df[page_n].shape[0]):
+                        self.data_dict[page_n][i] = self.df[page_n].iloc[i].to_dict() | {'IconPath':''}
+                self._line_fresh(self.tab_bar.get_current_text())
             case 2:
+                self.tab_bar.set_current_tab(next(iter(self.df.keys())))
+                for name_i in self.tab_bar.get_texts():
+                    if name_i not in self.df.keys():
+                        self.tab_bar._delete(name_i)
+                        self.data_dict.pop(name_i)
                 self._process_ori_df()
-                self._line_fresh(page_index)
-
+                
     def _save(self):
-        title_f = 'Warning'
-        prompt_f = 'Are you sure to write in pages to local data?'
-        value_d = {'Save All':2, "Save This Page":1, 'Cancel':-5}
-        out_f = self.up.tip(title_f, prompt_f, value_d, -5)
+        # title_f = 'Warning'
+        # prompt_f = 'Are you sure to write in pages to local data?'
+        # value_d = {'Save All':2, "Save This Page":1, 'Cancel':-5}
+        # out_f = self.up.tip(title_f, prompt_f, value_d, -5)
+        out_f = 1
         page_n = self.tab_bar.get_current_text()
-        page_index = self.tab_bar.currentIndex()
-        page_names = [i[0] for i in self.df_l]
-        ori_pages = self.df.keys()
         match out_f:
             case 1:
-                self._writein_data(page_index)
-                df_toadd = self.df_l[page_index][1].drop('IconID', axis=1)
-                self.df[page_n] = df_toadd
-                self.df = OrderedDict([[key, self.df[key]] for key in page_names if key in ori_pages])
+                df = self._read_data(self.data_dict[page_n], page_n)
+                self.df[page_n] = df
                 self.manager.save_xlsx()
             case 2:
-                self._writein_data(page_index)
-                df_to_write = OrderedDict()
-                for name, df in self.df_l:
-                    df_to_write[name] = df.drop('IconID', axis=1, inplace=False)
-                self.df = df_to_write
+                for group_name, dict_i in self.data_dict.items():
+                    df = self._read_data(dict_i, group_name)
+                    self.df[group_name] = df
+                
                 self.manager.save_xlsx()
-            case _:
-                return
+
 
 

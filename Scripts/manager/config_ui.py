@@ -242,12 +242,20 @@ class UIUpdater(QObject):
     
     def __init__(self):
         super().__init__()
+        self.update_delay = QTimer()
+        self.update_delay.setSingleShot(False)
+        self.update_delay.timeout.connect(self.on_yaml_change)
         self.init_watcher()
 
     def init_watcher(self):
         self.watcher = QFileSystemWatcher([self.config_manager.yaml_path])
-        self.watcher.fileChanged.connect(self.on_yaml_change)  
+        self.watcher.fileChanged.connect(self.restart_timer)  # 连接文件变化信号
+        
+    def restart_timer(self):
+        self.update_delay.start(500)
+    
     def on_yaml_change(self):
+        self.update_delay.stop()
         try:
             yml_file0 = yml.read(self.config_manager.yaml_path)
             yml_file1 = dicta.flatten_dict(yml_file0)

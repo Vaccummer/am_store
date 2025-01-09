@@ -145,7 +145,7 @@ class BaseLauncher(QMainWindow):
         keys = list(value_d.keys())
         values = list(value_d.values())
         value_dn = {keys[i]: i for i in range(len(keys)) }
-        tip = InfoTip(self, title, prompt_f, value_dn)
+        tip = InfoTip(title, prompt_f, value_dn, self.config)
         if tip.exec_() == QDialog.Accepted:
             return_i = tip.VALUE
             tip.close()
@@ -213,10 +213,11 @@ class UILauncher(BaseLauncher):
         self.MODE = self.switch_button.modes[0]
         self.switch_button.index_changed.connect(self._change_mode)
         # self.shortcut_entry = ShortcutEntry(self)
-        self.top_buttons = TopButton(self, self.config)._initbuttons()
+        self.top_buttons_widget = TopButton(self, self.config)
+        # self.top_buttons = TopButton(self, self.config)._initbuttons()
         self.layout_top.addWidget(self.switch_button)
         self.layout_top.addStretch()
-        add_obj(*self.top_buttons, parent_f=self.layout_top)
+        add_obj(self.top_buttons_widget, parent_f=self.layout_top)
     
     def _initLauncherUI(self):
         self.path_switch_button = PathModeSwitch(self, config=self.config)
@@ -314,7 +315,16 @@ class ControlLauncher(UILauncher):
         self.input_box.textChanged.connect(self._input_change)
         self.input_box.key_press.connect(self._input_box_signal_process)
         self.path_manager.con_res.connect(self._connection_check)
+        self.top_buttons_widget.button_click.connect(self._top_button_click)
     
+    @Slot(str)
+    def _top_button_click(self, sign:Literal['minimum', 'maximum', 'close', 'entry']):
+        match sign:
+            case 'entry':
+                if self.shortcut_setting.isVisible():
+                    return
+                self.shortcut_setting = ShortcutSetting(self, self.config.deepcopy())
+                self.shortcut_setting.showWin()
     @Slot(dict)
     def _input_box_signal_process(self, input_f:dict[Literal['key', 'text', 'type'], str]):
         event_type = input_f['type']
@@ -380,7 +390,11 @@ class ControlLauncher(UILauncher):
             return True, ''
         except Exception as e:
             return False, e
-
+    @Slot()
+    def _refresh_setting(self):
+        self._refresh_setting.disconnect()
+        self._refresh_setting.connect(self.shortcut_setting.refresh_signal)
+        self.shortcut_button.refresh()
 if __name__ == "__main__":
     # QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)

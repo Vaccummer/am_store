@@ -184,13 +184,14 @@ class BasicAS(QListWidget, QObject):
         
     def _load(self):
         # static load
-        self.pre = atuple('Launcher', self.name)
+        self.pre = ['Launcher', self.name]
         self.button_config = atuple('Launcher', self.name,'style','button')
         self.label_config = atuple('Launcher', self.name, 'style', 'label')
         self.main_config = atuple('Launcher', self.name, 'style', 'main')
         self.item_config = atuple('Launcher', self.name, 'style', 'item')
         self.scroll_bar_config = atuple('Launcher', self.name, 'style', 'scroll_bar')
         self.font_a = atuple('Launcher', self.name, 'font', 'main')
+        self.icon_proportion = atuple(self.pre+['style','button','icon_proportion'])
 
         # size
         pre = ['Launcher', self.name, 'Size']
@@ -199,6 +200,7 @@ class BasicAS(QListWidget, QObject):
         self.extra_width = atuple(pre+['extra_width'])
         self.max_width = atuple(pre+['max_width'])
         self.min_width = atuple(pre+['min_width'])
+        
 
         self.launcher_df = self.launcher_manager.df
         self.path_manager:PathManager = self.up.path_manager
@@ -264,11 +266,17 @@ class UIAS(BasicAS):
     def __init__(self, config:Config_Manager, parent:Union[QMainWindow, QWidget],manager:LauncherPathManager):  
         super().__init__(config, parent, manager)
         UIUpdater.set(self.font_a, self.setFont, 'font')
-        UIUpdater.set(alist(self.main_config, self.item_config, self.scroll_bar_config), self.customStyle)
+        style_d = atuple('Launcher', self.name, 'style')
         self._inititems()
+        UIUpdater.set(style_d, self.customStyle)
         self.setFocusPolicy(Qt.NoFocus)
 
-    def customStyle(self, main_config:dict, item_config:dict, bar_config:dict):
+    def customStyle(self, style_d:dict):
+        main_config = style_d.get('main', {})
+        item_config = style_d.get('item', {})
+        bar_config = style_d.get('scroll_bar', {})
+        label_config = style_d.get('label', {})
+
         # dynamic style set
         main_bg = main_config.get('background', 'transparent')
         main_border = main_config.get('border', 'none')
@@ -279,13 +287,19 @@ class UIAS(BasicAS):
         item_border = item_config.get('border', 'none')
         item_border_radius = item_config.get('border_radius', 10)
         item_padding = item_config.get('padding', [10,5,5,5])
-        height_f = item_config.get('height', 50)
+        height_t = atuple('Launcher', self.name, 'Size', 'item_height')
+        item_height = UIUpdater.config[height_t]
+        if item_height is None:
+            item_height = 70
+        item_margin = item_config.get('margin', 5)
 
         bar_handle_colors = enlarge_list(bar_config.get('background_colors', ['#32CC99']),3)
         orbit_color = bar_config.get('orbit_color', '#F7F7F7')
         bar_radius = bar_config.get('border_radius', 7)
         bar_width = bar_config.get('width', 15)
         bar_height = bar_config.get('height', 30)
+
+        label_resize_fractor = label_config.get('resize_fractor', 0.8)
 
         self.style_d = {
             'QListWidget': {
@@ -301,7 +315,8 @@ class UIAS(BasicAS):
                 "padding": f"{item_padding[2]}px {item_padding[1]}px {item_padding[3]}px {item_padding[0]}px",
                 'background-color': item_bg_colors[0],
                 'border-radius': f"{item_border_radius}px",
-                'height': f"{height_f}px",
+                'height': f"{item_height}px",
+                'margin': f"{item_margin}px",
             },
             'QListView::item:hover': {
                 'background-color': item_bg_colors[1],
@@ -339,15 +354,15 @@ class UIAS(BasicAS):
         self.setStyleSheet(self.style_sheet)
         self.setSpacing(1)  # 设置 item 之间的间距为 10 像素
         self.setAttribute(Qt.WA_TranslucentBackground) 
+        self._resizeLabelButton(item_height, label_resize_fractor=label_resize_fractor)
 
     def _init_signle_item(self, button_size:atuple, index_f:int, label_font:atuple=None):
         label_font = self.font_a if label_font is None else label_font
         item_i = QListWidgetItem()
         item_i.setData(Qt.UserRole, int(index_f))
-        button_i = YohoPushButton(icon_i=self.default_icon_d['dir'], style_config=self.button_config, size_f=button_size)
+        button_i = YohoPushButton(icon_i=self.default_icon_d['dir'], style_config=self.button_config, icon_proportion=self.icon_proportion)
         label_i = AutoLabel(text="Default", font=label_font, style_config=self.label_config)
         label_i.setAlignment(Qt.AlignLeft)
-        UIUpdater.set(button_size, label_i.setFixedHeight)
         layout_i = amlayoutH(align_v='l')
         layout_i.setContentsMargins(0,0,0,0)
         layout_i.addWidget(button_i)
@@ -377,6 +392,12 @@ class UIAS(BasicAS):
     def _getbutton(self, item:QListWidgetItem) -> QPushButton:
         index_f = item.data(Qt.UserRole)
         return self.button_l[index_f]
+    
+    def _resizeLabelButton(self, item_height:int, label_resize_fractor:float=0.8):
+        for i in range(len(self.item_l)):
+            self.label_l[i].setFixedHeight(int(item_height*label_resize_fractor))
+            self.button_l[i].setFixedSize(item_height, item_height)
+
 class AssociateList(UIAS):
     transfer_task = Signal(dict)
     def __init__(self, config:Config_Manager, parent:Union[QMainWindow, QWidget],manager:LauncherPathManager):  
@@ -993,7 +1014,7 @@ class TransferProgress(ProgressBar):
         self.up = parent
         super().__init__(parent, max_value, height)
 
-class ProgressData:
+class TransferInfo:
     def __init__(self, src:str, dst:str, src_host:str, dst_host:str, total_size:int):
         self.src = src
         self.dst = dst
@@ -1055,24 +1076,168 @@ class ProgressWidget2(QWidget):
     def _terminate(self):
         pass
     
-    def add(self, data:ProgressData):
+    def add(self, data:TransferInfo):
         pass
+
+class ProgressInfo(QWidget):
+    def __init__(self, parent):
+        self.up = parent
+        super().__init__(parent)
+        self.setWindowFlags(Qt.FramelessWindowHint)  
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        self._loadConfig()
+        self._initLayout()
+        self._initLabel()
+
+    def customStyle(self, style_d:dict):
+        background = style_d.get('background', '#F7F7F7')
+        border = style_d.get('border', 'none')
+        border_radius = style_d.get('border_radius', 10)
+        self.style_dict = {"QWidget":
+                           {'background':background,
+                            'border':border,
+                            'border-radius':border_radius,}
+        }
+        self.setStyleSheet(style_make(self.style_dict))
+
+    def _loadConfig(self):
+        self.main_margin = atuple('Launcher', 'progress_widget', 'Size', 'toolwidget', 'main_margin')
+        self.main_spacing = atuple('Launcher', 'progress_widget', 'Size', 'toolwidget', 'main_spacing')
+        self.label_spacing = atuple('Launcher', 'progress_widget', 'Size', 'toolwidget', 'label_spacing')
+        self.title_label_width = atuple('Launcher', 'progress_widget', 'Size', 'toolwidget', 'title_label_width')
+        self.extra_width = atuple('Launcher', 'progress_widget', 'Size', 'toolwidget', 'extra_width')
+        self.label_height = atuple('Launcher', 'progress_widget', 'Size', 'toolwidget', 'label_height')
+        self.title_label_font = atuple('Launcher', 'progress_widget', 'font', 'title_label_font')
+        self.info_label_font = atuple('Launcher', 'progress_widget', 'font', 'info_label_font')
+        self.line_margin = atuple('Launcher', 'progress_widget', 'Size', 'toolwidget', 'line_margin')
+        self.title_style_d = atuple('Launcher', 'progress_widget', 'style', 'tool_widget', 'title')
+        self.info_style_d = atuple('Launcher', 'progress_widget', 'style', 'tool_widget', 'info')
+        self.main_style_d = atuple('Launcher', 'progress_widget', 'style', 'tool_widget', 'main')
+        self.extra_height = atuple('Launcher', 'progress_widget', 'Size', 'toolwidget', 'extra_height')
+        UIUpdater.set(alist(self.label_height, self.label_spacing, self.extra_height), self._SetHeight)
+        UIUpdater.set(self.extra_width, self._dynamicLoad)
+        self.setMinimumWidth(self.extra_width+UIUpdater.config[self.title_label_width]+80)
+        UIUpdater.set(self.main_style_d, self.customStyle)
+
+    def _SetHeight(self, line_height, spacing, extra_height):
+        height_t = 4*line_height+3*spacing+extra_height
+        self.setFixedHeight(height_t)
+
+    def _dynamicLoad(self, extra_width:int):
+        self.extra_width = extra_width
+
+    def _initLayout(self):
+        self.layout_0 = amlayoutV(align_h='c')
+        self.setLayout(self.layout_0)
+        UIUpdater.set(self.main_margin, self.layout_0.setContentsMargins, type_f='margin')
+        UIUpdater.set(self.main_spacing, self.layout_0.setSpacing)
+
+        self.src_layout = amlayoutH(align_v='c')
+        self.dst_layout = amlayoutH(align_v='c')
+        self.size_layout = amlayoutH(align_v='c')
+        self.progress_layout = amlayoutH(align_v='c')
+        UIUpdater.set(self.label_spacing, self.src_layout.setSpacing)
+        UIUpdater.set(self.label_spacing, self.dst_layout.setSpacing)
+        UIUpdater.set(self.label_spacing, self.size_layout.setSpacing)
+        UIUpdater.set(self.label_spacing, self.progress_layout.setSpacing)
+        UIUpdater.set(self.line_margin, self.src_layout.setContentsMargins, type_f='margin')
+        UIUpdater.set(self.line_margin, self.dst_layout.setContentsMargins, type_f='margin')
+        UIUpdater.set(self.line_margin, self.size_layout.setContentsMargins, type_f='margin')
+        UIUpdater.set(self.line_margin, self.progress_layout.setContentsMargins, type_f='margin')
+
+        add_obj(self.src_layout, self.dst_layout, self.size_layout, self.progress_layout, parent_f=self.layout_0)
+
+    def _initLabel(self):
+        self.src_title = AutoLabel(text='Src', font=self.title_label_font, height=self.label_height, width=self.title_label_width, style_config=self.title_style_d)
+        self.src_info = AutoLabel(text='', font=self.info_label_font, height=self.label_height, style_config=self.info_style_d)
+        add_obj(self.src_title, self.src_info, parent_f=self.src_layout)
+
+        self.dst_title = AutoLabel(text='Dst', font=self.title_label_font, height=self.label_height, width=self.title_label_width, style_config=self.title_style_d)
+        self.dst_info = AutoLabel(text='', font=self.info_label_font, height=self.label_height, style_config=self.info_style_d)
+        add_obj(self.dst_title, self.dst_info, parent_f=self.dst_layout)
+
+
+        self.size_title = AutoLabel(text='Size', font=self.title_label_font, height=self.label_height, width=self.title_label_width,
+                                    style_config=self.title_style_d)
+        self.size_info = AutoLabel(text='', font=self.info_label_font, height=self.label_height, style_config=self.info_style_d)
+        add_obj(self.size_title, self.size_info, parent_f=self.size_layout)
+
+        self.progress_title = AutoLabel(text='Progress', font=self.title_label_font, height=self.label_height,
+        width=self.title_label_width, style_config=self.title_style_d)
+        self.progress_info = AutoLabel(text='', font=self.info_label_font, height=self.label_height, style_config=self.info_style_d)
+        add_obj(self.progress_title, self.progress_info, parent_f=self.progress_layout)
+    
+    def format_size(self, size:int):
+        if size < 1024:
+            return f"{size}B"
+        elif size < 1024*1024:
+            return f"{size/1024:.2f}KB"
+        elif size < 1024*1024*1024:
+            return f"{size/1024/1024:.2f}MB"
+        else:
+            return f"{size/1024/1024/1024:.2f}GB"
+        
+    @Slot(dict)
+    def change_info(self, info_d:TransferInfo):
+        '''
+        info_d:
+            src: str
+            src_host: str
+            dst: str
+            dst_host: str
+            size: int (in bytes)
+            progress: float (in percentage)
+        '''
+        src = info_d.src
+        src_host = info_d.src_host
+        dst = info_d.dst
+        dst_host = info_d.dst_host
+        size = info_d.total_size
+        progress = info_d.progress
+        src_str = f"{src_host}@{src}"
+        dst_str = f"{dst_host}@{dst}"
+        size_str = self.format_size(size)
+        progress_str = f"{progress:.2f}%"
+        width_t = max([QFontMetrics(self.src_info.font()).width(i) for i in [src_str, dst_str, size_str, progress_str]])
+        self.src_info.setFixedWidth(width_t+self.extra_width)
+        self.dst_info.setFixedWidth(width_t+self.extra_width)
+        self.size_info.setFixedWidth(width_t+self.extra_width)
+        self.progress_info.setFixedWidth(width_t+self.extra_width)
+        if src_str != self.src_info.text():
+            self.src_info.setText(src_str)
+        if dst_str != self.dst_info.text():
+            self.dst_info.setText(dst_str)
+        if size_str != self.size_info.text():
+            self.size_info.setText(size_str)
+        if progress_str != self.progress_info.text():
+            self.progress_info.setText(progress_str)
+        self.setFixedWidth(width_t+self.extra_width+self.title_label_width)
+    
+    def SetProgress(self, progress:float):
+        self.progress_info.setText(f"{progress:.2f}%")
 
 class ProgressWidget(QWidget):
     kill_signal = Signal(int)
-    add_signal = Signal(ProgressData)
+    add_signal = Signal(TransferInfo)
     update_signal = Signal(dict)
     def __init__(self, parent,):
         self.up = parent
-        super().__init__()
+        super().__init__(parent)
         self._loadConfig()
         self._initUI()
         UIUpdater.set(self.main_height, self.setFixedHeight)
-        self.data_l = []
+        self.data_dict = {}
         self.tipTimer = QTimer(self)
         self.tipTimer.setSingleShot(True)
         self.tipTimer.timeout.connect(self._showTip)
+        self.ID = None
 
+    def wheelEvent(self, event):
+        if event.angleDelta().y() > 0:
+            self.RollIndex(-1)
+        else:
+            self.RollIndex(1)
+    
     def _loadConfig(self):
         self.bar_height = atuple('Launcher', 'progress_widget', 'Size', 'bar_height')
         self.arrow_icon = atuple('Launcher', 'progress_widget', 'path', 'arrow_icon')
@@ -1083,7 +1248,8 @@ class ProgressWidget(QWidget):
         self.main_style = atuple('Launcher', 'progress_widget', 'style', 'main')
         self.main_tip_style = atuple('Launcher', 'progress_widget', 'style', 'main_tip')
         self.main_height = atuple('Launcher', 'progress_widget', 'Size', 'widget_height')
-
+        self.info_height = atuple('Launcher', 'progress_widget', 'Size', 'info_height')
+    
     def _initUI(self):
         # total layout
         self.layout_0 = amlayoutH(align_v='c')
@@ -1094,29 +1260,87 @@ class ProgressWidget(QWidget):
         self.close_button = YohoPushButton(icon_i=self.close_icon, style_config=self.icon_style, size_f=self.icon_size)
         add_obj(self.bar, self.close_button, parent_f=self.layout_0)
 
-    @Slot(int)
-    def update(self, data_f:dict[Literal['ID', 'size']]):
-        pass
-
-    def loadData(self, data:ProgressData):
-        pass
-
-    def kill(self, data:ProgressData):
-        pass
-    
-    def add(self, data:ProgressData):
-        pass
+        self.info_widget = ProgressInfo(self.up)
+        self.info_widget.hide()
 
     def enterEvent(self, event):
-        self.tipTimer.start(1000)
+        self.tipTimer.start(800)
         super().enterEvent(event)
 
     def leaveEvent(self, event):
         self.tipTimer.stop()
+        self.info_widget.hide()
         super().leaveEvent(event)
 
     def _showTip(self):
-        pass
+        if not self.data_dict:
+            return
+        cursor_pos = QCursor.pos()
+        x_p, y_p = self.up.geometry().x(), self.up.geometry().y()
+        x = cursor_pos.x()-x_p+10
+        y = cursor_pos.y()-y_p+10
+
+        w, h = self.info_widget.size().width(), self.info_widget.size().height()
+        self.info_widget.setGeometry(x,y,w,h)
+        self.info_widget.raise_()
+        self.info_widget.show()
+    
+    def kill(self):
+        ID_f = self.ID
+        index_t = self.getIndex(ID_f)
+        self.data_dict.pop(ID_f)
+        if not self.data_dict:
+            self.ID = None
+        else:
+            index_n = (index_t+len(self.data_dict))%len(self.data_dict)
+            self.ID = list(self.data_dict.keys())[index_n]
+            self.info_widget.change_info(self.data_dict[self.ID])
+        self.kill_signal.emit(ID_f)
+
+    def change_info(self, data:TransferInfo):
+        self.info_widget.change_info(data)
+        self.ID = data.ID
+        self.bar.setValue(data.progress)
+
+    def RollIndex(self, index_f:Literal[-1, 1]):
+        if not self.data_dict:
+            return
+        index_n = self.getIndex(self.ID)
+        index_n += index_f
+        index_n = max(0, min(len(self.data_dict)-1, index_n))
+        self.ID = list(self.data_dict.keys())[index_n]
+        self.info_widget.change_info(self.data_dict[self.ID])
+
+    def getIndex(self, ID):
+        for index, data in enumerate(list(self.data_dict.keys())):
+            if data == ID:
+                return index
+        warnings.warn(f"ID {ID} not found in data_l")
+        return 0
+    
+    def getCurrentData(self):
+        return self.data_dict[self.ID]
+    
+    def getCurrentID(self):
+        return self.ID
+    
+    @Slot(int)
+    def update(self, data_f:dict[Literal['ID', 'size']]):
+        self.data_dict[data_f['ID']].progress += data_f['size']/self.data_dict[data_f['ID']].total_size
+        if data_f['ID'] == self.ID:
+            self.info_widget.SetProgress(copy.deepcopy(self.data_dict[data_f['ID']].progress))
+            self.bar.setValue(copy.deepcopy(self.data_dict[data_f['ID']].progress))
+
+    @Slot(TransferInfo)
+    def add(self, data:TransferInfo):
+        if not self.data_dict:
+            self.data_dict[data.ID] = data
+            self.ID = data.ID
+            self.info_widget.change_info(data)
+        else:
+            self.data_dict[data.ID] = data
+
+
 
 class ProgressWidgetManager(QStackedWidget):
     def __init__(self, parent:QWidget, config:Config_Manager):
@@ -1141,5 +1365,4 @@ class ProgressWidgetManager(QStackedWidget):
         widget = ProgressWidget(self.up, self.config, data)
         self.addWidget(widget)
         return widget
-
 

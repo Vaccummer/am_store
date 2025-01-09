@@ -107,6 +107,8 @@ MainWindow:
     Size:
       widget_height: 1.3*het
       button_size: [1.2*het, 1.2*het]
+      layout_margin: [0, 0, 0, 0]
+      button_spacing: 10
     path:
       maximum: "./load/MainWindow/maximum.svg"
       minimum: "./load/MainWindow/minimum.svg"
@@ -225,15 +227,13 @@ Launcher:
       - "./load/MainWindow/middle.svg"
     sign: "^{sign_for_exchange}$"
     style:
-      background_colors: ["black", "#FFC300", "#FF5733"] # common, hover, pressed
+      background_colors: ["white", "#FFC300", "#FF5733"] # common, hover, pressed
       border: "none"
       border_radius: [0, 20, 20, 0]
       animation_type: "resize" # 'shake' or 'resize', default is None
 
   associate_list:
     Size:
-      item_height: 0.8*het
-      button_height: 0.7*het
       extra_width: 0.22*gap
       max_width: 7*gap
       min_width: 2*gap
@@ -252,40 +252,42 @@ Launcher:
       file_icon_getter: "./3rdparty/get_file_icon/main.exe"
     style:
       main:
-        background: "transparent"
-        border: "none"
+        background: "white"
+        border: "2px white"
         border_radius: 20
       item:
         background_colors: ["#F7F7F7", "#FFC300", "#FF5733"] # common, hover, pressed
-        border: "1px solid #F7F7F7"
-        border_radius: 10
-        padding: [10, 5, 5, 5]
-        height: 60
+        border: "none"
+        border_radius: 12
+        padding: [0, 0, 0, 0]
+        margin: 0
+        height: 60 # only int input, label and button will be adjusted to item's height
       scroll_bar:
-        orbit_color: "#F7F7F7"
+        orbit_color: "rgba(255, 255, 255, 50)"
         background_colors: ["#F7F7F7", "#FFC300", "#FF5733"] # common, hover, pressed
-        border_radius: 5
+        border_radius: 4
         width: 15
         min_height: 30
       label:
-        background: "#F7F7F7"
-        padding: [10, 10, 10, 10] # left, right, top, bottom
-        border: "1px solid #F7F7F7"
+        background: "transparent"
+        padding: [0, 0, 0, 0] # left, right, top, bottom
+        border: "none"
         border_radius: 10
+        resize_fractor: 0.8
       button:
-        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"] # common, hover, pressed
+        icon_proportion: 0.75
+        background_colors: ["transparent", "#FFC300", "#FF5733"] # common, hover, pressed
         border_radius: 10
         animation_type: "shake" # 'shake' or 'resize', default is None
-
     max_exe_num: 10
     max_dir_num: 999
     max_length: 600
 
   shortcut_obj:
-    horizontal_button_num: 6
+    horizontal_button_num: 9
     vertical_button_num: 5
     Size:
-      setting_window_size: [0.5*win_x, 0.5*win_y]
+      setting_window_size: [0.8*win_x, 0.8*win_y]
       title_height: 1.3*het
       entry_icon_r: 0.7*het
       icon_proportion: 0.8
@@ -452,8 +454,20 @@ Launcher:
       bar_height: 0.2*het
       icon_size: 0.5*het
       widget_height: 0.6*het
+      toolwidget:
+        main_width: 5*gap
+        main_height: 5*het
+        main_margin: [0, 0, 0, 0]
+        line_margin: [0, 0, 0, 0]
+        main_spacing: 0.1*het
+        label_spacing: 0.1*het
+        title_label_width: 2*het
+        extra_width: 0.2*het
+        extra_height: 10
+        label_height: het
     font:
-      label_font: [[Family, *yahei], [PixelSize, 20]]
+      title_label_font: [[Family, *yahei], [PixelSize, 40]]
+      info_label_font: [[Family, *yahei], [PixelSize, 60]]
     color:
       bar_color: "#FAC83F"
       bar_background: "#F7F7F7"
@@ -468,6 +482,7 @@ Launcher:
         border: "1px solid #F7F7F7"
         border_radius: 10 # 和bar共享
       main_tip:
+        delay_time: 500
         font: [[Family, *arial], [PixelSize, 40]]
         background: "#F7F7F7"
         font_color: "#000000"
@@ -484,6 +499,26 @@ Launcher:
         background_colors: ["#949494", "#FF5733", "#A23823"] # common, hover, pressed
         border_radius: 10
         animation_type: "resize" # 'shake' or 'resize', default is None
+      tool_widget:
+        main:
+          background: "#E02626"
+          border: "1px solid #E02626"
+          border_radius: 15
+        title:
+          print: "title"
+          background: "#1C30CC"
+          font_color: "#AC3636"
+          border: "none"
+          text_align: "center" # "left", "right", "center"
+          border_radius: 20
+          padding: [0, 0, 0, 0]
+        info:
+          background: "#F7F7F7"
+          font_color: "#000000"
+          border: "none"
+          border_radius: 0
+          text_align: "left" # "left", "right", "center"
+          padding: [0, 0, 0, 0]
 
 Terminal:
   font:
@@ -514,17 +549,18 @@ Settings:
       save_button: [[Family, *yahei], [PointSize, 12], [Weight, 70]]
       discard_button: [[Family, *yahei], [PointSize, 12], [Weight, 70]]
       reset_button: [[Family, *yahei], [PointSize, 12], [Weight, 70]]
-      tab: [[Family, *yahei], [PointSize, 12], [Weight, 70]]
+      tab: [[Family, *yahei], [PointSize, 10], [Weight, 60]]
     Size:
-      col_margin: [125, 0, 50, 0]
+      col_margin: [0, 0, 0, 0]
       frame_thickness: 5
-      add_button_margin: [190, 0, 84, 0]
+      add_button_margin: [70, 0, 0, 0]
       line_height: 0.85*het
       numbercol_width: 1.7*het
       number_width: 0.6*het
       layout_spacing: 0.2*het
-      line_spacing: 0.2*het
-      nameedit_max_length: 5*gap
+      line_spacing: 0.1*het
+      nameedit_length: 5*gap
+      chnameedit_length: 5*gap
       exeedit_min_length: 2*gap
       add_line_height: het
       tab_height: 0.7*het
@@ -598,6 +634,7 @@ Settings:
         animation_type: "shake" # 'shake' or 'resize', default is None
       add_line_button:
         background_colors: ["#F7F7F7", "#FFC300", "#FF5733"] # common, hover, pressed
+        icon_proportion: 0.95
         border: "none"
         border_radius: 10
         animation_type: "resize" # 'shake' or 'resize', default is None
@@ -608,13 +645,12 @@ Settings:
         border_radius: 5 # share with orbit
         min_height: 30
       sheet_control:
-        main_height: 60
+        main_height: 65
         main_border: "none"
         main_background: "transparent"
         main_border_radius: 10
-
         tab_margin_right: 10
-        padding: [0, 10, 0, 10]
+        padding: [10, 10, 0, 10]
         tab_height: 50
         background_colors: ["#F7F7F7", "#FFC300", "#FF5733"] # common, hover, pressed
         font_colors: ["#000000", "#000000", "#000000"] # common, hover, pressed
@@ -640,6 +676,7 @@ Settings:
       - ["ubuntu-24.04", "//wsl.localhost/Ubuntu-24.04", "am"] # ["hostname", "address", "username"]
     connection_check_interval: 30
     connection_timeout: 5
+
   TransferMaintainer:
     local_min_chunck: 256 # in MB
     local_max_chunck: 2048 # in MB
