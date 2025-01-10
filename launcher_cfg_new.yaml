@@ -550,6 +550,7 @@ Settings:
       discard_button: [[Family, *yahei], [PointSize, 12], [Weight, 70]]
       reset_button: [[Family, *yahei], [PointSize, 12], [Weight, 70]]
       tab: [[Family, *yahei], [PointSize, 10], [Weight, 60]]
+      tab_menu: [[Family, *yahei], [PointSize, 10], [Weight, 60]]
     Size:
       col_margin: [0, 0, 0, 0]
       frame_thickness: 5
@@ -567,6 +568,9 @@ Settings:
       tabbar_height: 0.9*het
       bottom_margin: [0, 0, 30, 0]
       min_handle_height: 30
+      tab_menu_button_height: 0.6*het
+      tab_menu_button_width: 2*het
+      control_button_width: 1.5*het
     path:
       number_col_icon: "./load/Settings/col_icons/opto_setting_window_icon.svg"
       icon_col_icon: "./load/Settings/col_icons/opto_setting_window_icon.svg"
@@ -656,6 +660,14 @@ Settings:
         font_colors: ["#000000", "#000000", "#000000"] # common, hover, pressed
         tab_border: "none"
         tab_border_radius: 10
+      tab_menu:
+        item:
+          spacing: 0
+          background_colors: ["#A75A5A", "#FFC300", "#FF5733"] # common, hover, pressed
+          font_colors: ["#000000", "#000000", "#000000"] # common, hover, pressed
+          border: "none"
+          border_radius: 10
+          padding: [0, 0, 0, 0]
       tab_add_button:
         background_colors: ["#F7F7F7", "#FFC300", "#FF5733"] # common, hover, pressed
         border: "1px solid #F7F7F7"

@@ -493,7 +493,6 @@ def cre_ssh_con(host_paras:dict, timeout:int=10)->tuple[paramiko.SSHClient, para
     return (server, stfp)
 
 
-
 class atuple(tuple):
     def __new__(cls, *args):
         if len(args) == 1 and isinstance(args[0], (list, tuple)):

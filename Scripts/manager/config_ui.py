@@ -228,7 +228,25 @@ class UIUpdater(QObject):
                 if value_ae:
                     action_f(value_ae)
         return atuple_check, value_t, value_ae
-    
+    @classmethod
+    def get(cls, key_f:atuple|alist[atuple], default_v=None):
+        if isinstance(key_f, atuple):
+            value_t = cls.config[key_f]
+            if not value_t:
+                return default_v
+            else:
+                return value_t
+        elif isinstance(key_f, alist):
+            value_l = []
+            for i in key_f:
+                if isinstance(i, atuple):
+                    value_l.append(cls.get(i, default_v))
+                else:
+                    value_l.append(default_v)
+            return value_l
+        else:
+            warnings.warn(f"UIUpdater.get: Invalid key type: {key_f}")
+            return default_v
     @classmethod
     def set(cls, key_f:Union[atuple,alist],action_f:callable,
              type_f:Union[alist[Literal[None, 'size', 'font', 'icon', 'config', 'height']], 

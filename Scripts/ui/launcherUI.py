@@ -399,9 +399,9 @@ class UIAS(BasicAS):
             self.button_l[i].setFixedSize(item_height, item_height)
 
 class AssociateList(UIAS):
-    transfer_task = Signal(dict)
     def __init__(self, config:Config_Manager, parent:Union[QMainWindow, QWidget],manager:LauncherPathManager):  
         super().__init__(config, parent, manager)
+        self.transfer_task = Signal(dict)
         self.raise_()
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.right_click)
@@ -912,9 +912,9 @@ class SearchTogleButton(YohoPushButton):
         self.setGeometry(x_n, y, self.width(), self.height())
 
 class ShortcutButton(QWidget):
-    launch_signal = Signal(str)
     def __init__(self, parent: QMainWindow, config:Config_Manager) -> None:
         super().__init__(parent)
+        self.launch_signal = Signal(str)
         self.ctrl_pressed = False
         self.name = "shortcut_obj"
         self.up = parent
@@ -1217,12 +1217,12 @@ class ProgressInfo(QWidget):
         self.progress_info.setText(f"{progress:.2f}%")
 
 class ProgressWidget(QWidget):
-    kill_signal = Signal(int)
-    add_signal = Signal(TransferInfo)
-    update_signal = Signal(dict)
     def __init__(self, parent,):
         self.up = parent
         super().__init__(parent)
+        self.kill_signal = Signal(int)
+        self.add_signal = Signal(TransferInfo)
+        self.update_signal = Signal(dict)
         self._loadConfig()
         self._initUI()
         UIUpdater.set(self.main_height, self.setFixedHeight)
@@ -1339,8 +1339,6 @@ class ProgressWidget(QWidget):
             self.info_widget.change_info(data)
         else:
             self.data_dict[data.ID] = data
-
-
 
 class ProgressWidgetManager(QStackedWidget):
     def __init__(self, parent:QWidget, config:Config_Manager):

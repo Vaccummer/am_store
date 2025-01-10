@@ -72,7 +72,6 @@ class BaseLauncher(QMainWindow):
         event.ignore()  # ignore the close event
         self.hide()  # hide the main window
         self.tray_icon.showMessage("Super Launcher", "Main Window is now hidden", QSystemTrayIcon.Information)
-    
     def createTrayIcon(self):
         # create taskbar hide icon
         self.tray_icon = QSystemTrayIcon(self)
@@ -130,8 +129,8 @@ class BaseLauncher(QMainWindow):
         painter.setRenderHint(QPainter.Antialiasing)
         # 绘制带有圆角和渐变的窗口背景
         gradient = QLinearGradient(0, 0, 0, self.height())
-        gradient.setColorAt(0, QColor(113, 148, 139))
-        gradient.setColorAt(1, QColor(162, 245, 224))
+        gradient.setColorAt(0, "#028EA1")
+        gradient.setColorAt(1, "#06BEB6")
         painter.setBrush(gradient)
         painter.setPen(Qt.NoPen)
         painter.drawRoundedRect(self.rect(), 20, 20)

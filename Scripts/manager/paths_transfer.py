@@ -217,6 +217,7 @@ class SSHManager(QObject):
         return {'type':type_t, 'config':config_t}
 
     def _initMaintainer(self):
+        return
         self.maintainer = ConnectionMaintainer(self.hostname_n, self.sftp)
         self.maintainer.check_result.connect(self._maintain_result)
         self.maintainer.start()
@@ -415,8 +416,9 @@ class ConnectionThread(QThread):
             self.finished_signal.emit([self.host_name, False, str(e)])
 
 class ConnectionMaintainer(QThread):
+    bar_state = Signal(list)
+    stop_signal = Signal(bool)
     server_input = Signal(list)
-    check_result = Signal(list)
     def __init__(self, server_name, server:paramiko.SFTPServer, interval:int=10):
         super().__init__()
         self.interval = interval
@@ -425,6 +427,7 @@ class ConnectionMaintainer(QThread):
         self.server_input.connect(self._input_server)
         self.stop_sign = False
     
+    @Slot(list)
     def _input_server(self, server:list):
         self.server_name = server[0]
         self.server = server[1]

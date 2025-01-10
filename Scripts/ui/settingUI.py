@@ -565,6 +565,7 @@ class SheetControl(QTabBar):
     tab_operation = Signal(dict)
     def __init__(self, parent:QWidget, font_f:QFont, style_main:dict, style_menu:dict):
         super().__init__(parent)
+        self._init_menu()
         self.up = parent
         self.pre = ['Launcher', 'shortcut_obj', 'path']
         UIUpdater.set(font_f, self.setFont, 'font')
@@ -659,26 +660,6 @@ class SheetControl(QTabBar):
         self.sheetcontrol_stylesheet = style_make(self.tab_style_d)
         self.setStyleSheet(self.sheetcontrol_stylesheet)
 
-    def _setMenuStyle(self, menu:QMenu, style:dict):
-        padding = style.get('padding', [10,5,5,5])
-        self.menu_style_d = {
-            "QMenu": {
-                "background-color": style.get('background', "#F7F7F7"),
-                "border": style.get('border', "none"),
-            },
-            "QMenu::item": {
-                "padding": f"{padding[2]}px {padding[1]}px {padding[3]}px {padding[0]}px",     # top, right, bottom, left
-                "background-color": 'transparent',
-                "color": style.get('font_color', "#000000"),
-            },
-            "QMenu::item:selected": {
-                "background-color": style.get('background_hover', "#FF5733"),
-                "color": style.get('font_color_hover', "#FFFFFF"),
-            }
-        }
-        self.menu_stylesheet = style_make(self.menu_style_d)
-        menu.setStyleSheet(self.menu_stylesheet)
-    
     def get_texts(self):
         texts = []
         for index in range(self.count()):  
@@ -694,20 +675,19 @@ class SheetControl(QTabBar):
             index = self.get_texts().index(name)
             self.setCurrentIndex(index)
 
-    def open_context_menu(self, position): 
-        index = self.tabAt(position)
-        if index == -1:
-            return
-        menu = QMenu()
-        self._setMenuStyle(menu, self.config[atuple(self.pre+['style', 'menu'])])
-        rename_action = menu.addAction("Rename")
-        delete_action = menu.addAction("Delete")
-        action = menu.exec_(self.mapToGlobal(position))
-        if action == rename_action:
-            self.tab_operation.emit({'action':'rename', 'index':index})
-        elif action == delete_action:
-            self.tab_operation.emit({'action':'delete', 'index':index})
+    def _init_menu(self):
+        style_d = atuple(['Settings', 'LauncherSetting', 'style', 'tab_menu'])
+        value_d = {'rename':'rename', 'delete':'rename'}
+        font_f = atuple('Settings', 'LauncherSetting', 'font', 'tab_menu')
+        width_f = atuple('Settings', 'LauncherSetting', 'Size', 'tab_menu_button_width')
+        height_f = atuple('Settings', 'LauncherSetting', 'Size', 'tab_menu_button_height')
+        self.menu = AutoMenu(style_d=style_d, action_value=value_d, font=font_f, width_f=width_f, height_f=height_f)
+        self.menu.hide()
 
+    def open_context_menu(self, position:QPoint): 
+        index = self.tabAt(position)
+        self.menu.action(index, position, self.mapToGlobal(QPoint(0, 0)))
+        
     def move_tab(self, from_index, to_index):
         self.tab_operation.emit({'action':'move', 'from':from_index, 'to':to_index})
 
@@ -813,6 +793,7 @@ class BaseLauncherSetting(QWidget):
         self.numbercol_width = atuple(pre+['numbercol_width'])
         self.number_width = atuple(pre+['number_width'])
         self.tabbar_height = atuple(pre+['tabbar_height'])
+        self.control_button_width = atuple(pre+['control_button_width'])
         
         pre = ['Settings', self.name, 'style']
         self.icon_button_style = atuple(pre+['icon_button'])
@@ -1091,9 +1072,15 @@ class LauncherSetting(UILauncherSetting):
         self.tab_layout.addWidget(self.tab_bar)
         add_obj(self.b_add_button, parent_f=self.tab_layout)
         
-        self.save_button = YohoPushButton(text_f='Save', font_f=self.save_button_font, style_config=self.save_button_style, size_f=self.line_height)
+        self.save_button = YohoPushButton(text_f='Save', font_f=self.save_button_font, style_config=self.save_button_style)
+        UIUpdater.set(self.line_height, self.save_button.setFixedHeight)
+        UIUpdater.set(self.control_button_width, self.save_button.setFixedWidth)
+
         self.save_button.clicked.connect(self._save)
-        self.reset_button = YohoPushButton(text_f='Reset', font_f=self.reset_button_font, style_config=self.reset_button_style, size_f=self.line_height)
+        self.reset_button = YohoPushButton(text_f='Reset', font_f=self.reset_button_font, style_config=self.reset_button_style, )
+        UIUpdater.set(self.line_height, self.reset_button.setFixedHeight)
+        UIUpdater.set(self.control_button_width, self.reset_button.setFixedWidth)
+
         self.reset_button.clicked.connect(self._reset)
         # self.discard_button = ChangeControl('Discard', self.config.get('discard_button', obj='color'), self.config.get('discard_button', obj='font'), self.line_height)
         # self.discard_button.clicked.connect(self._discard)

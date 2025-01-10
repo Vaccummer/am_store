@@ -2,6 +2,7 @@ from PySide2.QtCore import *
 from PySide2.QtGui import *
 from PySide2.QtWidgets import *
 import random
+from functools import partial
 from Scripts.manager.config_ui import UIUpdater, AIcon
 from typing import Literal, Optional, Tuple, Union, List
 from abc import abstractmethod
@@ -1015,5 +1016,106 @@ class SmartStackWidget(QStackedWidget):
                 self.animate_transition(index, sign=1)
             #self.setCurrentIndex(index)
 
+class TipButton(QPushButton):
+    def __init__(self, style_d:dict, text_f:str, font_f:QFont=QFont(), width_f=None, height_f=None, radius_set:List[bool]=[True, True, True, True]):
+        super().__init__()
+        UIUpdater.set(text_f, self.setText)
+        UIUpdater.set(font_f, self.setFont, 'font')
+        UIUpdater.set(width_f, self.setFixedWidth)
+        UIUpdater.set(height_f, self.setFixedHeight)
+        self.radius_set = radius_set
+        UIUpdater.set(style_d, self.customStyle)
 
+    def customStyle(self, style_d:dict):
+        bg_colors = enlarge_list(style_d.get('background_colors', ['#F7F7F7', '#FFC300', '#FF5733']), 3)
+        font_colors = enlarge_list(style_d.get('font_colors', ['#000000', '#000000', '#000000']), 3)
+        border = style_d.get('border', 'none')
+        border_radius = enlarge_list(style_d.get('border_radius', [6, 6, 6, 6]), 4)
+        padding = enlarge_list(style_d.get('padding', [5, 5, 5, 5]), 4)
+        border_radius = [border_radius[i] if self.radius_set[i] else 0 for i in range(4)]
+        self.style_dict = {
+            'QPushButton':{
+                'background-color': bg_colors[0],
+                'color': font_colors[0],
+                'border': border,
+                'border-top-left-radius': border_radius[0],
+                'border-top-right-radius': border_radius[1],
+                'border-bottom-left-radius': border_radius[2],
+                'border-bottom-right-radius': border_radius[3],
+                'padding': padding,
+            },
+            'QPushButton::hover':{
+                'background-color': bg_colors[1],
+                'color': font_colors[1],
+            },
+            'QPushButton::pressed':{
+                'background-color': bg_colors[2],
+                'color': font_colors[2],
+            },
+        }
+        self.style_sheet = style_make(self.style_dict)
+        self.setStyleSheet(self.style_sheet)
 
+class AutoMenu(QWidget):
+    action_signal = Signal(dict)
+    def __init__(self, style_d:dict, action_value:dict,font:QFont=QFont(), width_f=None, height_f=None):
+        super().__init__()
+        self.width_f = width_f
+        self.height_f = height_f
+        self.action_value = action_value
+        self.style_d = style_d
+        self.font_f = font
+        self.setWindowFlags(self.windowFlags()|Qt.FramelessWindowHint | Qt.Tool)
+        self.setAttribute(Qt.WA_ShowWithoutActivating)
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.setAttribute(Qt.WA_TranslucentBackground)  # 设置窗口属性为透明
+        # self.setWindowOpacity(1)
+        self._init_action()
+        UIUpdater.set(self.font_f, self.setFont, 'font')
+        # self.move_signal.connect(self.async_Move)
+        self.relative_position = QPoint(0, 0)
+    
+    def eventFilter(self, obj, event):
+        if self.isVisible():
+            if event.type() == QEvent.ActivationChange:
+                if not self.isActiveWindow():
+                    self.hide()  # 隐藏菜单
+                    QApplication.instance().removeEventFilter(self)
+            elif event.type() == QEvent.MouseButtonPress:
+                if not self.geometry().contains(event.globalPos()):
+                    self.hide()
+                    QApplication.instance().removeEventFilter(self)
+        return super().eventFilter(obj, event)
+    
+    def _init_action(self)->None:
+        self.layout_0 = amlayoutV(align_h='l')
+        self.setLayout(self.layout_0)
+        spacing_f = UIUpdater.config[atuple('Settings','LauncherSetting','style','tab_menu','item','spacing')]
+        
+        spacing_n = spacing_f if spacing_f else 0
+        self.layout_0.setSpacing(spacing_n)
+        for i, action_i in enumerate(self.action_value.keys()):
+            if i == 0:
+                button_i = TipButton(style_d=self.style_d|atuple('item'), text_f=action_i, font_f=self.font_f, width_f=self.width_f, height_f=self.height_f, radius_set=[True, True, False, False])
+            elif i == len(self.action_value.keys())-1:
+                button_i = TipButton(style_d=self.style_d|atuple('item'), text_f=action_i, font_f=self.font_f, width_f=self.width_f, height_f=self.height_f, radius_set=[False, False, True, True])
+            else:
+                button_i = TipButton(style_d=self.style_d|atuple('item'), text_f=action_i, font_f=self.font_f, width_f=self.width_f, height_f=self.height_f, radius_set=[False, False, False, False])
+            self.layout_0.addWidget(button_i)
+        self.layout_0.addWidget(button_i)
+    
+    def _action(self, action_name:str, action_value:str)->None:
+        self.action_signal.emit({'geometry':self.geometry(), 'tab_index':self.tab_index, 'action_name':action_name, 'action_value':action_value})
+        self.hide()
+    
+    def action(self, index:int, relative_position:QPoint, parent_pos:QPoint)->None:
+        self.tab_index = index
+        self.relative_position = relative_position
+        x = self.relative_position.x() + parent_pos.x()
+        y = self.relative_position.y() + parent_pos.y()
+        self.setGeometry(x, y, self.width(), self.height())
+        self.adjustSize()
+        self.show()
+        self.raise_()
+        QApplication.instance().installEventFilter(self)
+        # QApplication.instance().installEventFilter(self)
