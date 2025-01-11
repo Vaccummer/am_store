@@ -477,6 +477,24 @@ def style_make(config:dict)->str:
     for obj_name, style_dict in config.items():
         style += f"{obj_name} {{\n"
         for key, value in style_dict.items():
+            if not value:
+                continue
+            if isinstance(value, int):
+                value = f"{value}px"
+            elif isinstance(value, float):
+                value = f"{int(value)}px"
+            elif isinstance(value, list):
+                str_f = ''
+                for value_i in value:
+                    str_f += f"{value_i}px "
+                value = str_f
+            elif isinstance(value, str):
+                if is_url(value):
+                    value = value.replace("\\", "/")
+                    value = f"url({value})"
+            else:
+                warnings.warn(f"style_make function detected a illegal value: {value}")
+                continue
             style += f"{key}: {value};\n"
         style += "}"
     return style

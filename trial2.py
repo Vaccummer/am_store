@@ -1,59 +1,53 @@
-from PySide2.QtWidgets import (
-    QApplication,
-    QPushButton,
-    QVBoxLayout,
-    QWidget,
-    QGraphicsOpacityEffect,
-)
-from PySide2.QtCore import QPropertyAnimation, QEasingCurve
+import os
+import sys
+from PySide2.QtWidgets import QApplication, QListWidget, QListWidgetItem
+from PySide2.QtCore import QMimeData, Qt
+from PySide2.QtGui import QDrag
 
-class OpacityWidget(QWidget):
+
+class DraggableListWidget(QListWidget):
     def __init__(self):
         super().__init__()
-        self.init_ui()
+        self.setSelectionMode(QListWidget.SingleSelection)
+        self.setDragEnabled(True)
 
-    def init_ui(self):
-        # 创建按钮
-        self.fade_in_button = QPushButton("Fade In", self)
-        self.fade_out_button = QPushButton("Fade Out", self)
+    def startDrag(self, supportedActions):
+        # 获取当前选中的项
+        item = self.currentItem()
+        if item:
+            mime_data = QMimeData()
 
-        # 布局
-        layout = QVBoxLayout(self)
-        layout.addWidget(self.fade_in_button)
-        layout.addWidget(self.fade_out_button)
-        self.setLayout(layout)
+            # 创建一个实际存在的临时文件
+            file_name = item.text() + ".txt"
+            temp_dir = os.environ["TEMP"]
+            temp_file_path = os.path.join(temp_dir, file_name)
 
-        # 设置透明效果
-        self.opacity_effect = QGraphicsOpacityEffect(self)
-        self.setGraphicsEffect(self.opacity_effect)
-        self.opacity_effect.setOpacity(1.0)  # 初始透明度
+            # 写入临时文件内容
+            with open(temp_file_path, "w") as f:
+                f.write("This is a test file.")
 
-        # 绑定事件
-        self.fade_in_button.clicked.connect(self.fade_in)
-        self.fade_out_button.clicked.connect(self.fade_out)
+            # 设置 MIME 数据类型为支持拖拽到文件管理器的格式
+            url = f"file:///{temp_file_path.replace(os.sep, '/')}"
+            mime_data.setUrls([url])
 
-    def fade_in(self):
-        """部件渐显"""
-        animation = QPropertyAnimation(self.opacity_effect, b"opacity")
-        animation.setDuration(1000)  # 动画持续时间（毫秒）
-        animation.setStartValue(0.5)  # 起始透明度
-        animation.setEndValue(1.0)  # 结束透明度
-        animation.setEasingCurve(QEasingCurve.InOutQuad)  # 缓动效果
-        animation.start()
+            # 创建拖拽操作
+            drag = QDrag(self)
+            drag.setMimeData(mime_data)
 
-    def fade_out(self):
-        """部件渐隐"""
-        animation = QPropertyAnimation(self.opacity_effect, b"opacity")
-        animation.setDuration(1000)  # 动画持续时间（毫秒）
-        animation.setStartValue(1.0)  # 起始透明度
-        animation.setEndValue(0.5)  # 结束透明度
-        animation.setEasingCurve(QEasingCurve.InOutQuad)  # 缓动效果
-        animation.start()
+            # 可选：设置拖拽的视觉效果
+            drag.exec_(Qt.CopyAction)
+
 
 if __name__ == "__main__":
-    app = QApplication([])
-    widget = OpacityWidget()
-    widget.setWindowTitle("Widget Opacity Example")
-    widget.resize(300, 200)
-    widget.show()
-    app.exec_()
+    app = QApplication(sys.argv)
+    window = DraggableListWidget()
+
+    # 添加示例项
+    for i in range(5):
+        item = QListWidgetItem(f"Item {i + 1}")
+        window.addItem(item)
+
+    window.setWindowTitle("Draggable QListWidget")
+    window.resize(400, 300)
+    window.show()
+    sys.exit(app.exec_())

@@ -137,6 +137,7 @@ class BasicAS(QListWidget, QObject):
         self.config = config.deepcopy()
         self.setAcceptDrops(True)  # 接受放置事件
         self.setDragEnabled(True)  # 启用拖动事件
+        self.setDropIndicatorShown(True)
         self.config.group_chose("Launcher", self.name)
         self.launcher_manager = manager
         self._loadconfig(self.config)
@@ -183,6 +184,7 @@ class BasicAS(QListWidget, QObject):
         self.file_icon_getter = config[atuple(pre+['file_icon_getter'])]
         
     def _load(self):
+        self.extra_style_dict = {}
         # static load
         self.pre = ['Launcher', self.name]
         self.button_config = atuple('Launcher', self.name,'style','button')
@@ -192,11 +194,11 @@ class BasicAS(QListWidget, QObject):
         self.scroll_bar_config = atuple('Launcher', self.name, 'style', 'scroll_bar')
         self.font_a = atuple('Launcher', self.name, 'font', 'main')
         self.icon_proportion = atuple(self.pre+['style','button','icon_proportion'])
+        self.item_height = atuple(self.pre+['style','main','item','height'])
 
         # size
         pre = ['Launcher', self.name, 'Size']
-        self.item_height = atuple(pre+['item_height'])
-        self.button_height = atuple(pre+['button_height'])
+        self.button_height = self.item_height
         self.extra_width = atuple(pre+['extra_width'])
         self.max_width = atuple(pre+['max_width'])
         self.min_width = atuple(pre+['min_width'])
@@ -206,7 +208,13 @@ class BasicAS(QListWidget, QObject):
         self.path_manager:PathManager = self.up.path_manager
         self.ass = Associate(self.max_num, self.launcher_df, self.path_manager)
         self.config.group_chose(mode="Launcher", widget=self.name, obj=None)
+        self.line_margin = atuple('Launcher', self.name, 'style', 'main', 'widget', 'line_margin')
 
+        UIUpdater.set(self.font_a, self.setFont, 'font')
+        style_d = atuple('Launcher', self.name, 'style', 'main')
+        UIUpdater.set(style_d, self.customStyle, 'style')
+        spacing_f = atuple('Launcher', self.name, 'style', 'main', 'item', 'spacing')
+        UIUpdater.set(spacing_f, self.setSpacing, 'spacing')
         self._load_default_icons()
 
     def _load_default_icons(self) -> dict:
@@ -263,108 +271,105 @@ class BasicAS(QListWidget, QObject):
     def _get_prompt(self)->str:
         return self.up.input_box.text()
 class UIAS(BasicAS):
+    resize_info = Signal(list)
     def __init__(self, config:Config_Manager, parent:Union[QMainWindow, QWidget],manager:LauncherPathManager):  
         super().__init__(config, parent, manager)
-        UIUpdater.set(self.font_a, self.setFont, 'font')
-        style_d = atuple('Launcher', self.name, 'style')
         self._inititems()
-        UIUpdater.set(style_d, self.customStyle)
         self.setFocusPolicy(Qt.NoFocus)
 
-    def customStyle(self, style_d:dict):
-        main_config = style_d.get('main', {})
-        item_config = style_d.get('item', {})
-        bar_config = style_d.get('scroll_bar', {})
-        label_config = style_d.get('label', {})
-
+    def customStyle(self, style_d:dict, escape_sign:dict={}):
         # dynamic style set
-        main_bg = main_config.get('background', 'transparent')
-        main_border = main_config.get('border', 'none')
-        main_radius = main_config.get('border_radius', 20)
+        main_bg = Udata(atuple('widget', 'background'), 'transparent')
+        main_border = Udata(atuple('widget', 'border'), 'none')
+        main_radius = Udata(atuple('widget', 'border_radius'), 20)
 
+        item_bg_colors = Udata(atuple('item', 'background_colors'), ['#F7F7F7', '#FFC300', '#FF5733'])
+        item_border = Udata(atuple('item', 'border'), 'none')
+        item_border_radius = Udata(atuple('item', 'border_radius'), 10)
+        item_padding = Udata(atuple('item', 'padding'), [0, 0, 0, 0])
+        item_margin = Udata(atuple('item', 'margin'), 0)
+        item_height = Udata(atuple('item', 'height'), 60)
+        item_spacing = Udata(atuple('item', 'spacing'), 5)
 
-        item_bg_colors = enlarge_list(item_config.get('background_colors', ['#F7F7F7']),3)
-        item_border = item_config.get('border', 'none')
-        item_border_radius = item_config.get('border_radius', 10)
-        item_padding = item_config.get('padding', [10,5,5,5])
-        height_t = atuple('Launcher', self.name, 'Size', 'item_height')
-        item_height = UIUpdater.config[height_t]
-        if item_height is None:
-            item_height = 70
-        item_margin = item_config.get('margin', 5)
-
-        bar_handle_colors = enlarge_list(bar_config.get('background_colors', ['#32CC99']),3)
-        orbit_color = bar_config.get('orbit_color', '#F7F7F7')
-        bar_radius = bar_config.get('border_radius', 7)
-        bar_width = bar_config.get('width', 15)
-        bar_height = bar_config.get('height', 30)
-
-        label_resize_fractor = label_config.get('resize_fractor', 0.8)
-
-        self.style_d = {
-            'QListWidget': {
-                'border': main_border,
-            },
-            'QListView': {
-                'background': main_bg,
+        bar_handle_colors = Udata(atuple('scroll_bar', 'background_colors'), ['#32CC99'])
+        orbit_color = Udata(atuple('scroll_bar', 'orbit_color'), 'rgba(255, 255, 255, 50)')
+        bar_radius = Udata(atuple('scroll_bar', 'border_radius'), 4)
+        bar_width = Udata(atuple('scroll_bar', 'width'), 15)
+        bar_height = Udata(atuple('scroll_bar', 'height'), 30)
+        bar_margin = Udata(atuple('scroll_bar', 'margin'), 3)
+        bar_min_height = Udata(atuple('scroll_bar', 'min_height'), 30)
+        temp_d = {'QListWidget': {
+                'background-color': main_bg,
                 'border': main_border,
                 'border-radius': main_radius,
             },
-            'QListView::item': {
-                'border': item_border,
-                "padding": f"{item_padding[2]}px {item_padding[1]}px {item_padding[3]}px {item_padding[0]}px",
+            'QListWidget::item': {
                 'background-color': item_bg_colors[0],
-                'border-radius': f"{item_border_radius}px",
-                'height': f"{item_height}px",
-                'margin': f"{item_margin}px",
+                'border': item_border,
+                'padding': item_padding,
+                'margin': item_margin,
+                'height': item_height,
+                'spacing': item_spacing,
+                'border-top-left-radius': item_border_radius,
+                'border-top-right-radius': item_border_radius,
+                'border-bottom-left-radius': item_border_radius,
+                'border-bottom-right-radius': item_border_radius,
             },
-            'QListView::item:hover': {
+            'QListWidget::item:hover': {
                 'background-color': item_bg_colors[1],
             },
-            'QListView::item:selected': {
+            'QListWidget::item:selected': {
                 'background-color': item_bg_colors[2],
             },
-            'QListWidget QScrollBar:vertical': {
-                'background': orbit_color,
-                'width': f"{bar_width}px",
-                'margin': '3px',
-                'border-radius': f"{bar_radius}px",
+            'QScrollBar:vertical': {
+                'background-color': orbit_color,
             },
-            'QListWidget QScrollBar::handle': {
-                'background': bar_handle_colors[0],
-                'min-height': f"{bar_height}px",
-                'border-radius': f"{bar_radius}px",
+            'QScrollBar::handle:vertical': {
+                'background-color': bar_handle_colors[0],
+                'border-radius': bar_radius,
+                'width': bar_width,
+                'height': bar_height,
+                'margin': bar_margin,
+                'min-height': bar_min_height,
             },
-            'QListWidget QScrollBar::handle::hover': {
-                'background': bar_handle_colors[1],
+            'QScrollBar::handle:vertical:hover': {
+                'background-color': bar_handle_colors[1],
             },
-            'QListWidget QScrollBar::handle::selected': {
-                'background': bar_handle_colors[2],
+            'QScrollBar::handle:vertical:pressed': {
+                'background-color': bar_handle_colors[2],
             },
-            "QListWidget QScrollBar::add-line,QListWidget QScrollBar::sub-line":{
-                'background': 'none',
-                'height': '0px',
+            'QScrollBar::handle:horizontal': {
+                'width': 0,
+                'height': 0,
+                'background-color': 'transparent',
             },
-            "QListWidget QScrollBar::add-page,QListWidget QScrollBar::sub-page":{
-                'background': 'none',
-
-            }
+            "QScrollBar::add-line, QScrollBar::sub-line": {
+                "background": "none",
+            },
+            "QScrollBar::up-arrow, QScrollBar::down-arrow": {
+                "background": "none",
+            },
         }
-        self.style_sheet = style_make(self.style_d)
-        self.setStyleSheet(self.style_sheet)
-        self.setSpacing(1)  # 设置 item 之间的间距为 10 像素
-        self.setAttribute(Qt.WA_TranslucentBackground) 
-        self._resizeLabelButton(item_height, label_resize_fractor=label_resize_fractor)
+
+        if not hasattr(self, 'style_dict'):
+            self.style_dict = {}
+        self.style_dict = process_style_dict(self.style_dict, temp_d, escape_sign, style_d)
+        self.setStyleSheet(style_make(self.style_dict|self.extra_style_dict))
+        label_resize_factor = UIUpdater.get(atuple('Launcher', self.name, 'style', 'label', 'resize_fractor'), 0.8)
+        item_height = UIUpdater.get(atuple('Launcher', self.name, 'style', 'item', 'height'), 60)
+        self.resize_info.emit([item_height, label_resize_factor])
 
     def _init_signle_item(self, button_size:atuple, index_f:int, label_font:atuple=None):
         label_font = self.font_a if label_font is None else label_font
         item_i = QListWidgetItem()
         item_i.setData(Qt.UserRole, int(index_f))
         button_i = YohoPushButton(icon_i=self.default_icon_d['dir'], style_config=self.button_config, icon_proportion=self.icon_proportion)
+        button_i.setFixedSize(UIUpdater.get(button_size),UIUpdater.get(button_size))
+
         label_i = AutoLabel(text="Default", font=label_font, style_config=self.label_config)
-        label_i.setAlignment(Qt.AlignLeft)
+        label_i.setAlignment(Qt.AlignVCenter)
         layout_i = amlayoutH(align_v='l')
-        layout_i.setContentsMargins(0,0,0,0)
+        UIUpdater.set(self.line_margin, layout_i.setContentsMargins, 'margin')
         layout_i.addWidget(button_i)
         layout_i.addWidget(label_i)
         widget_i = QWidget()
@@ -393,11 +398,17 @@ class UIAS(BasicAS):
         index_f = item.data(Qt.UserRole)
         return self.button_l[index_f]
     
-    def _resizeLabelButton(self, item_height:int, label_resize_fractor:float=0.8):
+    @Slot(list)
+    def _resizeLabelButton(self, info_l:list):
+        if hasattr(self, 'label_size_info_l'):
+            if self.label_size_info_l == info_l:
+                return
+        else:
+            self.label_size_info_l = info_l
+        item_height, label_resize_factor = self.label_size_info_l
         for i in range(len(self.item_l)):
-            self.label_l[i].setFixedHeight(int(item_height*label_resize_fractor))
+            self.label_l[i].setFixedHeight(int(item_height*label_resize_factor))
             self.button_l[i].setFixedSize(item_height, item_height)
-
 class AssociateList(UIAS):
     def __init__(self, config:Config_Manager, parent:Union[QMainWindow, QWidget],manager:LauncherPathManager):  
         super().__init__(config, parent, manager)
@@ -671,7 +682,7 @@ class PathModeSwitch2(QComboBox):
         font_metrics = QFontMetrics(self.font())
         w_f = font_metrics.boundingRect(self.mode_list[0]).width() + 60  
         self.setFixedWidth(w_f)
-        UIUpdater.set(self.pre|atuple('style'), self.customStyle)   
+        UIUpdater.set(self.pre|atuple('style'), self.customStyle, 'style')   
     
     def customStyle(self, config):
         box_config = config.get('box', {})
@@ -756,8 +767,8 @@ class PathModeSwitch(CustomComboBox):
         self.color_state = index_n
         self.box_w.color_state = index_n
         self.menu_w.color_state = index_n
-        UIUpdater.action(self.style_d, self.box_w.customStyle)
-        UIUpdater.action(self.style_d, self.menu_w.customStyle)
+        UIUpdater.action(self.style_d|atuple('box'), self.box_w.customStyle, 'box')
+        UIUpdater.action(self.style_d|atuple('menu'), self.menu_w.customStyle, 'menu')
 
 class InputBox(AutoEdit):   
     key_press = Signal(dict)

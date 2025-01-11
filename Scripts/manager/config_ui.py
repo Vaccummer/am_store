@@ -16,7 +16,7 @@ class Asize(QSize):
 class AIcon(QIcon):
     def __init__(self, file_path):
         if isinstance(file_path, atuple):
-            self.file_path = UIUpdater.config.get(file_path,'')
+            self.file_path = UIUpdater.get(file_path,'')
             super().__init__(self.file_path)
         elif isinstance(file_path, str):
             self.file_path = file_path
@@ -176,13 +176,35 @@ class Config_Manager(object):
 
 class UIData(object):
     def __init__(self, index:int, key:atuple|alist[atuple], action:callable, 
-                 type:Literal[None, 'size', 'font', 'icon', 'config', 'height','margin','unpack']| Literal[None, 'size', 'font', 'icon', 'config', 'height','margin','unpack'], value_t, value_ae):
+                 type_f:Literal[None, 'size', 'font', 'icon', 'config', 'height','margin','unpack']| Literal[None, 'size', 'font', 'icon', 'config', 'height','margin','unpack'], value_t:dict|list|str|int, value_ae:dict|list|str|int, 
+                 escape_sign:dict, force_escape_sign:dict|list|bool={}):
         self.index = index
         self.key = key
         self.action = action
-        self.type = type
+        self.type = type_f
         self.value_t = value_t
         self.value_ae = value_ae
+        self.escape_sign = escape_sign
+        self.force_escape_sign = force_escape_sign
+    
+    def get_escape_sign(self):
+        if not self.force_escape_sign:
+            return self.escape_sign
+        elif isinstance(self.escape_sign, dict):
+            re_dict = copy.deepcopy(self.escape_sign)
+            for key_i, value_i in self.force_escape_sign.items():
+                re_dict[key_i] = value_i
+            return re_dict
+        elif isinstance(self.escape_sign, list):
+            list_f = []
+            for i in range(len(self.escape_sign)):
+                if self.force_escape_sign[i] is None:
+                    list_f.append(self.escape_sign[i])
+                else:
+                    list_f.append(self.force_escape_sign[i])
+            return list_f
+        else:
+            return self.force_escape_sign
 
 class UIUpdater(QObject):
     ui_set_l = []
@@ -193,31 +215,24 @@ class UIUpdater(QObject):
         cls.config:dict = copy.deepcopy(cls.config_manager.config)
     
     @classmethod
-    def action(cls, key_f:atuple|alist[atuple], action_f:callable, type_f:alist[Literal[None, 'size', 'font', 'icon', 'config', 'height','margin','unpack']| Literal[None, 'size', 'font', 'icon', 'config', 'height','margin','unpack']]=None):
+    def action(cls, key_f:atuple|alist[atuple], action_f:callable, type_f:None|str=None):
         value_t = cls._getValue(key_f, cls.config)
+        atuple_check = False
         if isinstance(key_f, atuple):
             atuple_check = True
         elif isinstance(key_f, alist):
-            atuple_check = True
-            for i in key_f:
-                if not isinstance(i, atuple):
-                    atuple_check = False
-                    break
-        else:
-            atuple_check = False
-        
-        if not isinstance(value_t, alist):
+            atuple_check = all(isinstance(i, atuple) for i in key_f)
+        if not value_t:
+            value_ae = value_t
+        elif isinstance(value_t, alist):
             if not type_f:
-                value_ae = value_t
-            else:
-                value_ae = cls._value_ae(cls, value_t, type_f)
+                type_f = alist([None]*len(value_t))
+            value_ae = [cls._value_ae(cls, value_t[i], type_f[i]) for i in range(len(value_t))]
         else:
-            if not type_f:
-                value_ae = value_t
-            else:
-                value_ae = [cls._value_ae(cls, value_t[i], type_f[i]) for i in range(len(value_t))]
-
+            value_ae = cls._value_ae(cls, value_t, type_f)
         match type_f:
+            case _ if value_ae is None:
+                pass
             case _ if isinstance(key_f, alist):
                 action_f(*value_ae)
             case 'margin':
@@ -250,14 +265,50 @@ class UIUpdater(QObject):
     @classmethod
     def set(cls, key_f:Union[atuple,alist],action_f:callable,
              type_f:Union[alist[Literal[None, 'size', 'font', 'icon', 'config', 'height']], 
-                          Literal[None, 'size', 'font', 'icon', 'config', 'height','margin','unpack']]=None):
+                          Literal[None, 'size', 'font', 'icon', 'config', 'height','margin','unpack', 'style']]=None):
         atuple_check, value_t, value_ae = cls.action(key_f, action_f, type_f)
         if atuple_check:
-            data_c = UIData(index=len(cls.ui_set_l), key=key_f, action=action_f, type=type_f, value_t=value_t, value_ae=value_ae)
-            #cls.ui_set_l.append({'index':len(cls.ui_set_l),'key':key_f, 'action':action_f, 'type':type_f, 'value':value_t})
+            escape_sign = UIUpdater.cal_escape_sign(value_t, value_t, init_value=True)
+            if (not isinstance(value_t, dict)) and (not isinstance(key_f, alist)):
+                action_f = UIwarpper(action_f)
+            data_c = UIData(index=len(cls.ui_set_l), key=key_f, action=action_f, type_f=type_f, value_t=value_t, 
+                            value_ae=value_ae, escape_sign=escape_sign, force_escape_sign={})
             cls.ui_set_l.append(data_c)
-        return value_ae
-    
+        else:
+            cls.action(key_f, action_f, type_f)
+            return None
+        return data_c
+
+    @staticmethod
+    def cal_escape_sign(value_t:str|dict|list|int|alist, value_n:str|dict|list|int|alist, init_value:bool=False)->dict|bool:
+        if isinstance(value_t, alist):
+            if init_value:
+                return [False]*len(value_t)
+            else:
+                return [value_t[i]==value_n[i] for i in range(len(value_t))]
+        elif isinstance(value_t, dict):
+            target_d = {}
+            value_t_flatten = dicta.flatten_dict(value_t)
+            value_n_flatten = dicta.flatten_dict(value_n)
+            if init_value:
+                target_d = {i:False for i in value_t_flatten.keys()}
+                return target_d
+            for key_t, value_t_i in value_t_flatten.items():
+                value_n_i = value_n_flatten.get(key_t, None)
+                if value_n_i is None or value_t_i != value_n_i:
+                    target_d[key_t] = False
+                else:
+                    target_d[key_t] = True
+            for key_n, value_n_i in value_n_flatten.items():
+                if key_n not in target_d:
+                    target_d[key_n] = False
+            return target_d
+        else:
+            if init_value:
+                return False
+            else:
+                return value_t==value_n
+        
     def __init__(self):
         super().__init__()
         self.update_delay = QTimer()
@@ -286,7 +337,6 @@ class UIUpdater(QObject):
             return
         self._updateUI(adict(yml_file3))
         
-    
     def _calSize(self, config:dict):
         config_r = copy.deepcopy(config)
         scr_x, scr_y = get_screen_size('pixel')
@@ -346,7 +396,14 @@ class UIUpdater(QObject):
                 warnings.warn(f"Invalid key type: {i.key}")
                 continue
             
-            if i.value_t == value_new:
+            escape_sign_server = UIUpdater.cal_escape_sign(i.value_t, value_new)
+            i.escape_sign = escape_sign_server
+            escape_sign = i.get_escape_sign()
+            if escape_sign is True:
+                continue
+            elif isinstance(escape_sign, dict) and all(escape_sign.values()):
+                continue
+            elif isinstance(escape_sign, list) and all(escape_sign):
                 continue
 
             if isinstance(value_new, alist):
@@ -359,28 +416,24 @@ class UIUpdater(QObject):
             else:
                 value_ae = self._value_ae(value_new, i.type)
             i.value_ae = value_ae
-            #self.update_task.emit(new_dict)
             update_result = self._objUpdate(i)
-            # if not update_result:
-            #     warnings.warn(f"Update {i['key']} failed: {update_result[1]}")
-            # else:
-            # self.ui_set_l[order_i]['value'] = value_new
-
-    def _objUpdate(self, dict_f:UIData):
+            i.value_t = value_new
+    
+    def _objUpdate(self, uidata_f:UIData):
         try:
-            action_i = dict_f.action
-            type_i = dict_f.type
-            value_new = dict_f.value_ae
+            action_i = uidata_f.action
+            type_i = uidata_f.type
+            value_new = uidata_f.value_ae
             match type_i:
                 case 'unpack' | 'margin':
-                    action_i(*value_new)
+                    action_i(*value_new, escape_sign=uidata_f.get_escape_sign())
                 case _ if isinstance(value_new, alist):
-                    action_i(*value_new)
+                    action_i(*value_new, escape_sign=uidata_f.get_escape_sign())
                 case _:
-                    action_i(value_new)
+                    action_i(value_new, escape_sign=uidata_f.get_escape_sign())
             return True, ''
         except Exception as e:
-            print(f"Update {dict_f.key} use {dict_f.action} failed: {e}")
+            print(f"Update {uidata_f.key} use {uidata_f.action} failed: {e}")
             return False, e
 
     def _value_ae(self, value_i, type_f:Literal[None, 'size', 'font', 'icon', 'config', 'height','margin','unpack']):
@@ -411,5 +464,54 @@ class UIUpdater(QObject):
         else:
             return key_f
     
+def UIwarpper(func_f:callable):
+    def inner_func(*args, escape_sign:bool=False, **kwargs):
+        if escape_sign:
+            return
+        else:
+            func_f(*args, **kwargs)
+    return inner_func
 
+class Udata(object):
+    def __init__(self, key_f:atuple, default_v=None, index:int=None):
+        self.key_f = key_f
+        self.default_v = default_v
+        self.add_str = ''
+        self.index = index
+
+    def __getitem__(self, index:int):
+        return Udata(self.key_f, self.default_v, index)
+    
+    def value(self, config:dict)->str|int|list|dict|None:
+        if self.index is None:
+            return config.get(self.key_f, self.default_v)
+        else:
+            temp_data = config.get(self.key_f, self.default_v)
+            if isinstance(temp_data, list) and self.index is not None:
+                return temp_data[min(self.index, len(temp_data)-1)]
+            else:
+                return temp_data
+
+def process_style_dict(pre_d:dict, temp_d:dict, escape_sign:dict, config_f:dict)->dict:
+    config = dicta.flatten_dict(config_f)
+    pre_f = dicta.flatten_dict(pre_d)
+    temp_f = dicta.flatten_dict(temp_d)
+    out_d = {}
+    if pre_d == {}:
+        for key_i, value_i in temp_f.items():
+            if not isinstance(value_i, Udata):
+                out_d[key_i] = value_i
+            else:
+                out_d[key_i] = value_i.value(config)
+    else:
+        for key_i, value_i in pre_f.items():
+            value_n = temp_f.get(key_i, None)
+            if isinstance(value_n, Udata):
+                value_n = value_n.value(config)
+            if value_n is None or escape_sign.get(key_i, False):
+                out_d[key_i] = value_i.value(config) if isinstance(value_i, Udata) else value_i
+            else:
+                out_d[key_i] = value_n
+    
+    return dicta.unflatten_dict(out_d)
 

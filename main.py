@@ -98,7 +98,6 @@ class BaseLauncher(QMainWindow):
         self.tray_icon.show()
     
     def _init_para(self):
-        self.setMinimumSize(350, 350)
         # for mouse click enven judge
         self.drag_position = None
         self.edge_drag = None

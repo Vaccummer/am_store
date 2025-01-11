@@ -79,22 +79,22 @@ class LauncherPathManager(object):
         if group:
             group_check = self.df.get(group, False)
             if group_check is False:
-                return UIUpdater.config[self.default_app_icon]
+                return UIUpdater.get(self.default_app_icon, '')
             else:
                 icon_path = self.app_icon_d[group].get(name, "")
         else:
             icon_path, group = self._find_icon_in_all_groups(name)
         if icon_path:
             if isinstance(icon_path, atuple):
-                return UIUpdater.config[icon_path]
+                return UIUpdater.get(icon_path, '')
             else:
                 return icon_path
         if not group:
-            return UIUpdater.config[self.default_app_icon]
+            return UIUpdater.get(self.default_app_icon, '')
 
         exe_entry = self.df[group][self.df[group]['Name'] == name]
         if exe_entry.empty:
-            return UIUpdater.config[self.default_app_icon]
+            return UIUpdater.get(self.default_app_icon, '') 
 
         exe_path = exe_entry.iloc[0]['EXE Path']
         icon_key = f"{group}{self.sign_for_separate}{name}"
@@ -108,7 +108,7 @@ class LauncherPathManager(object):
             else:
                 self.app_icon_d[group][name] = self.default_app_icon
 
-        return UIUpdater.config[self.default_app_icon]
+        return UIUpdater.get(self.default_app_icon, '')
 
     def get_icon(self, name, group=None)->Union[str, atuple]:
         return self.get_app_icon(name, group)
@@ -462,8 +462,7 @@ class TransferMaintainer(QThread):
         self.l_min = atuple(pre+['local_max_chunck'])
         self.r_max = atuple(pre+['remote_min_chunck'])
         self.r_min = atuple(pre+['remote_max_chunck'])
-        UIUpdater.set(alist(self.l_min, self.l_max, self.r_min, self.r_max), self._loadconfig, 
-                      alist())
+        UIUpdater.set(alist(self.l_min, self.l_max, self.r_min, self.r_max), self._loadconfig, alist())
         self.task_queue = []
         self.loop = None  # Event loop for asyncio
         self.state = 'Stop'

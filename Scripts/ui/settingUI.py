@@ -6,6 +6,7 @@ from PySide2.QtWidgets import QListWidget, QMainWindow, QWidget,QListWidgetItem,
 from PySide2.QtGui import QFontMetrics, QIcon
 from PySide2.QtCore import QSize, Qt
 from Scripts.ui.custom_widget import *
+from Scripts.manager.config_ui import *
 from functools import partial
 import shutil
 import pandas
@@ -511,6 +512,7 @@ class ExePathLine(AutoEdit):
         self.error_color = style_d['background_error']
 
     def _customTooltip(self, tooltip_style:dict):
+        return
         self.setToolTip(self.place_holder)
         fm = tooltip_style.get('font_family', 'Consolas')
         size_f = tooltip_style.get('font_pt', 20)
@@ -567,9 +569,10 @@ class SheetControl(QTabBar):
         super().__init__(parent)
         self._init_menu()
         self.up = parent
-        self.pre = ['Launcher', 'shortcut_obj', 'path']
         UIUpdater.set(font_f, self.setFont, 'font')
         UIUpdater.set(style_main, self.customStyle)
+        height_f = atuple('Settings', 'LauncherSetting', 'style', 'sheet_control', 'main_height')
+        self.height_ctrl = UIUpdater.set(height_f, self.setFixedHeight, 'height')
         self.setMovable(True) 
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.open_context_menu)
@@ -597,40 +600,41 @@ class SheetControl(QTabBar):
         else:
             right_button.click()
     
-    def customStyle(self, style:dict):
-        UIUpdater.set(style.get('main_height',60), self.setFixedHeight)
-        bg_colors = style.get('background_colors', ["#F7F7F7", "#FFC300", "#FF5733"])
-        font_colors = style.get('font_colors', ["#000000", "#000000", "#000000"])
-        padding = style.get('padding', [0, 10, 0, 10])
-        close_icon0 = UIUpdater.config[atuple(self.pre+['path', 'tab_close_icon0'])]
-        if not close_icon0:
-            close_icon0 = ''
-        else:
-            close_icon0 = close_icon0.replace('\\', '/')
-        close_icon1 = UIUpdater.config[atuple(self.pre+['path', 'tab_close_icon1'])]
-        if not close_icon1:
-            close_icon1 = ''
-        else:
-            close_icon1 = close_icon1.replace('\\', '/')
-        close_icon2 = UIUpdater.config[atuple(self.pre+['path', 'tab_close_icon2'])]
-        if not close_icon2:
-            close_icon2 = ''
-        else:
-            close_icon2 = close_icon2.replace('\\', '/')
-        self.tab_style_d = {
+    def customStyle(self, style:dict, escape_sign:dict={}):
+        bg_color = Udata(atuple('main_background'),'transparent')
+        main_border = Udata(atuple('main_border'),'none')
+        main_border_radius = Udata(atuple('main_border_radius'),10)
+
+        tab_margin_right = Udata(atuple('tab_margin_right'),10)
+        padding = Udata(atuple('padding'),[0, 10, 0, 10])
+        tab_height = Udata(atuple('tab_height'),50)
+        tab_border = Udata(atuple('tab_border'),'none')
+        tab_border_radius = Udata(atuple('tab_border_radius'),[10,10,10,10])
+        bg_colors = Udata(atuple('background_colors'),["#F7F7F7", "#FFC300", "#FF5733"])
+        font_colors = Udata(atuple('font_colors'),["#000000", "#000000", "#000000"])
+        close_icon0 = Udata(atuple('path', 'tab_close_icon0'),'')
+        close_icon1 = Udata(atuple('path', 'tab_close_icon1'),'')
+        close_icon2 = Udata(atuple('path', 'tab_close_icon2'),'')
+        close_icon_margin = Udata(atuple('close_icon_margin'),2)
+        if not hasattr(self, 'tab_style_d'):
+            self.tab_style_d = {}
+        style_temp = {
             "QTabBar": {
-                "border": style.get('main_border', "none"),
-                "background": style.get('main_background', "transparent"),
-                'border-radius': style.get('main_border_radius', 10),
+                "border": main_border,
+                "background": bg_color,
+                'border-radius': main_border_radius,
             },
             "QTabBar::tab": {
-                "margin-right": f"{style.get('tab_margin_right', 10)}px",
-                "padding": f"{padding[2]}px {padding[1]}px {padding[3]}px {padding[0]}px", 
-                "border-radius": f"{style.get('tab_border_radius', 10)}px",
-                "height": f"{style.get('tab_height', 50)}px",
+                "margin-right": tab_margin_right,
+                "padding": padding, 
+                'border-bottom-left-radius': tab_border_radius[0],
+                'border-bottom-right-radius': tab_border_radius[1],
+                'border-top-left-radius': tab_border_radius[2],
+                'border-top-right-radius': tab_border_radius[3],
+                "height": tab_height,
                 "background": bg_colors[0],
                 "color": font_colors[0],
-                'border': style.get('tab_border', 'none'),
+                'border': tab_border,
             },
             "QTabBar::tab:selected": {
                 "background": bg_colors[2],
@@ -641,15 +645,15 @@ class SheetControl(QTabBar):
                 "color": font_colors[1],
             },
             "QTabBar::close-button": {
-                "image": f"url({close_icon0});",
+                "image": close_icon0,
                 "subcontrol-position": "right",
-                "margin": "2px",
+                "margin": close_icon_margin,
             },
             "QTabBar::close-button:hover": {
-                "image": f"url({close_icon1});",
+                "image": close_icon1,
             },
             "QTabBar::close-button:pressed": {
-                "image": f"url({close_icon2});",
+                "image": close_icon2,
             },
             "QTabBar::scroller": {
                 "width": "0px",
@@ -657,8 +661,8 @@ class SheetControl(QTabBar):
                 "background-color": "transparent",
             }
         }
-        self.sheetcontrol_stylesheet = style_make(self.tab_style_d)
-        self.setStyleSheet(self.sheetcontrol_stylesheet)
+        self.tab_style_d = process_style_dict(self.tab_style_d, style_temp, escape_sign, style)
+        self.setStyleSheet(style_make(self.tab_style_d))
 
     def get_texts(self):
         texts = []
@@ -707,7 +711,7 @@ class AddButton(QPushButton):
         UIUpdater.set(height_f, self.setFixedHeight)
         UIUpdater.set(style_d, self.customStyle)
     
-    def customStyle(self, style_d:dict):
+    def customStyle(self, style_d:dict, escape_sign:dict={}):
         border_f = style_d.get('border', 'none')
         border_radius_f = enlarge_list(style_d.get('border_radius', 10), 4)
         background_colors = enlarge_list(style_d.get('background_colors', ['#F7F7F7', '#FFC300', '#FF5733']), 3)
@@ -1006,7 +1010,13 @@ class UILauncherSetting(BaseLauncherSetting):
         #                                 )
         # UIUpdater.set(self.line_height, self.add_button.setFixedHeight)
         # self.add_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.add_button = AddButton(style_d=self.add_button_style, icon_f=self.add_button_icon, height_f=self.line_height)
+        icon_proportion = atuple('Settings', 'LauncherSetting', 'style', 'tab_add_button', 'icon_proportion')
+        #self.add_button = AddButton(style_d=self.add_button_style, icon_f=self.add_button_icon, height_f=self.line_height)
+        self.add_button = YohoPushButton(icon_i=self.add_button_icon, style_config=self.add_button_style, 
+                                         icon_proportion=icon_proportion)
+        UIUpdater.set(self.line_height, self.add_button.setFixedHeight, 'height')
+        self.add_button.setMaximumWidth(99999)
+        self.add_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.add_button.clicked.connect(self._insert_line)
         self.add_button_lo = amlayoutH()
         UIUpdater.set(self.add_button_margin, self.add_button_lo.setContentsMargins, 'margin')

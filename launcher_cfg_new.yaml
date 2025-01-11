@@ -252,31 +252,36 @@ Launcher:
       file_icon_getter: "./3rdparty/get_file_icon/main.exe"
     style:
       main:
-        background: "white"
-        border: "2px white"
-        border_radius: 20
-      item:
-        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"] # common, hover, pressed
-        border: "none"
-        border_radius: 12
-        padding: [0, 0, 0, 0]
-        margin: 0
-        height: 60 # only int input, label and button will be adjusted to item's height
-      scroll_bar:
-        orbit_color: "rgba(255, 255, 255, 50)"
-        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"] # common, hover, pressed
-        border_radius: 4
-        width: 15
-        min_height: 30
+        widget:
+          background: "rgba(255, 255, 255, 20)"
+          border: "2px white"
+          border_radius: 20
+          line_margin: [0, 0, 0, 0]
+        item:
+          background_colors: ["rgba(255, 255, 255, 160)"] # common, hover, pressed
+          border: "none"
+          border_radius: 12
+          padding: [0, 0, 0, 0]
+          margin: 0
+          height: 80 # only int input, label and button will be adjusted to item's height
+          spacing: 1
+        scroll_bar:
+          orbit_color: "rgba(255, 255, 255, 50)"
+          background_colors: ["#F7F7F7", "#FFC300", "#FF5733"] # common, hover, pressed
+          border_radius: 4
+          width: 5
+          min_height: 30
+          margin: 3
       label:
-        background: "transparent"
+        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"]
         padding: [0, 0, 0, 0] # left, right, top, bottom
         border: "none"
+        text_align: "left"
         border_radius: 10
-        resize_fractor: 0.8
+        resize_fractor: 0.5
       button:
-        icon_proportion: 0.75
-        background_colors: ["transparent", "#FFC300", "#FF5733"] # common, hover, pressed
+        icon_proportion: 0.8
+        background_colors: ["rgba(255, 255, 255, 20)", "#FFC300", "#FF5733"] # common, hover, pressed
         border_radius: 10
         animation_type: "shake" # 'shake' or 'resize', default is None
     max_exe_num: 10
@@ -583,9 +588,6 @@ Settings:
       tab_delete_icon: ""
       add_sheet_button_icon: ""
       tmp_icon_folder: "./tmp/icon"
-      tab_close_icon0: ""
-      tab_close_icon1: ""
-      tab_close_icon2: ""
     ori_line_num: 22
     style:
       title:
@@ -655,8 +657,13 @@ Settings:
         main_border_radius: 10
         tab_margin_right: 10
         padding: [10, 10, 0, 10]
+        path:
+          tab_close_icon0: ""
+          tab_close_icon1: ""
+          tab_close_icon2: ""
+        close_icon_margin: 2
         tab_height: 50
-        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"] # common, hover, pressed
+        background_colors: ["#F7F7F7", "#BD16C3", "#FF5733"] # common, hover, pressed
         font_colors: ["#000000", "#000000", "#000000"] # common, hover, pressed
         tab_border: "none"
         tab_border_radius: 10
@@ -669,6 +676,7 @@ Settings:
           border_radius: 10
           padding: [0, 0, 0, 0]
       tab_add_button:
+        icon_proportion: 0.9
         background_colors: ["#F7F7F7", "#FFC300", "#FF5733"] # common, hover, pressed
         border: "1px solid #F7F7F7"
         border_radius: 10
