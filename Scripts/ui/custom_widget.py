@@ -181,7 +181,7 @@ class AutoLabel(QLabel):
         text_align = Udata(atuple('text_align'), 'left')
         temp_dict = {
             'QLabel': {
-                'background-color': bg_color,
+                'background-color': bg_color[0],
                 'border-top-left-radius': border_radius,
                 'border-top-right-radius': border_radius,
                 'border-bottom-right-radius': border_radius,
@@ -229,6 +229,7 @@ class AutoLabel(QLabel):
 class AutoEdit(QLineEdit):
     def __init__(self, text='', font:atuple=None, style_d={}, height:atuple=None, width:atuple=None, disable_scroll:bool=True):
         super().__init__()
+        self.extra_style_dict = {}
         self.scroll_step = 10  # 基础滚动步长
         self.scroll_acceleration = 1.5  # 滚动加速度
         self.max_scroll_step = 30  # 最大滚动步长
@@ -243,7 +244,7 @@ class AutoEdit(QLineEdit):
         UIUpdater.set(height, self.setFixedHeight)
         if width is not None:
             UIUpdater.set(width, self.setFixedWidth)
-        UIUpdater.set(style_d, self.customStyle, 'style')
+        self.style_ctl = UIUpdater.set(style_d, self.customStyle, 'style')
         self.cursor_paint_time = 0
 
     def customStyle(self, style_dict:dict, escape_sign:dict={}):
@@ -280,7 +281,7 @@ class AutoEdit(QLineEdit):
         if not hasattr(self, 'style_dict'):
             self.style_dict = {}
         self.style_dict = process_style_dict(self.style_dict, temp_dict, escape_sign, style_dict)
-        self.setStyleSheet(style_make(self.style_dict))
+        self.setStyleSheet(style_make(self.style_dict|self.extra_style_dict))
     
     def wheelEvent(self, event: QWheelEvent):
         if self.disable_scroll:
@@ -328,7 +329,7 @@ class AutoEdit(QLineEdit):
             
     def setText(self, text: str):
         super().setText(text)
-        self.setCursorPosition(0)  
+        self.setCursorPosition(len(self.text()))
 
     def paintEvent(self, event):
         super().paintEvent(event)
@@ -393,10 +394,11 @@ class ModeButton(YohoPushButton, QObject):
             if not colors:
                 return
         colors = enlarge_list(colors, 3)
-        self.style_dict['QPushButton']['background-color'] = colors[0]
-        self.style_dict['QPushButton::hover']['background-color'] = colors[1]
-        self.style_dict['QPushButton::pressed']['background-color'] = colors[2]
-        self.setStyleSheet(style_make(self.style_dict))
+        self.style_ctl.force_escape_sign[atuple('background_colors')] = True
+        self.extra_style_dict[atuple('QPushButton', 'background-color')] = colors[0]
+        self.extra_style_dict[atuple('QPushButton::hover', 'background-color')] = colors[1]
+        self.extra_style_dict[atuple('QPushButton::pressed', 'background-color')] = colors[2]
+        self.setStyleSheet(style_make(self.style_dict|self.extra_style_dict))
 
 class ModeListWidget(QListWidget):
     def __init__(self, style_d, max_height=None, font_f=None, parent=None, color_state=0):
@@ -406,12 +408,13 @@ class ModeListWidget(QListWidget):
         else:
             super().__init__(parent=parent)
         self.default_item_margin = 1
-        self.deault_extra_height = 5
-        self.deault_extra_width = 30
+        self.deault_extra_height = 35
+        self.deault_extra_width = 80
+        UIUpdater.set(font_f, self.setFont, type_f='font')
         self.setWindowFlags(Qt.FramelessWindowHint)  
         UIUpdater.set(style_d, self.customStyle, 'style')
+        self.scrollbar_style()
         UIUpdater.set(max_height, self.setMaximumHeight, type_f='height')
-        UIUpdater.set(font_f, self.setFont, type_f='font')
 
     def customStyle(self, style_d:dict, escape_sign:dict={}):
         '''
@@ -427,9 +430,12 @@ class ModeListWidget(QListWidget):
         menu_padding = Udata(atuple('menu', 'padding'), 5)
         menu_bg = Udata(atuple('menu', 'background'), 'rgba(255, 255, 255, 80)')
         
-
-        self.extra_height = UIUpdater.get(atuple('item', 'extra_height'), self.deault_extra_height)
-        self.extra_width = UIUpdater.get(atuple('item', 'extra_width'), self.deault_extra_width)
+        style_f = dicta.flatten_dict(style_d)
+        self.extra_height = style_f.get(atuple('item','extra_height'), self.deault_extra_height)
+        self.extra_width = style_f.get(atuple('item','extra_width'), self.deault_extra_width)
+        self.item_height = style_f.get(atuple('item','item_height'), 60)
+        self.item_spacing = style_f.get(atuple('item','spacing'), 1)
+        self.setSpacing(self.item_spacing)
         item_margin = Udata(atuple('item', 'margin'), 1)
         bg_colors = Udata(atuple('item', 'background_colors'), ['#2C51C1', '#FFC300', '#FF5733'])
         font_colors = Udata(atuple('item', 'font_colors'), ['#000000', '#000000', '#000000'])
@@ -466,23 +472,60 @@ class ModeListWidget(QListWidget):
                 'background-color': bg_colors[2],
                 'color': font_colors[2],
             },
-            'QListWidget::QScrollBar':{
-                'border': 'none',
-                'background': 'transparent',
-                'height': '0px',
-                'width': '0px',
-            }
         }
         if not hasattr(self, 'style_dict'):
             self.style_dict = {}
         self.style_dict = process_style_dict(self.style_dict, temp_dict, escape_sign, style_d)
         self.setStyleSheet(style_make(self.style_dict))
 
+    def scrollbar_style(self):
+        self.ver_style = """
+            QScrollBar:vertical {
+                width: 0px;  /* 设置垂直滚动条的宽度 */
+                background: transparent;  /* 设置背景颜色 */
+            }
+            QScrollBar::handle:vertical {
+                background: transparent;  /* 设置滚动条滑块的颜色 */
+                border-radius: 0px;   /* 设置滑块的圆角 */
+            }
+            QScrollBar::add-line:vertical, 
+            QScrollBar::sub-line:vertical {
+                background: none;  /* 隐藏上下箭头 */
+            }
+            QScrollBar::add-page:vertical, 
+            QScrollBar::sub-page:vertical {
+                background: none;  /* 隐藏滚动条的背景 */
+            }
+        """
+        self.hor_style = """
+            QScrollBar:horizontal {
+                height: 0px;
+                background: transparent;
+            }
+            QScrollBar::handle:horizontal {
+                background: transparent;
+                border-radius: 0px;
+            }
+            QScrollBar::add-line:horizontal, 
+            QScrollBar::sub-line:horizontal {
+                background: none;
+            }
+            QScrollBar::add-page:horizontal, 
+            QScrollBar::sub-page:horizontal {
+                background: none;
+            }
+        """
+        self.horizontalScrollBar().setStyleSheet(self.hor_style)
+        self.verticalScrollBar().setStyleSheet(self.ver_style)
+
     def get_size(self):
-        str_l = [self.item(i).text() for i in range(self.count())]
-        width_l = [self.fontMetrics().width(text) for text in str_l]
+        width_l = [self.fontMetrics().width(self.item(i).text()) for i in range(self.count())]
+        height_l = [self.fontMetrics().height() for i in range(self.count())]
         width_n = max(width_l) + self.extra_width
-        height_n = self.fontMetrics().height() *(1+self.count()) + self.extra_height
+        height_i = max(height_l) 
+        height_n = height_i*(self.count())+ self.extra_height+self.item_spacing*(self.count()-1)
+        for i in range(self.count()):
+            self.item(i).setSizeHint(QSize(width_n-10, height_i))
         return width_n, height_n
     
     def get_max_width(self):
@@ -518,7 +561,6 @@ class CustomComboBox(QWidget, QObject):
         self.box_w.clicked.connect(self.show_menu)
         self.box_w.wheel_signal.connect(self.wheel_signal_receiver)
 
-
         # Create list widget for dropdown
         self.menu_w = ModeListWidget(style_d=self.style_d, font_f=self.menu_font, parent=self.up, color_state=self.color_state)
         self.menu_w.hide()
@@ -526,7 +568,6 @@ class CustomComboBox(QWidget, QObject):
             self.add_item(mode)
         # self.menu_w.setWindowFlags(Qt.Popup | Qt.FramelessWindowHint)
         self.menu_w.setFixedSize(*self.menu_w.get_size())
-
 
         # Connect signals
         self.menu_w.itemClicked.connect(self.menu_click)
@@ -541,15 +582,17 @@ class CustomComboBox(QWidget, QObject):
         if self.menu_w.isVisible():
             self.menu_w.hide()
             return
+        
         box_g = self.box_w.geometry()
         uper_g = self.geometry()
         x_n = box_g.x() + uper_g.x()
         y_n = box_g.y() + uper_g.y() + self.box_w.height() - 5
+        self.menu_w.setFixedSize(*self.menu_w.get_size())
         # pos = self.box_w.geometry()
         self.menu_w.setGeometry(
             x_n, 
             y_n,
-            self.menu_w.width(),
+            self.menu_w.get_size()[0],
             0
         )
         self.menu_w.show()
@@ -559,8 +602,8 @@ class CustomComboBox(QWidget, QObject):
         self.animation = QPropertyAnimation(self.menu_w, b"geometry")
         self.animation.setDuration(self.default_an_time)
         # width_n = self.menu_w.get_max_width()
-        start_rect = QRect(self.menu_w.x(), self.menu_w.y(), self.menu_w.width(), 0)
-        end_rect = QRect(self.menu_w.x(), self.menu_w.y(), self.menu_w.width(), self.menu_w.get_size()[1])
+        start_rect = QRect(self.menu_w.x(), self.menu_w.y(), self.menu_w.get_size()[0], 0)
+        end_rect = QRect(self.menu_w.x(), self.menu_w.y(), self.menu_w.get_size()[0], self.menu_w.get_size()[1])
         self.animation.setStartValue(start_rect)
         self.animation.setEndValue(end_rect)
         self.animation.start()
@@ -572,7 +615,6 @@ class CustomComboBox(QWidget, QObject):
             self.setIndex(index)
             self.menu_w.hide()
             item.setSelected(False)
-
 
     def setFixedWidth(self, w):
         self.box_w.setFixedWidth(w)
@@ -722,52 +764,6 @@ class PolygonWidget(QWidget):
             painter.setBrush(color)
             painter.drawEllipse(center + offset, radius, radius)  # 绘制圆形
 
-class ProgressBar2(QProgressBar):
-    def __init__(self, parent:QMainWindow, max_value:float, 
-                 height:int, 
-                 background_color:str='#E0E0E0', 
-                 color_gradient:List[str]=['#DF461CC1', '#069D40FF'],
-                 position_gradient:List[float]=[0, 1],
-                 show_text:bool=False):
-        super().__init__(parent)
-        self.max_value = max_value
-        self.setRange(0, max_value)  
-        self.setValue(0)  
-        self.progress=0
-        UIUpdater.set(alist(height, background_color, color_gradient, position_gradient), self.custom_ui, alist())
-        self.setTextVisible(show_text)  
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.update_progress)
-        self.timer.start(50)
-    @abstractmethod
-    def update_progress(self):
-        pass
-    
-    def custom_ui(self, height_f, b_color, color_gradient, position_gradient):
-        len_t = min(len(color_gradient), len(position_gradient))
-        match len_t:
-            case 2:
-                color_g = f"qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0, stop: {position_gradient[0]} {color_gradient[0]}, stop: {position_gradient[1]} {color_gradient[1]})"
-            case 3:
-                color_g = f"qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0, stop: {position_gradient[0]} {color_gradient[0]}, stop: {position_gradient[1]} {color_gradient[1]}, stop: {position_gradient[2]} {color_gradient[2]})"
-            case 4:
-                color_g = f"qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0, stop: {position_gradient[0]} {color_gradient[0]}, stop: {position_gradient[1]} {color_gradient[1]}, stop: {position_gradient[2]} {color_gradient[2]}, stop: {position_gradient[3]} {color_gradient[3]})"
-            case _:
-                color_g = "qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0, stop: 0 #DF461CC1, stop: 1 #069D40FF)"
-        self.setFixedHeight(height_f)
-        self.border_radius = height_f // 2
-        self.stylesheet = f'''
-        QProgressBar {{
-            border-radius: {self.border_radius}px;
-            background-color: {b_color};
-            border: 0px solid ;
-        }}
-        QProgressBar::chunk {{
-            border-radius: {self.border_radius}px;
-            background: {color_g};
-        }}
-        '''
-        self.setStyleSheet(self.stylesheet)
 class ProgressBar(QProgressBar):
     def __init__(self, parent:QMainWindow, 
                  style_d:dict,  
@@ -775,6 +771,7 @@ class ProgressBar(QProgressBar):
                  height:int=10, 
                  ):
         super().__init__(parent)
+        self.extra_style_dict = {}
         self.max_value = max_value
         self.setRange(0, max_value)  
         self.setValue(0)  
@@ -810,72 +807,7 @@ class ProgressBar(QProgressBar):
         if not hasattr(self, 'style_dict'):
             self.style_dict = {}
         self.style_dict = process_style_dict(self.style_dict, temp_dict, escape_sign, style_d)
-        self.setStyleSheet(style_make(self.style_dict))
-
-class InputLine(QLineEdit):
-    def __init__(self, height_f:int, scrollbar_color:str="#C3C3C3", 
-                 scrollbar_color_hover:str="#6B6B6B",
-                 scrollbar_color_pressed:str="#1F1F1F",
-                 ):
-        super().__init__()
-        self.height_f = height_f
-        self.color1 = scrollbar_color
-        self.color2 = scrollbar_color_hover
-        self.color3 = scrollbar_color_pressed
-        #self._style_set()
-    
-    def _style_set(self):
-        #self.setTextInteractionFlags(Qt.TextEditable)  # 保证可编辑
-        self.setCursorPosition(0)  # 可选：将光标放置在文本开头
-        self.setAlignment(Qt.AlignLeft)  # 确保文本左对齐
-        self.setFixedHeight(self.height_f)  
-        # self.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)  
-        # self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  
-        self.setTextMargins(10, 0, 10, 0)
-        self.setToolTip(self.text())  # 鼠标悬停时显示完整文本
-        QToolTip.setFont(QFont("Arial", 10))  # 设置工具提示字体大小
-        #self.setWordWrapMode(QTextOption.NoWrap)
-        self.scroll_bar_style_sheet = f'''
-        /* 水平滚动条 */
-        QScrollBar:horizontal {{
-            height: 16px;
-            background: rgba(255, 255, 255, 255);
-            border: none;
-        }}
-
-        QScrollBar::handle:horizontal {{
-            background: {self.color1};
-            border-radius: 6px;
-            min-width: 20px;
-        }}
-
-        QScrollBar::handle:horizontal:hover {{
-            background: {self.color2};
-        }}
-
-        QScrollBar::handle:horizontal:pressed {{
-            background: {self.color3};
-        }}
-
-        QScrollBar::add-line:horizontal {{
-            border: 1px solid transparent;
-            background: transparent;
-        }}
-
-        QScrollBar::sub-line:horizontal {{
-            border: 1px solid transparent;
-            background: transparent;
-        }}
-
-        QScrollBar::up-arrow:horizontal, QScrollBar::down-arrow:horizontal {{
-            background: transparent;
-        }}
-
-        QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
-            background: transparent;
-        }}
-        '''
-        #self.horizontalScrollBar().setStyleSheet(self.scroll_bar_style_sheet)
+        self.setStyleSheet(style_make(self.style_dict|self.extra_style_dict))
 
 class SmartStackWidget(QStackedWidget):
     def __init__(self, parent:QWidget,an_time=200):
@@ -1024,12 +956,13 @@ class TipButton(QPushButton):
 
 class AutoMenu(QWidget):
     action_signal = Signal(dict)
-    def __init__(self, style_d:dict, action_value:dict,font:QFont=QFont(), width_f=None, height_f=None):
+    def __init__(self, main_style_d:dict, item_style_d:dict, action_value:dict,font:QFont=QFont(), width_f=None, height_f=None):
         super().__init__()
         self.width_f = width_f
         self.height_f = height_f
         self.action_value = action_value
-        self.style_d = style_d
+        self.item_style_d = item_style_d
+        self.main_style_ctl = UIUpdater.set(main_style_d, self.customStyle, 'style')
         self.font_f = font
         self.setWindowFlags(self.windowFlags()|Qt.FramelessWindowHint | Qt.Tool)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
@@ -1040,61 +973,96 @@ class AutoMenu(QWidget):
         UIUpdater.set(self.font_f, self.setFont, 'font')
         # self.move_signal.connect(self.async_Move)
         self.relative_position = QPoint(0, 0)
+        self.exit_sign = 'hide'
     
     def eventFilter(self, obj, event):
         if self.isVisible():
             if event.type() == QEvent.ActivationChange:
                 if not self.isActiveWindow():
-                    self.hide()  # 隐藏菜单
+                    self.am_exit()
                     QApplication.instance().removeEventFilter(self)
             elif event.type() == QEvent.MouseButtonPress:
                 if not self.geometry().contains(event.globalPos()):
-                    self.hide()
+                    self.am_exit()
                     QApplication.instance().removeEventFilter(self)
         return super().eventFilter(obj, event)
     
+    def customStyle(self, style_d:dict, escape_sign:dict={}):
+        background = Udata(atuple('background'), 'transparent')
+        border = Udata(atuple('border'), 'none')
+        border_radius = Udata(atuple('border_radius'), 10)
+        temp_dict = {
+            'QWidget':{
+                'background-color': background,
+                'border': border,
+                'border-top-left-radius': border_radius[0],
+                'border-top-right-radius': border_radius[1],
+                'border-bottom-left-radius': border_radius[2],
+                'border-bottom-right-radius': border_radius[3],
+            }
+        }
+        if not hasattr(self, 'style_dict'):
+            self.style_dict = {}
+        if not hasattr(self, 'extra_style_dict'):
+            self.extra_style_dict = {}
+        self.style_dict = process_style_dict(self.style_dict, temp_dict, escape_sign, style_d)
+        self.setStyleSheet(style_make(self.style_dict|self.extra_style_dict))
+
     def _init_action(self)->None:
         self.layout_0 = amlayoutV(align_h='l')
         self.setLayout(self.layout_0)
-        spacing_f = UIUpdater.config[atuple('Settings','LauncherSetting','style','tab_menu','item','spacing')]
-        
-        spacing_n = spacing_f if spacing_f else 0
-        self.layout_0.setSpacing(spacing_n)
+        spacing_f = self.item_style_d | atuple('spacing')
+        UIUpdater.set(spacing_f, self.layout_0.setSpacing, 'spacing')
         for i, action_i in enumerate(self.action_value.keys()):
-            if i == 0:
-                button_i = YohoPushButton(style_config=self.style_d|atuple('item'), text_f=action_i, font_f=self.font_f, width_f=self.width_f, height_f=self.height_f)
-                button_i.extra_style_dict = {'QPushButton':
-                                             { 'border-bottom-left-radius':0, 
-                                              'border-bottom-right-radius':0}}
+            button_i = YohoPushButton(style_config=self.item_style_d, text_f=action_i, font_f=self.font_f, width_f=self.width_f, height_f=self.height_f)
+            if len(self.action_value.keys()) == 1:
+                pass
+            elif i == 0:
+                button_i.extra_style_dict[atuple('QPushButton', 'border-bottom-left-radius')] = 0
+                button_i.extra_style_dict[atuple('QPushButton', 'border-bottom-right-radius')] = 0
                 button_i.setStyleSheet(style_make(button_i.style_dict|button_i.extra_style_dict))
             elif i == len(self.action_value.keys())-1:
-                button_i = YohoPushButton(style_config=self.style_d|atuple('item'), text_f=action_i, font_f=self.font_f, width_f=self.width_f, height_f=self.height_f)
-                button_i.extra_style_dict = {'QPushButton':
-                                             { 'border-top-left-radius':0, 
-                                              'border-top-right-radius':0}}
+                button_i.extra_style_dict[atuple('QPushButton', 'border-top-left-radius')] = 0
+                button_i.extra_style_dict[atuple('QPushButton', 'border-top-right-radius')] = 0
                 button_i.setStyleSheet(style_make(button_i.style_dict|button_i.extra_style_dict))
             else:
-                button_i = YohoPushButton(style_config=self.style_d|atuple('item'), text_f=action_i, font_f=self.font_f, width_f=self.width_f, height_f=self.height_f)
-                button_i.extra_style_dict = {'QPushButton':
-                                             { 'border-top-left-radius':0, 
-                                              'border-top-right-radius':0,
-                                              'border-bottom-left-radius':0,
-                                              'border-bottom-right-radius':0}}
+                button_i.extra_style_dict[atuple('QPushButton', 'border-top-left-radius')] = 0
+                button_i.extra_style_dict[atuple('QPushButton', 'border-top-right-radius')] = 0
+                button_i.extra_style_dict[atuple('QPushButton', 'border-bottom-left-radius')] = 0
+                button_i.extra_style_dict[atuple('QPushButton', 'border-bottom-right-radius')] = 0
                 button_i.setStyleSheet(style_make(button_i.style_dict|button_i.extra_style_dict))
             self.layout_0.addWidget(button_i)
+            button_i.clicked.connect(lambda: self.action_signal.emit({action_i:self.action_value[action_i]}))
+
+        # update the position offset of the menu
+        self.x_offset = self.item_style_d | atuple('display_x_offset')
+        self.y_offset = self.item_style_d | atuple('display_y_offset')
+        UIUpdater.set(alist(self.x_offset, self.y_offset), self._load_offset, alist())
     
-    def _action(self, action_name:str, action_value:str)->None:
-        self.action_signal.emit({'geometry':self.geometry(), 'tab_index':self.tab_index, 'action_name':action_name, 'action_value':action_value})
-        self.hide()
-    
+    def _load_offset(self, x_offset:int, y_offset:int):
+        self.x_offset = x_offset
+        self.y_offset = y_offset
+
     def action(self, index:int, relative_position:QPoint, parent_pos:QPoint)->None:
         self.tab_index = index
         self.relative_position = relative_position
-        x = self.relative_position.x() + parent_pos.x()
-        y = self.relative_position.y() + parent_pos.y()
+        x = self.relative_position.x() + parent_pos.x()+self.x_offset
+        y = self.relative_position.y() + parent_pos.y()+self.y_offset
         self.setGeometry(x, y, self.width(), self.height())
         self.adjustSize()
         self.show()
         self.raise_()
         QApplication.instance().installEventFilter(self)
-        # QApplication.instance().installEventFilter(self)
+
+    def emit_action(self, action_value:dict):
+        self.action_signal.emit(action_value)
+
+    def am_exit(self):
+        try:
+            QApplication.instance().removeEventFilter(self)
+        except Exception:
+            pass
+        if self.exit_sign == 'hide':
+            self.hide()
+        else:
+            self.close()

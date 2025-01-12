@@ -150,7 +150,8 @@ class BasicAS(QListWidget, QObject):
         if event.mimeData().hasUrls():  # 检查是否有文件 URL
             event.acceptProposedAction()  # 接受拖入
         else:
-            super().dragEnterEvent(event)
+            pass
+            # super().dragEnterEvent(event)
     def dragMoveEvent(self, event: QDragMoveEvent):
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
@@ -164,7 +165,8 @@ class BasicAS(QListWidget, QObject):
             self._upload(paths)
             event.acceptProposedAction()  # 接受拖放
         else:
-            super().dropEvent(event)
+            # super().dropEvent(event)
+            pass
     
     @abstractmethod
     def _upload(self, src:str):
@@ -195,6 +197,9 @@ class BasicAS(QListWidget, QObject):
         self.font_a = atuple('Launcher', self.name, 'font', 'main')
         self.icon_proportion = atuple(self.pre+['style','button','icon_proportion'])
         self.item_height = atuple(self.pre+['style','main','item','height'])
+        self.menu_style = atuple('Launcher', self.name, 'style', 'menu', 'main')
+        self.menu_item_style = atuple('Launcher', self.name, 'style', 'menu', 'item_button')
+        self.menu_font = atuple('Launcher', self.name, 'font', 'menu')
 
         # size
         pre = ['Launcher', self.name, 'Size']
@@ -203,8 +208,8 @@ class BasicAS(QListWidget, QObject):
         self.max_width = atuple(pre+['max_width'])
         self.min_width = atuple(pre+['min_width'])
         
-
         self.launcher_df = self.launcher_manager.df
+        self.path_dict:dict[int:dict] = dict2df(self.launcher_manager.pure_df)
         self.path_manager:PathManager = self.up.path_manager
         self.ass = Associate(self.max_num, self.launcher_df, self.path_manager)
         self.config.group_chose(mode="Launcher", widget=self.name, obj=None)
@@ -251,25 +256,16 @@ class BasicAS(QListWidget, QObject):
                         if name.endswith(f'.{key}'):
                             return value
                     return self.default_icon_d['file']
-                  
-    def _changeicon(self, index_i):
-        app_name = self.label_l[index_i].text
-        options = QFileDialog.Options()
-        file_filter = "SVG Files (*.svg);;ICO Files (*.ico);;PNG Files (*.png)"
-        file_path, _ = QFileDialog.getOpenFileName(self, f"Choose '{app_name}' icon", "", file_filter, options=options)
-
-        if not file_path:
-            return
-        file_type = os.path.splitext(file_path)[-1]
-        dst = os.path.join(os.path.basename(self.ass_icon_list[0]), app_name+file_type)
-        path = glob(os.path.join(os.path.basename(self.ass_icon_list[0]), app_name+".*"))
-        for path_i in path:
-            os.remove(path_i)
-        shutil.copy2(file_path, dst)
-        self.button_l[index_i].setIcon(QIcon(dst))
     
     def _get_prompt(self)->str:
-        return self.up.input_box.text()
+        return self.input_text
+
+    def get_exe_path(self, name:str)->str:
+        for value_i in self.path_dict.values():
+            value_t =  value_i.get('name', None)
+            if value_t is not None:
+                return value_t
+        return ''
 class UIAS(BasicAS):
     resize_info = Signal(list)
     def __init__(self, config:Config_Manager, parent:Union[QMainWindow, QWidget],manager:LauncherPathManager):  
@@ -295,7 +291,6 @@ class UIAS(BasicAS):
         orbit_color = Udata(atuple('scroll_bar', 'orbit_color'), 'rgba(255, 255, 255, 50)')
         bar_radius = Udata(atuple('scroll_bar', 'border_radius'), 4)
         bar_width = Udata(atuple('scroll_bar', 'width'), 15)
-        bar_height = Udata(atuple('scroll_bar', 'height'), 30)
         bar_margin = Udata(atuple('scroll_bar', 'margin'), 3)
         bar_min_height = Udata(atuple('scroll_bar', 'min_height'), 30)
         temp_d = {'QListWidget': {
@@ -309,46 +304,57 @@ class UIAS(BasicAS):
                 'padding': item_padding,
                 'margin': item_margin,
                 'height': item_height,
-                'spacing': item_spacing,
                 'border-top-left-radius': item_border_radius,
                 'border-top-right-radius': item_border_radius,
                 'border-bottom-left-radius': item_border_radius,
                 'border-bottom-right-radius': item_border_radius,
             },
             'QListWidget::item:hover': {
-                'background-color': item_bg_colors[1],
+                'background': item_bg_colors[1],
             },
             'QListWidget::item:selected': {
-                'background-color': item_bg_colors[2],
+                'background': item_bg_colors[2],
             },
-            'QScrollBar:vertical': {
-                'background-color': orbit_color,
-            },
-            'QScrollBar::handle:vertical': {
-                'background-color': bar_handle_colors[0],
-                'border-radius': bar_radius,
+            'QScrollBar': {
+                'background': orbit_color,
                 'width': bar_width,
-                'height': bar_height,
                 'margin': bar_margin,
+                'border-top-left-radius': bar_radius[0],
+                'border-top-right-radius': bar_radius[1],
+                'border-bottom-left-radius': bar_radius[2],
+                'border-bottom-right-radius': bar_radius[3],
+            },
+            'QScrollBar::handle': {
+                'background': bar_handle_colors[0],
+                'border-radius': bar_radius,
                 'min-height': bar_min_height,
             },
             'QScrollBar::handle:vertical:hover': {
-                'background-color': bar_handle_colors[1],
+                'background': bar_handle_colors[1],
             },
             'QScrollBar::handle:vertical:pressed': {
-                'background-color': bar_handle_colors[2],
+                'background': bar_handle_colors[2],
             },
             'QScrollBar::handle:horizontal': {
                 'width': 0,
                 'height': 0,
-                'background-color': 'transparent',
+                'background': 'transparent',
             },
-            "QScrollBar::add-line, QScrollBar::sub-line": {
-                "background": "none",
+            "QScrollBar::add-line": {
+                "background": 'transparent',
+                "height": "0px",
+                "subcontrol-position": "bottom",
+                "subcontrol-origin": "margin",
             },
-            "QScrollBar::up-arrow, QScrollBar::down-arrow": {
-                "background": "none",
+            "QScrollBar::sub-line": {
+                "background": 'transparent',
+                "height": "0px",
+                "subcontrol-position": "top",
+                "subcontrol-origin": "margin",
             },
+            "QScrollBar::sub-page, QScrollBar::add-page": {
+                "background": 'transparent',
+            }
         }
 
         if not hasattr(self, 'style_dict'):
@@ -410,6 +416,9 @@ class UIAS(BasicAS):
             self.label_l[i].setFixedHeight(int(item_height*label_resize_factor))
             self.button_l[i].setFixedSize(item_height, item_height)
 class AssociateList(UIAS):
+    text_set_signal = Signal(str)
+    app_launch_signal = Signal(str)
+    file_transfer_signal = Signal(dict)
     def __init__(self, config:Config_Manager, parent:Union[QMainWindow, QWidget],manager:LauncherPathManager):  
         super().__init__(config, parent, manager)
         self.transfer_task = Signal(dict)
@@ -417,8 +426,9 @@ class AssociateList(UIAS):
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.right_click)
         self.itemClicked.connect(self.left_click)
-    
+    @Slot(str)
     def update_associated_words(self, text:str):
+        self.input_text = text
         if is_path(text):
             sign_n = 'path'
             matching_words, type_l = self.ass.ass_path(text)
@@ -445,6 +455,21 @@ class AssociateList(UIAS):
             icon_i = self._geticon(text_i, sign_n, type_l[i])
             self.label_l[i].setText(text_i)
             self.button_l[i].setIcon(AIcon(icon_i))
+            info_dict = {}
+            if sign_n == 'name':
+                info_dict['type'] = sign_n
+                info_dict['name'] = text_i
+                info_dict['path'] = self.get_exe_path(text_i)
+                info_dict['host'] = None
+            else:
+                info_dict['type'] = sign_n
+                info_dict['name'] = None
+                path_dir = self.input_text 
+                if self.path_manager.check(path_dir) is None:
+                    path_dir = os.path.join(path_dir, text_i)
+                info_dict['path'] = path_dir
+                info_dict['host'] = self.path_manager.host_type
+            self.item_l[i].setData(Qt.UserRole, info_dict)
 
         # font_metrics = QFontMetrics(self.font())
         # b_h = self.config[self.button_height]
@@ -467,13 +492,17 @@ class AssociateList(UIAS):
         if is_path(prompt_f):
             if not self.path_manager.check(prompt_f):
                 prompt_f = os.path.dirname(prompt_f)
-            if item_text != '..':
+            if item_text == '..':
+                path_n = os.path.dirname(prompt_f)
+            else:
                 path_n = os.path.join(prompt_f, item_text)
                 if '/' in prompt_f:
                     path_n = path_n.replace('\\', '/')
-            else:
-                path_n = os.path.dirname(prompt_f)
-            self.up.input_box.setText(path_n)
+            self.set_input_text(path_n)
+        else:
+            info_dict = item.data(Qt.UserRole)
+            self.app_launch_signal.emit(info_dict)
+            self.set_input_text('')
         item.setSelected(False)
     
     def right_click(self, pos):
@@ -481,260 +510,63 @@ class AssociateList(UIAS):
         if not is_path(prompt_f):
             return 
         item = self.itemAt(pos)
-        context_menu = QMenu(self)
-        down_action = QAction('Downdload', self)
-        downdir_action = QAction('Download to DIR', self)
-        change_icon_action = QAction("Change Default Icon")
-        down_action.triggered.connect(lambda: self._download(item, ask_save_dir=True))
-        downdir_action.triggered.connect(lambda: self._download(item, ask_save_dir=False))
-        change_icon_action.triggered.connect(lambda: self._cg_default_icon(item))
-        context_menu.addAction(down_action)
-        context_menu.addAction(downdir_action)
-        context_menu.addAction(change_icon_action)
-        context_menu.exec_(self.mapToGlobal(pos))
+        info_dict = item.data(Qt.UserRole)
+        action_dict = {'Download':{'action':1, 'info':info_dict},
+                       'Download(Ask dir)':{'action':2, 'info':info_dict},}
+        if hasattr(self, 'context_menu'):
+            try:
+                self.context_menu.close()
+            except Exception:
+                pass
+        
+        self.context_menu = AutoMenu(main_style_d=self.menu_style, item_style_d=self.menu_item_style, 
+                                     action_value=action_dict,font=self.menu_font)
+        self.context_menu.action_signal.connect(self.menu_action)
+        self.context_menu.action(1, pos, self.mapToGlobal(QPoint(0, 0)))
+        self.context_menu.exit_sign = 'close'
 
-    def _transfer_trigger(self):
-        pass
+    def menu_action(self, action_dict:dict):
+        self.context_menu.close()
+        transfer_info = {}
+        info_dict = action_dict['info']
 
-    def _cg_default_icon(self, item):
-        pass
-
-
-    def _upload(self, src:Union[str, list]):
-        prompt_text = self._get_prompt()
-        if not is_path(prompt_text):
-            return
-        if not self.path_manager.check(prompt_text):
-            prompt_text = os.path.dirname(prompt_text)
-        if not self.path_manager.isdir(prompt_text):
-            return
-        if isinstance(src, str):
-            src = [src]
-        src = [i for i in src if os.path.exists(i)]
-        if src:
-            self._transfer_preprocess({'src':src, 'dst':prompt_text, 'task_type':'upload',
-                                    'host':self.up.HOST, 'host_type':self.path_manager.host_type})
-    
-    def _download(self, item, ask_save_dir:bool):
-        if ask_save_dir:
-            dir_path = QFileDialog.getExistingDirectory(self, "Choose a directory to save the file", self.filelog_default_path)
-            if not dir_path:
+        transfer_info['type'] = 'get'
+        transfer_info['src_host'] = info_dict['host']
+        transfer_info['dst_host'] = 'Local'
+        transfer_info['src_path'] = info_dict['path']
+        if action_dict['action'] == 1:
+            transfer_info['dst_path'] = self.path_manager.get_path(info_dict['path'])   #wait for change
+        else:
+            temp_path = QFileDialog.getExistingDirectory(self, "Select Download Dir", self.path_manager.get_path(info_dict['path']))    # wait for change
+            if not temp_path:
                 return
-        else:
-            dir_path = self.download_dir
-        item_text = self._get_item_text(item)
-        prompt_f = self._get_prompt()
-        if not self.path_manager.check(prompt_f):
-            prompt_f = os.path.dirname(prompt_f)
-        src = os.path.join(prompt_f, item_text)
-        if os.path.isdir(dir_path) and self.path_manager.check(src):
-            file_type = 'dir' if self.path_manager.isdir(src) else 'file'
-            self._transfer_preprocess({'src':[src], 'dst':dir_path, 'task_type':'download', 
-                                     'host':self.up.HOST, 'host_type':self.path_manager.host_type})
+            transfer_info['dst_path'] = temp_path
+        self.file_transfer_signal.emit(transfer_info)
 
-    def _transfer_preprocess(self, tasks:dict):
-        task_tupe_list = [] # [(src, dst, size), ...]
-        type_t = tasks['task_type']
-        host = tasks['host']
-        host_type = tasks['host_type']
-        if type_t == 'upload' or host_type != 'Remote':
-            # src in upload task is a list of local directories or files
-            # dst is a Local or Remote directory
-            for src_i in tasks['src']:
-                if os.path.isdir(src_i):
-                    for dirpath, dirnames, filenames in os.walk(src_i):
-                        for filename_i in filenames:
-                            src = os.path.join(dirpath, filename_i)
-                            dst = os.path.join(tasks['dst'], os.path.relpath(dirpath, src_i), filename_i)
-                            size_f = os.path.getsize(src)
-                            task_tupe_list.append((src, dst, size_f))
-                else:
-                    size_f = os.path.getsize(src_i)
-                    task_tupe_list.append((src_i, os.path.join(tasks['dst'], os.path.basename(src_i)), size_f))
-        else:
-            for src_i in tasks['src']:
-                for relpath, filename, file_path, size_i in self.path_manager.walk(src_i):
-                    dst = os.path.join(tasks['dst'], relpath, filename)
-                    task_tupe_list.append((file_path, dst, size_i))
-        self.transfer_task.emit({'tasks':task_tupe_list, 'task_type':type_t, 'host':host, host_type:host_type})
+    def _changeicon(self, index_i):
+        app_name = self.label_l[index_i].text()
+        options = QFileDialog.Options()
+        file_filter = "All Files (*.*)"
+        file_path, _ = QFileDialog.getOpenFileName(self, f"Choose '{app_name}' icon", "", file_filter, options=options)
 
-
-
-    def _local_transfer(self, src:str, dst:str):
-        bar = self.up.download_progress_bar
-        if os.path.isfile(src):
-            size_f = os.path.getsize(src)
-            asyncio.run(self.copy_directory([(src, dst, size_f)], bar))
-        elif os.path.isdir(src):
-            tasks_f = self.src_dst_parsing(src, dst, 'local')
-            size_f = sum([i[2] for i in tasks_f])
-            asyncio.run(self.copy_directory(tasks_f, bar))
-        else:
+        if not file_path:
             return
+        
+        file_type = os.path.splitext(file_path)[-1]
+        if file_type not in ['svg', 'ico', 'png']:
+            warnings.warn(f"Unsupported file type: {file_type}")
+            return
+        
+        dst = os.path.join(os.path.basename(self.ass_icon_list[0]), app_name+file_type)
+        path = glob(os.path.join(os.path.basename(self.ass_icon_list[0]), app_name+".*"))
+        for path_i in path:
+            os.remove(path_i)
+        shutil.copy2(file_path, dst)
+        self.button_l[index_i].setIcon(QIcon(dst))
+    
+    def set_input_text(self, text:str):
+        self.text_set_signal.emit(text)
 
-    def _remote_transfer(self, src:str, dst:str, type_f:Literal['put', 'get']):
-        bar = self.up.download_progress_bar
-        if type_f == "put":
-            tasks = self.src_dst_parsing(src, dst, 'local', 'remote')
-            size_a = sum([i[2] for i in tasks])
-            asyncio.run(self.transfer_multiple_files(tasks, type_f))
-        else:
-            tasks = self.src_dst_parsing(src, dst, 'remote', 'local')
-            size_a = sum([i[2] for i in tasks])
-            asyncio.run(self.transfer_multiple_files(tasks, type_f))
-
-    def src_dst_parsing(self, src:str, dst:str, src_type:Literal['local', 'remote'], dst_type:Literal['local', 'remote'])->list:
-        copy_paths = []  
-        if src_type == 'local':
-            for dirpath, dirnames, filenames in os.walk(src):
-                relative_path = os.path.relpath(dirpath, src)
-                target_dir = os.path.join(dst, relative_path)  
-                if dst_type == 'local':
-                    if not os.path.exists(target_dir):
-                        os.makedirs(target_dir)
-                else:
-                    try:
-                        self.remote_server.mkdir(target_dir)
-                    except Exception as e:
-                        pass
-                for filename in filenames:
-                    src_file = os.path.join(dirpath, filename)  
-                    dst_file = os.path.join(target_dir, filename)  
-                    file_size = os.path.getsize(src_file)
-                    copy_paths.append((src_file, dst_file, file_size))
-        else:
-            walk_out = self.remote_server.walk(src)
-            if not walk_out:
-                return []
-            for relpath, type, size_f in walk_out:
-                if type == 'directory':
-                    target_dir = os.path.join(dst, relpath)
-                    os.makedirs(target_dir, exist_ok=True)
-                else:
-                    src_file = os.path.join(src, relpath)
-                    dst_file = os.path.join(dst, os.path.basename(src), relpath)
-                    copy_paths.append((src_file, dst_file, size_f))
-        return copy_paths
-     
-    async def copy_directory(self, task_i:tuple, bar:QProgressBar):
-        tasks = []  
-        for src_i, dst_i, size_i in task_i:
-            chunck_size = self.cal_chunck_size(size_i, hosttype='local')
-            tasks.append(copy_file_chunk(src_i, dst_i, chunck_size, bar))
-        await asyncio.gather(*tasks) 
-    
-    def progress_handler(self, current, total):
-        print(f"上传进度：{current}/{total} bytes ({(current / total) * 100:.2f}%)")
-    
-    async def transfer_single_file(self, src, dst, size_f, sftp, type_f:Literal['get', 'put']):
-        block_size = self.cal_chunck_size(size_f)
-        if type_f == 'get':
-            await sftp.get(src, dst, progress_handler=self.progress_handler, block_size= block_size)
-        else:
-            await sftp.put(src, dst, progress_handler=self.progress_handler, block_size= block_size)
-
-    async def transfer_multiple_files(self, tasks:List[tuple[str, str]], type_f:Literal['get', 'put']):
-        host_d = self.remote_server.host
-        try:
-            async with asyncssh.connect(host_d['HostName'], 
-                                        username=host_d.get('User', os.getlogin()), 
-                                        password=host_d.get(('Password', '')),
-                                        port=int(self.host.get('port', 22))) as conn:
-                async with conn.start_sftp_client() as sftp:
-                    tasks = []  
-                    for src, dst, size_f in tasks:
-                        tasks.append(self.transfer_single_file(src, dst, sftp, type_f))
-                    await asyncio.gather(*tasks)
-                    return True
-        except Exception as e:
-            print(f"文件传输失败: {e}")
-            return False
-
-class PathModeSwitch2(QComboBox):
-    def __init__(self, parent:QMainWindow, config:Config_Manager) -> None:
-        super().__init__(parent)
-        self.up = parent
-        self.name = "path_mode_switch"
-        self.config = config.deepcopy()
-        self.config.group_chose(mode="Launcher", widget=self.name, obj=None)
-        self.height_f = atuple('Launcher', self.name, 'Size', 'height')
-        self.font_f = atuple('Launcher', self.name, 'font', 'main')
-        self._load()
-        self._initUI()
-        UIUpdater.set(alist(self.height_f, self.font_f), self._loadconfig, alist(None, 'font'))
-        self.currentIndexChanged.connect(self._index_change)
-        self._index_change()
-    
-    def _loadconfig(self, height_f, font_f):
-        self.setFixedHeight(height_f)
-        self.setFont(font_f)
-    
-    def _load(self):
-        self.path_manager:PathManager = self.up.path_manager
-        self.hostd = self.path_manager.hostd
-        self.mode_list = list(self.hostd.keys())
-        self.pre = atuple('Launcher', self.name)
-    
-    def _initUI(self):
-        for model_if in self.mode_list:
-            self.addItem(model_if)
-        self.setCurrentIndex(0)
-        font_metrics = QFontMetrics(self.font())
-        w_f = font_metrics.boundingRect(self.mode_list[0]).width() + 60  
-        self.setFixedWidth(w_f)
-        UIUpdater.set(self.pre|atuple('style'), self.customStyle, 'style')   
-    
-    def customStyle(self, config):
-        box_config = config.get('box', {})
-        menu_config = config.get('menu', {})
-        b_bg = box_config.get('normal_background', 'rgba(255, 255, 255, 50)')
-        b_font_color = box_config.get('font_color', '#F7F7F7')
-        b_border = box_config.get('border', 'none')
-        b_radius = box_config.get('border_radius', 10)
-        b_padding = box_config.get('padding', [5,0,5,5])
-
-        m_font_color = menu_config.get('font_color', '#F7F7F7')
-        m_bg = menu_config.get('background', '#9DCDC8FF')
-        m_hover_bg = menu_config.get('line_hover_background', '#4CC1B5')
-        m_hover_font_color = menu_config.get('hover_font_color', 'black')
-        self.box_style_dict = {
-            'QComboBox':{
-                'background': b_bg,
-                'color': b_font_color,
-                'border': b_border,
-                'border-radius': f"{b_radius}px",
-                "padding": f"{b_padding[2]}px {b_padding[1]}px {b_padding[3]}px {b_padding[0]}px", 
-            },
-            "QComboBox::drop-down":{
-                'border': 'none'
-            },
-            }
-        self.menu_style_dict = {
-            'QComboBox QAbstractItemView':{
-                'background-color': m_bg,
-                'color': m_font_color,
-                'selection-background-color': m_hover_bg,
-                'selection-color': m_hover_font_color
-            }
-        }
-        self.style_sheet_0 = style_make(self.box_style_dict)
-        self.style_sheet_1 = style_make(self.menu_style_dict)
-        self.setStyleSheet(self.style_sheet_0+'\n'+self.style_sheet_1)
-
-    def _index_change(self):
-        mode_n = self.currentText()
-        font_metrics = QFontMetrics(self.font())
-        min_length = font_metrics.boundingRect(self.mode_list[0]).width() + 60  
-        w_f = max(font_metrics.boundingRect(mode_n).width() + 60  ,min_length)
-        self.setFixedWidth(w_f)
-    
-    def _change_color(self, state_f:Literal['normal', 'error', 'warn']):
-        color = self.config[self.pre|atuple('style', 'box', f'{state_f}_color')]
-        if not color:
-            color = "rgba(255, 255, 255, 50)" 
-        self.box_style_dict['QComboBox']['background'] = color
-        self.style_sheet_0 = style_make(self.box_style_dict)
-        self.setStyleSheet(self.style_sheet_0+'\n'+self.style_sheet_1)
 class PathModeSwitch(CustomComboBox):
     def __init__(self, parent:QMainWindow, config:Config_Manager) -> None:
         self.up = parent
@@ -743,7 +575,7 @@ class PathModeSwitch(CustomComboBox):
         self._load()
         super().__init__(modes=self.mode_list, style_d=self.style_d, box_height=self.box_height, 
                          menu_font=self.menu_font, box_font=self.box_font, parent=parent)
-    
+        self.ForceRadius()
     def _load(self):
         self.path_manager:PathManager = self.up.path_manager
         self.hostd = self.path_manager.hostd
@@ -769,8 +601,12 @@ class PathModeSwitch(CustomComboBox):
         self.menu_w.color_state = index_n
         UIUpdater.action(self.style_d|atuple('box'), self.box_w.customStyle, 'box')
         UIUpdater.action(self.style_d|atuple('menu'), self.menu_w.customStyle, 'menu')
+    def ForceRadius(self):
+        self.box_w.extra_style_dict[atuple('QPushButton', 'border-top-right-radius')] = 0
+        self.box_w.extra_style_dict[atuple('QPushButton', 'border-bottom-right-radius')] = 0
+        self.box_w.setStyleSheet(style_make(self.box_w.style_dict|self.box_w.extra_style_dict))
 
-class InputBox(AutoEdit):   
+class InputBox(AutoEdit, QObject):   
     key_press = Signal(dict)
     geometry_signal = Signal(QRect)
     def __init__(self, parent:QMainWindow, config:Config_Manager):
@@ -825,6 +661,10 @@ class InputBox(AutoEdit):
         new_size = event.size()
         self.geometry_signal.emit(QRect(self.x(), self.y(), new_size.width(), new_size.height()))
         super().resizeEvent(event)  
+
+    @Slot(str)
+    def external_set_text(self, text:str):
+        self.setText(text)
 
 class SearchTogleButton2(YohoPushButton):
     search_signal=Signal(dict) #{'url':str, 'sign':str}
@@ -1094,22 +934,12 @@ class ProgressInfo(QWidget):
     def __init__(self, parent):
         self.up = parent
         super().__init__(parent)
+        self.extra_style_dict = {}
         self.setWindowFlags(Qt.FramelessWindowHint)  
-        self.setAttribute(Qt.WA_StyledBackground, True)
+        # self.setAttribute(Qt.WA_StyledBackground, True)
         self._loadConfig()
         self._initLayout()
         self._initLabel()
-
-    def customStyle(self, style_d:dict):
-        background = style_d.get('background', '#F7F7F7')
-        border = style_d.get('border', 'none')
-        border_radius = style_d.get('border_radius', 10)
-        self.style_dict = {"QWidget":
-                           {'background':background,
-                            'border':border,
-                            'border-radius':border_radius,}
-        }
-        self.setStyleSheet(style_make(self.style_dict))
 
     def _loadConfig(self):
         self.main_margin = atuple('Launcher', 'progress_widget', 'Size', 'toolwidget', 'main_margin')
@@ -1126,9 +956,24 @@ class ProgressInfo(QWidget):
         self.main_style_d = atuple('Launcher', 'progress_widget', 'style', 'tool_widget', 'main')
         self.extra_height = atuple('Launcher', 'progress_widget', 'Size', 'toolwidget', 'extra_height')
         UIUpdater.set(alist(self.label_height, self.label_spacing, self.extra_height), self._SetHeight)
-        UIUpdater.set(self.extra_width, self._dynamicLoad)
+        UIUpdater.set(self.extra_width, self._dynamicLoad, 'width')
         self.setMinimumWidth(self.extra_width+UIUpdater.config[self.title_label_width]+80)
-        UIUpdater.set(self.main_style_d, self.customStyle)
+        UIUpdater.set(self.main_style_d, self.customStyle, 'style')
+
+    def customStyle(self, style_d:dict, escape_sign:dict={}):
+        bg_color = Udata(atuple('background'), '#F7F7F7')
+        border = Udata(atuple('border'), 'none')
+        border_radius = Udata(atuple('border-radius'), 10)
+        if not hasattr(self, 'style_dict'):
+            self.style_dict = {}
+        
+        temp_dict = {"QWidget":
+                           {'background':bg_color,
+                            'border':border,
+                            'border-radius':border_radius,}
+        }
+        self.style_dict = process_style_dict(self.style_dict, temp_dict, escape_sign, style_d)
+        self.setStyleSheet(style_make(self.style_dict|self.extra_style_dict))
 
     def _SetHeight(self, line_height, spacing, extra_height):
         height_t = 4*line_height+3*spacing+extra_height
@@ -1374,4 +1219,155 @@ class ProgressWidgetManager(QStackedWidget):
         widget = ProgressWidget(self.up, self.config, data)
         self.addWidget(widget)
         return widget
+
+class AsBACKup:
+    def _upload(self, src:Union[str, list]):
+        prompt_text = self._get_prompt()
+        if not is_path(prompt_text):
+            return
+        if not self.path_manager.check(prompt_text):
+            prompt_text = os.path.dirname(prompt_text)
+        if not self.path_manager.isdir(prompt_text):
+            return
+        if isinstance(src, str):
+            src = [src]
+        src = [i for i in src if os.path.exists(i)]
+        if src:
+            self._transfer_preprocess({'src':src, 'dst':prompt_text, 'task_type':'upload',
+                                    'host':self.up.HOST, 'host_type':self.path_manager.host_type})
+    
+    def _download(self, item, ask_save_dir:bool):
+        if ask_save_dir:
+            dir_path = QFileDialog.getExistingDirectory(self, "Choose a directory to save the file", self.filelog_default_path)
+            if not dir_path:
+                return
+        else:
+            dir_path = self.download_dir
+        item_text = self._get_item_text(item)
+        prompt_f = self._get_prompt()
+        if not self.path_manager.check(prompt_f):
+            prompt_f = os.path.dirname(prompt_f)
+        src = os.path.join(prompt_f, item_text)
+        if os.path.isdir(dir_path) and self.path_manager.check(src):
+            file_type = 'dir' if self.path_manager.isdir(src) else 'file'
+            self._transfer_preprocess({'src':[src], 'dst':dir_path, 'task_type':'download', 
+                                     'host':self.up.HOST, 'host_type':self.path_manager.host_type})
+
+    def _transfer_preprocess(self, tasks:dict):
+        task_tupe_list = [] # [(src, dst, size), ...]
+        type_t = tasks['task_type']
+        host = tasks['host']
+        host_type = tasks['host_type']
+        if type_t == 'upload' or host_type != 'Remote':
+            # src in upload task is a list of local directories or files
+            # dst is a Local or Remote directory
+            for src_i in tasks['src']:
+                if os.path.isdir(src_i):
+                    for dirpath, dirnames, filenames in os.walk(src_i):
+                        for filename_i in filenames:
+                            src = os.path.join(dirpath, filename_i)
+                            dst = os.path.join(tasks['dst'], os.path.relpath(dirpath, src_i), filename_i)
+                            size_f = os.path.getsize(src)
+                            task_tupe_list.append((src, dst, size_f))
+                else:
+                    size_f = os.path.getsize(src_i)
+                    task_tupe_list.append((src_i, os.path.join(tasks['dst'], os.path.basename(src_i)), size_f))
+        else:
+            for src_i in tasks['src']:
+                for relpath, filename, file_path, size_i in self.path_manager.walk(src_i):
+                    dst = os.path.join(tasks['dst'], relpath, filename)
+                    task_tupe_list.append((file_path, dst, size_i))
+        self.transfer_task.emit({'tasks':task_tupe_list, 'task_type':type_t, 'host':host, host_type:host_type})
+
+
+    def _local_transfer(self, src:str, dst:str):
+        bar = self.up.download_progress_bar
+        if os.path.isfile(src):
+            size_f = os.path.getsize(src)
+            asyncio.run(self.copy_directory([(src, dst, size_f)], bar))
+        elif os.path.isdir(src):
+            tasks_f = self.src_dst_parsing(src, dst, 'local')
+            size_f = sum([i[2] for i in tasks_f])
+            asyncio.run(self.copy_directory(tasks_f, bar))
+        else:
+            return
+
+    def _remote_transfer(self, src:str, dst:str, type_f:Literal['put', 'get']):
+        bar = self.up.download_progress_bar
+        if type_f == "put":
+            tasks = self.src_dst_parsing(src, dst, 'local', 'remote')
+            size_a = sum([i[2] for i in tasks])
+            asyncio.run(self.transfer_multiple_files(tasks, type_f))
+        else:
+            tasks = self.src_dst_parsing(src, dst, 'remote', 'local')
+            size_a = sum([i[2] for i in tasks])
+            asyncio.run(self.transfer_multiple_files(tasks, type_f))
+
+    def src_dst_parsing(self, src:str, dst:str, src_type:Literal['local', 'remote'], dst_type:Literal['local', 'remote'])->list:
+        copy_paths = []  
+        if src_type == 'local':
+            for dirpath, dirnames, filenames in os.walk(src):
+                relative_path = os.path.relpath(dirpath, src)
+                target_dir = os.path.join(dst, relative_path)  
+                if dst_type == 'local':
+                    if not os.path.exists(target_dir):
+                        os.makedirs(target_dir)
+                else:
+                    try:
+                        self.remote_server.mkdir(target_dir)
+                    except Exception as e:
+                        pass
+                for filename in filenames:
+                    src_file = os.path.join(dirpath, filename)  
+                    dst_file = os.path.join(target_dir, filename)  
+                    file_size = os.path.getsize(src_file)
+                    copy_paths.append((src_file, dst_file, file_size))
+        else:
+            walk_out = self.remote_server.walk(src)
+            if not walk_out:
+                return []
+            for relpath, type, size_f in walk_out:
+                if type == 'directory':
+                    target_dir = os.path.join(dst, relpath)
+                    os.makedirs(target_dir, exist_ok=True)
+                else:
+                    src_file = os.path.join(src, relpath)
+                    dst_file = os.path.join(dst, os.path.basename(src), relpath)
+                    copy_paths.append((src_file, dst_file, size_f))
+        return copy_paths
+     
+    async def copy_directory(self, task_i:tuple, bar:QProgressBar):
+        tasks = []  
+        for src_i, dst_i, size_i in task_i:
+            chunck_size = self.cal_chunck_size(size_i, hosttype='local')
+            tasks.append(copy_file_chunk(src_i, dst_i, chunck_size, bar))
+        await asyncio.gather(*tasks) 
+    
+    def progress_handler(self, current, total):
+        print(f"上传进度：{current}/{total} bytes ({(current / total) * 100:.2f}%)")
+    
+    async def transfer_single_file(self, src, dst, size_f, sftp, type_f:Literal['get', 'put']):
+        block_size = self.cal_chunck_size(size_f)
+        if type_f == 'get':
+            await sftp.get(src, dst, progress_handler=self.progress_handler, block_size= block_size)
+        else:
+            await sftp.put(src, dst, progress_handler=self.progress_handler, block_size= block_size)
+
+    async def transfer_multiple_files(self, tasks:List[tuple[str, str]], type_f:Literal['get', 'put']):
+        host_d = self.remote_server.host
+        try:
+            async with asyncssh.connect(host_d['HostName'], 
+                                        username=host_d.get('User', os.getlogin()), 
+                                        password=host_d.get(('Password', '')),
+                                        port=int(self.host.get('port', 22))) as conn:
+                async with conn.start_sftp_client() as sftp:
+                    tasks = []  
+                    for src, dst, size_f in tasks:
+                        tasks.append(self.transfer_single_file(src, dst, sftp, type_f))
+                    await asyncio.gather(*tasks)
+                    return True
+        except Exception as e:
+            print(f"文件传输失败: {e}")
+            return False
+
 

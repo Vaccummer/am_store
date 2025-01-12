@@ -27,6 +27,10 @@ import time
 from abc import ABC, abstractmethod
 import numpy
 import yaml
+import sys
+import pandas
+
+
 
 def is_path(string_f, exist_check:bool=False):
     # To judge whether a variable is Path or not
@@ -473,6 +477,7 @@ def style_make(config:dict)->str:
     """
     config must be a dict, key is obj name, value is a dict with key-value pairs
     """
+    config = dicta.unflatten_dict(config)
     style = ""
     for obj_name, style_dict in config.items():
         style += f"{obj_name} {{\n"
@@ -484,6 +489,8 @@ def style_make(config:dict)->str:
             elif isinstance(value, float):
                 value = f"{int(value)}px"
             elif isinstance(value, list):
+                if not all(isinstance(value_i, int) for value_i in value):
+                    warnings.warn(f"style_make function detected a illegal value! '{key}: {value}'")
                 str_f = ''
                 for value_i in value:
                     str_f += f"{value_i}px "
@@ -496,7 +503,7 @@ def style_make(config:dict)->str:
                 warnings.warn(f"style_make function detected a illegal value: {value}")
                 continue
             style += f"{key}: {value};\n"
-        style += "}"
+        style += "}\n"
     return style
 
 def cre_ssh_con(host_paras:dict, timeout:int=10)->tuple[paramiko.SSHClient, paramiko.SFTPClient]:
@@ -510,6 +517,21 @@ def cre_ssh_con(host_paras:dict, timeout:int=10)->tuple[paramiko.SSHClient, para
     stfp = server.open_sftp()
     return (server, stfp)
 
+def dict2df(data_f:dict|pandas.DataFrame):
+    '''dict_format: {1:{key_1:value_1,key_2, value_2..}, 2:{key_1:value_1,key_2, value_2..}, 
+    3:{key_1:value_1,key_2, value_2..}...'''
+    if isinstance(data_f, dict):
+        data_t = pandas.DataFrame(list(data_f.values()))
+    elif isinstance(data_f, pandas.DataFrame):
+        data_t = {}
+        i = 0
+        for index_i, row_i in data_f.iterrows():
+            data_t[i] = row_i.to_dict()
+            i += 1
+    else:
+        warnings.warn(f"dict2df function detected a illegal data type: {type(data_f)}")
+        return None
+    return data_t
 
 class atuple(tuple):
     def __new__(cls, *args):

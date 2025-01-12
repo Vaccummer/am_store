@@ -10,7 +10,8 @@ from Scripts.manager.config_ui import *
 from abc import abstractmethod
 from Scripts.manager.paths_transfer import *
 
-class BaseLauncher(QMainWindow):
+
+class BaseLauncher(QMainWindow, QObject):
     MODE = "Launcher"
     HOST = 'Local'
     HOST_TYPE = "Local"
@@ -281,6 +282,7 @@ class UILauncher(BaseLauncher):
         pass
 
 class ControlLauncher(UILauncher):
+    update_as = Signal(str)
     def __init__(self, config: dict, app: QApplication):
         super().__init__(config, app)
         self._obj_connect()
@@ -314,6 +316,8 @@ class ControlLauncher(UILauncher):
         self.input_box.key_press.connect(self._input_box_signal_process)
         self.path_manager.con_res.connect(self._connection_check)
         self.top_buttons_widget.button_click.connect(self._top_button_click)
+        self.update_as.connect(self.associate_list.update_associated_words)
+        self.associate_list.text_set_signal.connect(self.input_box.external_set_text)
     
     @Slot(str)
     def _top_button_click(self, sign:Literal['minimum', 'maximum', 'close', 'entry']):
@@ -354,12 +358,13 @@ class ControlLauncher(UILauncher):
     
     def _input_change(self, text:str):
         if self.MODE == "Launcher":
-            self.associate_list.update_associated_words(text)
+            self.update_as.emit(text)
             driver_parttern = r"^([A-Za-z])[\\]$"
             dirver_match = re.match(driver_parttern, text)
             if dirver_match:
                 self.input_box.setText(f"{dirver_match.group(1)}:\\")
                 return
+            
     
     @Slot(list)
     def _connection_check(self, result):
@@ -393,6 +398,7 @@ class ControlLauncher(UILauncher):
         self._refresh_setting.disconnect()
         self._refresh_setting.connect(self.shortcut_setting.refresh_signal)
         self.shortcut_button.refresh()
+
 if __name__ == "__main__":
     # QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)

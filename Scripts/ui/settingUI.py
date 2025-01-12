@@ -10,10 +10,6 @@ from Scripts.manager.config_ui import *
 from functools import partial
 import shutil
 import pandas
-import pathlib
-import aiofiles
-import asyncio
-import asyncssh
 from typing import List, Literal, Union, OrderedDict
 
 class UIShortcutSetting(QWidget):
@@ -501,16 +497,10 @@ class ExePathLine(AutoEdit):
         super().__init__(text='', font=font, style_d=style_d, height=height_f, disable_scroll=disable_scroll)
         self.setPlaceholderText(place_holder)
         self.place_holder = place_holder
-
-        UIUpdater.set(style_d, self._loadColor)
+        self.style_ctl.force_escape_sign[atuple('QLineEdit', 'background-color')] = True
         UIUpdater.set(tooltip_style, self._customTooltip)
-        self.textChanged.connect(self._text_change)
+        self.textChanged.connect(self.customBackground)
     
-    def _loadColor(self, style_d:atuple):
-        self.background_color = style_d['background']
-        self.warning_color = style_d['background_warning']
-        self.error_color = style_d['background_error']
-
     def _customTooltip(self, tooltip_style:dict):
         return
         self.setToolTip(self.place_holder)
@@ -533,18 +523,20 @@ class ExePathLine(AutoEdit):
         style_t = self.style_n + '\n' + self.tool_style
         self.setStyleSheet(style_t)
 
-    def _text_change(self, text):
+    def customBackground(self, text:str)->None:
         self.setToolTip(text)
+        normal_color = atuple('Settings', 'LauncherSetting', 'style', 'exe_edit', 'background')
+        error_color = atuple('Settings', 'LauncherSetting', 'style', 'exe_edit', 'background_error')
+        warning_color = atuple('Settings', 'LauncherSetting', 'style', 'exe_edit', 'background_warning')
+
         if os.path.exists(text) or (not text):
-            color_n = self.background_color
+            color_n = UIUpdater.get(normal_color, '#F7F7F7')
         elif os.path.isabs(text):
-            color_n = self.warning_color
+            color_n = UIUpdater.get(warning_color, '#FFC300')
         else:
-            color_n = self.error_color
-        self.style_dict['QLineEdit']['background-color'] = color_n
-        self.style_n = style_make(self.style_dict)
-        style_t = self.style_n + '\n' + self.tool_style
-        self.setStyleSheet(style_t)
+            color_n = UIUpdater.get(error_color, '#FF5733')
+        self.extra_style_dict[atuple('QLineEdit', 'background-color')] = color_n
+        self.setStyleSheet(style_make(self.style_dict|self.extra_style_dict))
 
 class NameEdit(AutoEdit):
     def __init__(self, text_f:str,style_d,font:QFont, height:int,
@@ -552,16 +544,15 @@ class NameEdit(AutoEdit):
         super().__init__(text=text_f, font=font, height=height, style_d=style_d)
         self.style_d = style_d
     
-    def _setStlye(self, sign_f:bool=True):
-        style_dict = UIUpdater.config[self.style_d]
-        if not style_dict:
-            style_dict = {}
+    def customBackground(self, sign_f:bool=True):
+        color_normal = atuple('Settings', 'LauncherSetting', 'style', 'name_edit', 'background')
+        color_error = atuple('Settings', 'LauncherSetting', 'style', 'name_edit', 'background_error')
         if sign_f:
-            self.style_dict['QLineEdit']['background-color'] = style_dict.get('background', '#F7F7F7')
+            color_t = UIUpdater.get(color_normal, '#F7F7F7')
         else:
-            self.style_dict['QLineEdit']['background-color'] = style_dict.get('background_error', '#FF5733')
-        self.style_n = style_make(self.style_dict)
-        self.setStyleSheet(self.style_n)
+            color_t = UIUpdater.get(color_error, '#FF5733')
+        self.extra_style_dict[atuple('QLineEdit', 'background-color')] = color_t
+        self.setStyleSheet(style_make(self.style_dict|self.extra_style_dict))
 
 class SheetControl(QTabBar):
     tab_operation = Signal(dict)
@@ -570,7 +561,7 @@ class SheetControl(QTabBar):
         self._init_menu()
         self.up = parent
         UIUpdater.set(font_f, self.setFont, 'font')
-        UIUpdater.set(style_main, self.customStyle)
+        UIUpdater.set(style_main, self.customStyle, 'style')
         height_f = atuple('Settings', 'LauncherSetting', 'style', 'sheet_control', 'main_height')
         self.height_ctrl = UIUpdater.set(height_f, self.setFixedHeight, 'height')
         self.setMovable(True) 
@@ -680,12 +671,13 @@ class SheetControl(QTabBar):
             self.setCurrentIndex(index)
 
     def _init_menu(self):
-        style_d = atuple(['Settings', 'LauncherSetting', 'style', 'tab_menu'])
+        menu_style_d = atuple('Settings', 'LauncherSetting', 'style', 'tab_menu', 'main')
+        item_style_d = atuple('Settings', 'LauncherSetting', 'style', 'tab_menu', 'item_button')
         value_d = {'rename':'rename', 'delete':'rename'}
         font_f = atuple('Settings', 'LauncherSetting', 'font', 'tab_menu')
         width_f = atuple('Settings', 'LauncherSetting', 'Size', 'tab_menu_button_width')
         height_f = atuple('Settings', 'LauncherSetting', 'Size', 'tab_menu_button_height')
-        self.menu = AutoMenu(style_d=style_d, action_value=value_d, font=font_f, width_f=width_f, height_f=height_f)
+        self.menu = AutoMenu(main_style_d=menu_style_d, item_style_d=item_style_d, action_value=value_d, font=font_f, width_f=width_f, height_f=height_f)
         self.menu.hide()
 
     def open_context_menu(self, position:QPoint): 
@@ -703,38 +695,6 @@ class SheetControl(QTabBar):
             index = self.get_texts().index(index)
         
         self.removeTab(index)
-
-class AddButton(QPushButton):
-    def __init__(self, style_d:dict, icon_f:str, height_f:int):
-        super().__init__()
-        UIUpdater.set(icon_f, self.setIcon, type_f='icon')
-        UIUpdater.set(height_f, self.setFixedHeight)
-        UIUpdater.set(style_d, self.customStyle)
-    
-    def customStyle(self, style_d:dict, escape_sign:dict={}):
-        border_f = style_d.get('border', 'none')
-        border_radius_f = enlarge_list(style_d.get('border_radius', 10), 4)
-        background_colors = enlarge_list(style_d.get('background_colors', ['#F7F7F7', '#FFC300', '#FF5733']), 3)
-        self.style_dict = {
-            'QPushButton': {
-                'border': border_f,
-                'border-top-left-radius': border_radius_f[0],
-                'border-top-right-radius': border_radius_f[1],
-                'border-bottom-left-radius': border_radius_f[2],
-                'border-bottom-right-radius': border_radius_f[3],
-                'background-color': background_colors[0],
-            },
-            'QPushButton::hover': {
-                'background-color': background_colors[1],
-            },
-            'QPushButton::pressed': {
-                'background-color': background_colors[2],
-            },
-        }
-        self.style_n = style_make(self.style_dict)
-        self.setStyleSheet(self.style_n)
-        icon_proportion = style_d.get('icon_proportion', 0.9)
-        self.setIconSize(QSize(int(self.height()*icon_proportion), int(self.height()*icon_proportion)))
 
 class BaseLauncherSetting(QWidget):
     def __init__(self, config:Config_Manager, parent:QMainWindow, manager:LauncherPathManager):
@@ -857,36 +817,53 @@ class UILauncherSetting(BaseLauncherSetting):
         self.frame_layout.setContentsMargins(0, 0, 0, 0)
         self.frame.setLayout(self.frame_layout)
         self.frame.setObjectName("OuterFrame")
-        UIUpdater.set(self.frame_style, self._frameStyle)
+        UIUpdater.set(self.frame_style, self.customFrameStyle, 'style')
         
         self.scroll_area = QScrollArea()
         self.scroll_area.setObjectName("myScrollArea")
         self.scroll_area.setWidget(self.frame)  # Set the frame as the widget of the scroll area
         self.scroll_area.setWidgetResizable(True)
         UIUpdater.set(self.scroll_area_style,
-                      self._scrollAreaStyle,
-                      alist())
+                      self.customScrollAreaStyle,
+                      'style')
     
-    def _frameStyle(self, frame_style:dict):
-        self.frame_style_d = {
+    def customFrameStyle(self, frame_style:dict, escape_sign:dict={}):
+        bg_color = Udata(atuple('background'), 'transparent')
+        border_radius = Udata(atuple('border-radius'), 10)
+        border = Udata(atuple('border'), '5px solid gray')
+        if not hasattr(self, 'frame_style_dict'):
+            self.frame_style_dict = {}
+        if not hasattr(self, 'extra_frame_style_dict'):
+            self.extra_frame_style_dict = {}
+        temp_dict = {
             'QFrame#OuterFrame':{
-                'background': frame_style.get('background', 'transparent'),
-                'border-radius': f"{frame_style.get('border-radius', 10)}px",
-                'border': frame_style.get('border', '5px solid gray'),
+                'background': bg_color,
+                'border-top-left-radius': border_radius[0],
+                'border-top-right-radius': border_radius[1],
+                'border-bottom-left-radius': border_radius[2],
+                'border-bottom-right-radius': border_radius[3],
+                'border': border,
             }
         }
-        self.frame_stylesheet = style_make(self.frame_style_d)
-        self.frame.setStyleSheet(self.frame_stylesheet)
+        self.frame_style_dict = process_style_dict(self.frame_style_dict, temp_dict, escape_sign, frame_style)
+        self.frame.setStyleSheet(style_make(self.frame_style_dict|self.extra_frame_style_dict))
 
-    def _scrollAreaStyle(self, scroll_style:dict):
-        orbit_color = scroll_style.get('orbit_color', 'transparent')
-        background_colors = scroll_style.get('background_colors', ["#F7F7F7", "#FFC300", "#FF5733"])
-        border_radius = scroll_style.get('border_radius', 10)
-        min_height = scroll_style.get('min_height', 20)
-        width = scroll_style.get('width', 20)
-        border = scroll_style.get('border', 'none')
+    def customScrollAreaStyle(self, scroll_style:dict, escape_sign:dict={}):
+        orbit_color = Udata(atuple('orbit_color'), 'rgba(255, 255, 255, 40)')
 
-        self.scroll_area_style_d = {
+        handle_colors = Udata(atuple('background_colors'), ["#F7F7F7", "#FFC300", "#FF5733"])
+        border_radius = Udata(atuple('border_radius'), 10)
+        min_height = Udata(atuple('min_height'), 20)
+        width = Udata(atuple('width'), 20)
+        border = Udata(atuple('border'), 'none')
+        margin = Udata(atuple('margin'), 5)
+
+        if not hasattr(self, 'scroll_area_style_dict'):
+            self.scroll_area_style_dict = {}
+        if not hasattr(self, 'extra_scroll_area_style_dict'):
+            self.extra_scroll_area_style_dict = {}
+        
+        temp_dict = {
             "QScrollArea#myScrollArea": {
                 "background": 'transparent',
                 "border": 'none',
@@ -894,20 +871,26 @@ class UILauncherSetting(BaseLauncherSetting):
             "QScrollBar": {
                 "border": border,
                 "background": orbit_color,
-                "width": f"{width}px",
-                "margin": "5px",
-                "border-radius": f"{border_radius}px",
+                "width": width,
+                "margin": margin,
+                "border-top-left-radius": border_radius[0],
+                "border-top-right-radius": border_radius[1],
+                "border-bottom-left-radius": border_radius[2],
+                "border-bottom-right-radius": border_radius[3],
             },
             "QScrollBar::handle": {
-                "background": background_colors[0],
-                "min-height": f"{min_height}px",
-                "border-radius": f"{border_radius}px",
+                "background": handle_colors[0],
+                "min-height": min_height,
+                "border-top-left-radius": border_radius[0],
+                "border-top-right-radius": border_radius[1],
+                "border-bottom-left-radius": border_radius[2],
+                "border-bottom-right-radius": border_radius[3],
             },
             "QScrollBar::handle:vertical:hover": {
-                "background": background_colors[1],
+                "background": handle_colors[1],
             },
-            "QScrollBar::handle:selected": {
-                "background": background_colors[2],
+            "QScrollBar::handle:vertical:pressed": {
+                "background": handle_colors[2],
             },
             "QScrollBar::add-line": {
                 "background": 'transparent',
@@ -924,9 +907,11 @@ class UILauncherSetting(BaseLauncherSetting):
             "QScrollBar::sub-page, QScrollBar::add-page": {
                 "background": 'transparent',
             }
+
         }
-        self.scroll_stylesheet = style_make(self.scroll_area_style_d)
-        self.scroll_area.setStyleSheet(self.scroll_stylesheet)
+
+        self.scroll_area_style_dict = process_style_dict(self.scroll_area_style_dict, temp_dict, escape_sign, scroll_style)
+        self.scroll_area.setStyleSheet(style_make(self.scroll_area_style_dict|self.extra_scroll_area_style_dict))
 
     def _init_tiles(self):
         self.title_layout = amlayoutH()
@@ -1175,23 +1160,23 @@ class LauncherSetting(UILauncherSetting):
         self.dict_n['IconPath'] = file_path
     
     def name_edit_change(self, text:str)->None:
-        edit_f = self.sender()
-        type_f = edit_f.property('type')
-        index_f = edit_f.property('index')
+        edit_f:NameEdit = self.sender()
+        type_f:str = edit_f.property('type')
+        index_f:int = edit_f.property('index')
         if type_f == 'name':
             self.dict_n[index_f]['Name'] = text
         elif type_f == 'chname':
             self.dict_n[index_f]['Chinese Name'] = text
         names = [i['name'].text() for i in self.objs_l.values()]
         if not text:
-            edit_f._setStlye(True)
+            edit_f.customBackground(True)
         elif names.count(text) > 1:
             if type_f == 'name':
-                edit_f._setStlye(False)
+                edit_f.customBackground(False)
             else:
                 pass
         else:
-            edit_f._setStlye(True)     
+            edit_f.customBackground(True)     
 
     def exe_edit_write(self, text:str)->None:
         line_f = self.sender()
@@ -1258,6 +1243,4 @@ class LauncherSetting(UILauncherSetting):
                     self.df[group_name] = df
                 
                 self.manager.save_xlsx()
-
-
 

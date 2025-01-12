@@ -1,3 +1,7 @@
-a = {1:3, 2:4, 5:7, 8:9}
-b = {1:7, 2:8, 5:11}
-print(a|b)
+from am_store.common_tools import *
+
+@timeit()
+def search():
+    time.sleep(1)
+
+search(am_timeit_tag='hahah')

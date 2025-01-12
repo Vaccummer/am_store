@@ -26,11 +26,13 @@ class LauncherPathManager(object):
         self._load_icon_dict()
     
     def _read_xlsx(self):
+        self.pure_df = pd.DataFrame()
         self.df = OrderedDict()
         with pd.ExcelFile(self.data_path) as xls:
             # read all sheets and add a column to indicate the group
             for sheet_name in xls.sheet_names:
                 df_t = pd.read_excel(self.data_path, sheet_name=sheet_name)
+                self.pure_df = pd.concat([self.pure_df, df_t], ignore_index=True)
                 for col_i in df_t.columns:
                     if col_i not in self.permit_col:
                         df_t.drop(col_i, axis=1, inplace=True)

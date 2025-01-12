@@ -321,7 +321,7 @@ class UIUpdater(QObject):
         self.watcher.fileChanged.connect(self.restart_timer)  # 连接文件变化信号
         
     def restart_timer(self):
-        self.update_delay.start(500)
+        self.update_delay.start(200)
     
     def on_yaml_change(self):
         self.update_delay.stop()
@@ -513,5 +513,5 @@ def process_style_dict(pre_d:dict, temp_d:dict, escape_sign:dict, config_f:dict)
             else:
                 out_d[key_i] = value_n
     
-    return dicta.unflatten_dict(out_d)
+    return out_d
 

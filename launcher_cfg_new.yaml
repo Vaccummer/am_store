@@ -146,6 +146,7 @@ Launcher:
   path_mode_switch:
     Size:
       box_height: 1.2*het
+      menu_max_height: 8*het
     font:
       box: [[Family, *jetbrains], [PixelSize, 45], [Weight, 70]]
       menu: [[Family, *jetbrains], [PixelSize, 45], [Weight, 70]]
@@ -177,15 +178,15 @@ Launcher:
       menu:
         animation_time: 200
         border: "none"
-        background: "transparent"
+        background: "rgba(255, 255, 255, 20)"
         border_radius: [10, 10, 10, 10] # top-left, top-right, bottom-right, bottom-left
         padding: [5, 5, 5, 5]
         item_spacing: 10
       item:
         margin: 1
-        extra_height: 15 # can be negative, a int to add to menu height in case system auto calculate is not accurate
-        extra_width: 30 # can be negative, a int to add to menu width in case system auto calculate is not accurate
-
+        spacing: 1
+        extra_height: 30 # can be negative, a int to add to menu height in case system auto calculate is not accurate
+        extra_width: 50 # can be negative, a int to add to menu width in case system auto calculate is not accurate
         background_colors: ["#2C51C1", "#FFC300", "#FF5733"] # common, hover, pressed
         font_colors: ["#000000", "#000000", "#000000"] # common, hover, pressed
         background_colors_1: ["#2C51C1", "#FFC300", "#FF5733"] # common, hover, pressed
@@ -194,7 +195,7 @@ Launcher:
         font_colors_2: ["#000000", "#000000", "#000000"] # common, hover, pressed
         border: "none"
         border_radius: 10
-        padding: [10, 5, 5, 5]
+        padding: [0, 0, 0, 0]
         # height: 90 # force set height, must be a int, if not set, system auto calculate
 
   input_box:
@@ -239,6 +240,7 @@ Launcher:
       min_width: 2*gap
     font:
       main: [[Family, *yahei], [PixelSize, 40]]
+      menu: [[Family, *yahei], [PixelSize, 40]]
     path:
       file_icon_folder: "./load/Launcher/file_icons"
       app_icon_folder: "./load/Launcher/app_icons"
@@ -253,8 +255,8 @@ Launcher:
     style:
       main:
         widget:
-          background: "rgba(255, 255, 255, 20)"
-          border: "2px white"
+          background: "transparent"
+          border: "none"
           border_radius: 20
           line_margin: [0, 0, 0, 0]
         item:
@@ -267,23 +269,40 @@ Launcher:
           spacing: 1
         scroll_bar:
           orbit_color: "rgba(255, 255, 255, 50)"
-          background_colors: ["#F7F7F7", "#FFC300", "#FF5733"] # common, hover, pressed
-          border_radius: 4
-          width: 5
+          background_colors:
+            - "qlineargradient(spread:pad, x1:0, y1:1, x2:0, y2:0, stop:0 #fbc2eb, stop:1 #a6c1ee)"
+            - "rgba(255, 255, 255, 100)"
+            - "rgba(255, 255, 255, 150)"
+          border_radius: [7, 7, 7, 7]
+          width: 16
           min_height: 30
-          margin: 3
+          margin: 0
       label:
         background_colors: ["#F7F7F7", "#FFC300", "#FF5733"]
-        padding: [0, 0, 0, 0] # left, right, top, bottom
+        padding: [0, 10, 0, 0]
         border: "none"
         text_align: "left"
         border_radius: 10
         resize_fractor: 0.5
       button:
-        icon_proportion: 0.8
+        icon_proportion: 0.95
         background_colors: ["rgba(255, 255, 255, 20)", "#FFC300", "#FF5733"] # common, hover, pressed
         border_radius: 10
         animation_type: "shake" # 'shake' or 'resize', default is None
+      menu:
+        main:
+          background: "transparent"
+          border: "none"
+          border_radius: 10
+        item_button:
+          spacing: 0
+          background_colors: ["#A75A5A", "#FFC300", "#FF5733"] # common, hover, pressed
+          font_colors: ["#000000", "#000000", "#000000"] # common, hover, pressed
+          border: "none"
+          border_radius: 10
+          display_x_offset: -15
+          display_y_offset: -5
+          padding: [0, 0, 0, 0]
     max_exe_num: 10
     max_dir_num: 999
     max_length: 600
@@ -668,12 +687,18 @@ Settings:
         tab_border: "none"
         tab_border_radius: 10
       tab_menu:
-        item:
+        main:
+          background: "transparent"
+          border: "none"
+          border_radius: 10
+        item_button:
           spacing: 0
           background_colors: ["#A75A5A", "#FFC300", "#FF5733"] # common, hover, pressed
           font_colors: ["#000000", "#000000", "#000000"] # common, hover, pressed
           border: "none"
           border_radius: 10
+          display_x_offset: -15
+          display_y_offset: -5
           padding: [0, 0, 0, 0]
       tab_add_button:
         icon_proportion: 0.9
