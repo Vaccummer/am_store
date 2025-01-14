@@ -1,7 +1,5 @@
-from am_store.common_tools import *
+from Scripts.tools.toolbox import *
 
-@timeit()
-def search():
-    time.sleep(1)
-
-search(am_timeit_tag='hahah')
+a = [1]
+b = [4]
+print(list(zip(a,b)))

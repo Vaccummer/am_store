@@ -95,7 +95,7 @@ MainWindow:
         padding: [5, 5, 5, 5]
         item_spacing: 10
       item:
-        background_colors: ["#2C51C1", "#FFC300", "#FF5733"] # common, hover, pressed
+        background_colors: ["#ADB1BB", "#FFC300", "#FF5733"] # common, hover, pressed
         margin: 1 # vertical margin between items
         extra_height: 15 # can be negative, a int to add to menu height in case system auto calculate is not accurate
         extra_width: 30 # can be negative, a int to add to menu width in case system auto calculate is not accurate
@@ -238,20 +238,24 @@ Launcher:
       extra_width: 0.22*gap
       max_width: 7*gap
       min_width: 2*gap
+      menu_item_height: 0.8*het
     font:
       main: [[Family, *yahei], [PixelSize, 40]]
-      menu: [[Family, *yahei], [PixelSize, 40]]
+      menu: [[Family, *yahei], [PixelSize, 30]]
     path:
       file_icon_folder: "./load/Launcher/file_icons"
       app_icon_folder: "./load/Launcher/app_icons"
       default_app_icon: &default_button_icon "./load/Launcher/shortcut_setting/default/default_button_icon.svg"
-      default_folder_icon: &default_folder_icon "./load/Launcher/shortcut_setting/default/default_button_icon.svg"
-      default_file_icon: &default_file_icon "./load/Launcher/shortcut_setting/default/default_button_icon.svg"
+      default_folder_icon: &default_folder_icon "./load/Launcher/assoicate_list/default_icon_folder/folder.svg"
+      default_file_icon: &default_file_icon "./load/Launcher/assoicate_list/default_icon_folder/file.svg"
+      # icons of certian format file is customed via UI, usually stored in $file_icon_folder
+      # name of the icon is f"Ass_Icon_{extension}.{svg|png|icon}"
       default_back_icon: ""
       download_save_dir: "./load/Launcher/assoicate_list/download"
       filelog_default_path: 'F:\\Windows_Data\\Desktop_File'
       exe_icon_getter: "./3rdparty/get_exe_icon/main.exe"
       file_icon_getter: "./3rdparty/get_file_icon/main.exe"
+
     style:
       main:
         widget:
@@ -284,6 +288,7 @@ Launcher:
         text_align: "left"
         border_radius: 10
         resize_fractor: 0.5
+        animation_time: "none"
       button:
         icon_proportion: 0.95
         background_colors: ["rgba(255, 255, 255, 20)", "#FFC300", "#FF5733"] # common, hover, pressed
@@ -291,21 +296,30 @@ Launcher:
         animation_type: "shake" # 'shake' or 'resize', default is None
       menu:
         main:
-          background: "transparent"
           border: "none"
           border_radius: 10
+          extra_width: 30
+          extra_height: 30
         item_button:
           spacing: 0
-          background_colors: ["#A75A5A", "#FFC300", "#FF5733"] # common, hover, pressed
+          background_colors: ["#7BA75A", "#FFC300", "#FF5733"] # common, hover, pressed
           font_colors: ["#000000", "#000000", "#000000"] # common, hover, pressed
           border: "none"
           border_radius: 10
-          display_x_offset: -15
-          display_y_offset: -5
-          padding: [0, 0, 0, 0]
-    max_exe_num: 10
+          display_x_offset: -20
+          display_y_offset: -40
+          padding: [0, 0, 0, 10]
+    max_exe_num: 15
+    max_item_maintain: 999
     max_dir_num: 999
     max_length: 600
+    sort_method:
+      fliter_sign: [".", "$", "~"] # for filename start with sign, the item will be set to the end
+      path:
+        name: "./load/Launcher/assoicate_list/default_icon_folder/sort_by_name.svg"
+        type: "./load/Launcher/assoicate_list/default_icon_folder/sort_by_type.svg"
+        size: "./load/Launcher/assoicate_list/default_icon_folder/sort_by_size.svg"
+        time: "./load/Launcher/assoicate_list/default_icon_folder/sort_by_time.svg"
 
   shortcut_obj:
     horizontal_button_num: 9
@@ -691,6 +705,8 @@ Settings:
           background: "transparent"
           border: "none"
           border_radius: 10
+          extra_width: 10
+          extra_height: 10
         item_button:
           spacing: 0
           background_colors: ["#A75A5A", "#FFC300", "#FF5733"] # common, hover, pressed
@@ -713,6 +729,9 @@ Settings:
         border_radius: 20
 
   PathManager:
+    path:
+      deault_download_path: "F:\\Windows_Data\\Desktop_File"
+      download_filedialog_root: "./load"
     filename_flitter: ["$"] # filename or dirname starts with these characters will be moved to the end of the list
     separate_sign: "^--$"
     ssh_config: "C:\\Users\\am\\.ssh\\config"
@@ -728,3 +747,8 @@ Settings:
     remote_min_chunck: 4 # in MB
     remote_max_chunck: 100 # in MB
 
+  PathTracker:
+    path:
+      tag_folder: "./tmp/tag"
+    wait_time: 500
+    monitor_drivers: [] # Disk to be monitored, just like ['C', 'D'], default is all

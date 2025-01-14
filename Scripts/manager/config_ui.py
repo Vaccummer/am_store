@@ -269,7 +269,7 @@ class UIUpdater(QObject):
         atuple_check, value_t, value_ae = cls.action(key_f, action_f, type_f)
         if atuple_check:
             escape_sign = UIUpdater.cal_escape_sign(value_t, value_t, init_value=True)
-            if (not isinstance(value_t, dict)) and (not isinstance(key_f, alist)):
+            if type_f != 'style':
                 action_f = UIwarpper(action_f)
             data_c = UIData(index=len(cls.ui_set_l), key=key_f, action=action_f, type_f=type_f, value_t=value_t, 
                             value_ae=value_ae, escape_sign=escape_sign, force_escape_sign={})
@@ -321,7 +321,7 @@ class UIUpdater(QObject):
         self.watcher.fileChanged.connect(self.restart_timer)  # 连接文件变化信号
         
     def restart_timer(self):
-        self.update_delay.start(200)
+        self.update_delay.start(400)
     
     def on_yaml_change(self):
         self.update_delay.stop()
@@ -336,6 +336,11 @@ class UIUpdater(QObject):
         if not yml_file3:
             return
         self._updateUI(adict(yml_file3))
+        self.update_config(yml_file3)
+    
+    @classmethod
+    def update_config(cls, yml_file:dict):
+        cls.config = adict(copy.deepcopy(yml_file))
         
     def _calSize(self, config:dict):
         config_r = copy.deepcopy(config)
@@ -374,7 +379,7 @@ class UIUpdater(QObject):
         else:
             return input_f
 
-    def _updateUI(self, yml_file:dict):
+    def _updateUI(self, yml_file:adict):
         for order_i in range(len(self.ui_set_l)):
             i:UIData = self.ui_set_l[order_i]
             # read the value from the new yaml file
@@ -466,10 +471,13 @@ class UIUpdater(QObject):
     
 def UIwarpper(func_f:callable):
     def inner_func(*args, escape_sign:bool=False, **kwargs):
-        if escape_sign:
-            return
+        if isinstance(escape_sign, list):
+            if all(escape_sign):
+                return
         else:
-            func_f(*args, **kwargs)
+            if escape_sign:
+                return
+        func_f(*args, **kwargs)
     return inner_func
 
 class Udata(object):

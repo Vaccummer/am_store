@@ -31,7 +31,6 @@ import sys
 import pandas
 
 
-
 def is_path(string_f, exist_check:bool=False):
     # To judge whether a variable is Path or not
     if isinstance(string_f, pathlib.Path):
@@ -272,27 +271,7 @@ def is_url(str_f:str):
     )
     match_f = url_pattern.match(str_f)
     return bool(match_f)
-def get_screen_size2(target: Literal['pixel', 'physical', "dpi"]="pixel"):
-    app = QApplication.instance() if QApplication.instance() else QApplication([])
-    allowed_values = ["pixel", "physical","dpi"]
-    assert target in allowed_values, f"Invalid value: {target}. Allowed values are: {allowed_values}"
-    screen = app.primaryScreen()  # 获取主屏幕对象
-    match target:
-        case "pixel":
-            pixel_size = screen.size()
-            width_px = pixel_size.width()
-            height_px = pixel_size.height()
-            app.quit()
-            return (width_px, height_px)
-        case "physical":
-            physical_size = screen.physicalSize()
-            width_mm = physical_size.width()
-            height_mm = physical_size.height()
-            app.quit()
-            return [width_mm, height_mm]
-        case "dpi":
-            app.quit()
-            return screen.physicalDotsPerInch()
+
 def get_screen_size(target: Literal['pixel', 'physical', "dpi"]="pixel"):
     user32 = ctypes.windll.user32
     user32.SetProcessDPIAware()  # 使程序支持高 DPI
@@ -482,10 +461,10 @@ def style_make(config:dict)->str:
     for obj_name, style_dict in config.items():
         style += f"{obj_name} {{\n"
         for key, value in style_dict.items():
-            if not value:
-                continue
             if isinstance(value, int):
                 value = f"{value}px"
+            elif not value:
+                continue
             elif isinstance(value, float):
                 value = f"{int(value)}px"
             elif isinstance(value, list):
@@ -533,6 +512,27 @@ def dict2df(data_f:dict|pandas.DataFrame):
         return None
     return data_t
 
+def get_hard_drives():
+    drives = os.popen("wmic logicaldisk get name").read().strip().split('\n')[1:]
+    drives = [drive.strip() for drive in drives if drive.strip()]
+    hard_drives = []
+    for drive in drives:
+        drive_type = ctypes.windll.kernel32.GetDriveTypeW(drive + '\\')
+        if drive_type == 3:  
+            hard_drives.append(drive+'\\')
+    return hard_drives
+
+def get_geometry(window_f:QWidget)->list[int]:
+    geom_f = window_f.geometry()
+    return[geom_f.x(), geom_f.y(), geom_f.width(), geom_f.height()]
+
+def is_admin():
+    """Check if the script is running with admin privileges."""
+    try:
+        return ctypes.windll.shell32.IsUserAnAdmin()
+    except:
+        return False
+
 class atuple(tuple):
     def __new__(cls, *args):
         if len(args) == 1 and isinstance(args[0], (list, tuple)):
@@ -547,7 +547,7 @@ class atuple(tuple):
             return atuple(list(self) + [other])
 
     def __hash__(self):
-        return hash(tuple(atuple('Atuple') | self))
+        return hash(tuple(atuple(['atuple']+list(self))))
 
     def __getitem__(self, index):
         result = super().__getitem__(index)
@@ -574,16 +574,16 @@ class alist(list):
                     return False
             return True
 
-class adict(dict):
+class adict(object):
     def __init__(self, dict_f:dict):
         super().__init__()
-        self.update(dict_f)
+        self.dict_f = dict_f
 
     def __getitem__(self, key):
         if not isinstance(key, atuple):
-            return self.get(key, None)
+            return self.dict_f.get(key, None)
         else:
-            dict_n = self
+            dict_n = self.dict_f
             for key_i in key:
                 dict_n = dict_n.get(key_i, None)
                 if dict_n is None:
@@ -767,4 +767,3 @@ class yml:
         with open(path_f, "w", encoding="utf-8") as f:
             ryaml.dump(new_data, f)
     
-

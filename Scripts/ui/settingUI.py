@@ -13,11 +13,12 @@ import pandas
 from typing import List, Literal, Union, OrderedDict
 
 class UIShortcutSetting(QWidget):
-    def __init__(self, parent:QMainWindow, config:Config_Manager):
+    def __init__(self, parent:QMainWindow, config:Config_Manager, shortcuts_manager:ShortcutsPathManager):
         super().__init__()
         self.up = parent
         self.name = 'shortcut_obj'
         self.config = config.deepcopy().group_chose(mode="Launcher", widget=self.name)
+        self.manager:ShortcutsPathManager = shortcuts_manager
         self._initpara()
         self._windowset()
         self._initUI()
@@ -113,7 +114,6 @@ class UIShortcutSetting(QWidget):
         self.search_button_style = atuple('Launcher', self.name, 'style', 'folder_search_button')
         # init path
         pre = ['Launcher', self.name, 'path']
-        self.manager:ShortcutsPathManager = self.up.shortcut_data
         self.df = self.manager.df
         self.taskbar_icon = atuple(pre+['taskbar_icon'])
         self.button_icons = atuple(pre+['button_icons'])
@@ -343,8 +343,8 @@ class UIShortcutSetting(QWidget):
         self.layout_0.addLayout(button_layout)   
 class ShortcutSetting(UIShortcutSetting):
     refresh_signal = Signal()
-    def __init__(self, parent:QMainWindow, config:Config_Manager):
-        super().__init__(parent, config)
+    def __init__(self, parent:QMainWindow, config:Config_Manager, shortcuts_manager:ShortcutsPathManager):
+        super().__init__(parent, config, shortcuts_manager)
         self.up = parent
         self.name = 'shortcut_obj'
         self.config = config.deepcopy().group_chose(mode="Launcher", widget='shortcut_obj')
@@ -673,11 +673,12 @@ class SheetControl(QTabBar):
     def _init_menu(self):
         menu_style_d = atuple('Settings', 'LauncherSetting', 'style', 'tab_menu', 'main')
         item_style_d = atuple('Settings', 'LauncherSetting', 'style', 'tab_menu', 'item_button')
-        value_d = {'rename':'rename', 'delete':'rename'}
+        actions = ['rename', 'delete']
+        values = [{'action':'rename'}, {'action':'delete'}]
         font_f = atuple('Settings', 'LauncherSetting', 'font', 'tab_menu')
         width_f = atuple('Settings', 'LauncherSetting', 'Size', 'tab_menu_button_width')
         height_f = atuple('Settings', 'LauncherSetting', 'Size', 'tab_menu_button_height')
-        self.menu = AutoMenu(main_style_d=menu_style_d, item_style_d=item_style_d, action_value=value_d, font=font_f, width_f=width_f, height_f=height_f)
+        self.menu = AutoMenu(main_style_d=menu_style_d, item_style_d=item_style_d, actions=actions, values=values, font=font_f, width_f=width_f, height_f=height_f)
         self.menu.hide()
 
     def open_context_menu(self, position:QPoint): 
@@ -1126,14 +1127,15 @@ class LauncherSetting(UILauncherSetting):
         new_name, ok = QInputDialog.getText(self, "Rename Sheet", "Enter New Name:", text=current_name)
         if ok and new_name.strip():
             if new_name in self.tab_bar.get_texts():
-                self.up.tip('Warning', 'Name already exists', {'OK':False}, False)
+                #self.up.tip('Warning', 'Name already exists', {'OK':False}, False)
                 return
             self.tab_bar.setTabText(index, new_name)
             self.data_dict[new_name] = self.data_dict.pop(current_name)
     
     def delete_tab(self, page_name:str)->None:
         tip_prompt = f'Are you sure to DELETE sheet "{page_name}"?'
-        out_f = self.up.tip('Warning', tip_prompt, {'Yes':True, 'No':False}, False)
+        #out_f = self.up.tip('Warning', tip_prompt, {'Yes':True, 'No':False}, False)
+        out_f = True
         if out_f:
             self.data_dict.pop(page_name)
             self.tab_bar._delete(page_name)

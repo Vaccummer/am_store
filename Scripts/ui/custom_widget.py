@@ -27,6 +27,7 @@ class YohoPushButton(QPushButton):
             super().__init__(parent)
         self.setText(text_f)
         self.an_type = "resize"
+        self.force_antype = None
         self.an_time = an_time
         self.default_an_time = an_time
         self.extra_style_dict = {}
@@ -47,9 +48,13 @@ class YohoPushButton(QPushButton):
         self.clicked.connect(self.start_animation)
     
     def start_animation(self):
-        if self.an_type == "shake":
+        if self.force_antype is not None:
+            an_type_t = self.force_antype
+        else:
+            an_type_t = self.an_type
+        if an_type_t == "shake":
             self.shake_icon()
-        elif self.an_type == "resize":
+        elif an_type_t == "resize":
             self.resize_icon()
     
     def shake_icon(self):
@@ -74,7 +79,7 @@ class YohoPushButton(QPushButton):
         self.animation.setEndValue(size_n)  
         self.animation.start()
 
-    def _loadIconProportion(self,icon_proportion:float):
+    def _loadIconProportion(self, icon_proportion:float):
         self.icon_proportion = icon_proportion
         self._resize(self.size())
 
@@ -170,7 +175,10 @@ class AutoLabel(QLabel):
         UIUpdater.set(width, self.setFixedWidth, type_f='width')
         UIUpdater.set(font, self.setFont, type_f='font')
         UIUpdater.set(icon_f, self.set_icon, type_f='icon')
-        UIUpdater.set(style_config, self.customStyle, 'style')
+        self.extra_style_dict = {}
+        self.style_config = style_config
+        self.cl_pointer = style_config | atuple(['background_colors'])
+        self.style_ctl = UIUpdater.set(style_config, self.customStyle, 'style')
         self.setAlignment(Qt.AlignCenter)
     
     def customStyle(self, format_dict:dict, escape_sign:dict={}):
@@ -200,25 +208,35 @@ class AutoLabel(QLabel):
         if not hasattr(self, 'style_dict'):
             self.style_dict = {}
         self.style_dict = process_style_dict(self.style_dict, temp_dict, escape_sign, format_dict)
-        self.setStyleSheet(style_make(self.style_dict))
+        self.setStyleSheet(style_make(self.style_dict|self.extra_style_dict))
 
-    # def set_text(self, text:str):
-    #     self.setText(text)
-    #     self.adjustSize()
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            color_l = UIUpdater.get(self.cl_pointer, [])
+            if isinstance(color_l, list) and len(color_l) == 3:
+                self.extra_style_dict[atuple('QLabel', 'background-color')] = color_l[-1]
+                self.extra_style_dict[atuple('QLabel::hover', 'background-color')] = color_l[-1]
+                self.setStyleSheet(style_make(self.style_dict|self.extra_style_dict))
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.extra_style_dict.pop(atuple('QLabel', 'background-color'), None)
+            self.extra_style_dict.pop(atuple('QLabel::hover', 'background-color'), None)
+            self.setStyleSheet(style_make(self.style_dict|self.extra_style_dict))
+        super().mouseReleaseEvent(event)
     
-    # def set_color(self, color:str, border_radius:int=5):
-    #     sheet_f = f'''
-    #                 QLabel {{
-    #                         border-radius: {border_radius}px;  /* 边角弧度 */
-    #                         padding-left: 5px;   /* 左边距 */
-    #                         padding-right: 5px;  /* 右边距 */
-    #                         padding-top: 0px;    /* 上边距 */
-    #                         padding-bottom: 0px; /* 下边距 */
-    #                         background-color: {color};  /* 背景透明 */
-    #                         text-align: center;  /* 文字居中 */
-    #                         }}
-    #                 '''
-    #     self.setStyleSheet(sheet_f)
+    def setSelected(self, selected:bool):
+        if selected:
+            color_l = UIUpdater.get(self.cl_pointer, [])
+            if isinstance(color_l, list) and len(color_l) == 3:
+                self.extra_style_dict[atuple('QLabel', 'background-color')] = color_l[-1]
+                self.extra_style_dict[atuple('QLabel::hover', 'background-color')] = color_l[-1]
+                self.setStyleSheet(style_make(self.style_dict|self.extra_style_dict))
+        else:
+            self.extra_style_dict.pop(atuple('QLabel', 'background-color'), None)
+            self.extra_style_dict.pop(atuple('QLabel::hover', 'background-color'), None)
+            self.setStyleSheet(style_make(self.style_dict|self.extra_style_dict))
 
     def set_icon(self, icon:Union[str,QIcon]):
         if isinstance(icon, str):
@@ -537,7 +555,7 @@ class ModeListWidget(QListWidget):
 class CustomComboBox(QWidget, QObject):
     index_changed = Signal(int)
     def __init__(self, modes:list, style_d:dict, box_height=None, box_font=QFont(), menu_font=QFont(),
-                 parent=None):
+                 parent:QMainWindow=None):
         super().__init__(parent)
         self.color_state = 0 
         self.up = parent
@@ -956,13 +974,16 @@ class TipButton(QPushButton):
 
 class AutoMenu(QWidget):
     action_signal = Signal(dict)
-    def __init__(self, main_style_d:dict, item_style_d:dict, action_value:dict,font:QFont=QFont(), width_f=None, height_f=None):
+    def __init__(self, main_style_d:dict, item_style_d:dict, actions:list[str], values:list[dict], font:QFont=QFont(), width_f=None, height_f=None):
         super().__init__()
-        self.width_f = width_f
         self.height_f = height_f
-        self.action_value = action_value
+        self.action_l = actions
+        self.value_l = values
         self.item_style_d = item_style_d
+        self.button_list = []
         self.main_style_ctl = UIUpdater.set(main_style_d, self.customStyle, 'style')
+        self.extra_width = main_style_d | atuple('extra_width')
+        self.extra_height = main_style_d | atuple('extra_height')
         self.font_f = font
         self.setWindowFlags(self.windowFlags()|Qt.FramelessWindowHint | Qt.Tool)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
@@ -1013,31 +1034,33 @@ class AutoMenu(QWidget):
         self.setLayout(self.layout_0)
         spacing_f = self.item_style_d | atuple('spacing')
         UIUpdater.set(spacing_f, self.layout_0.setSpacing, 'spacing')
-        for i, action_i in enumerate(self.action_value.keys()):
-            button_i = YohoPushButton(style_config=self.item_style_d, text_f=action_i, font_f=self.font_f, width_f=self.width_f, height_f=self.height_f)
-            if len(self.action_value.keys()) == 1:
+        for i, action_i in enumerate(self.action_l):
+            button_i = YohoPushButton(style_config=self.item_style_d, text_f=action_i, font_f=self.font_f)
+            button_i.extra_style_dict[atuple('QPushButton', 'text-align')] = 'left'
+            if len(self.action_l) == 1:
                 pass
             elif i == 0:
                 button_i.extra_style_dict[atuple('QPushButton', 'border-bottom-left-radius')] = 0
                 button_i.extra_style_dict[atuple('QPushButton', 'border-bottom-right-radius')] = 0
-                button_i.setStyleSheet(style_make(button_i.style_dict|button_i.extra_style_dict))
-            elif i == len(self.action_value.keys())-1:
+            elif i == len(self.action_l)-1:
                 button_i.extra_style_dict[atuple('QPushButton', 'border-top-left-radius')] = 0
                 button_i.extra_style_dict[atuple('QPushButton', 'border-top-right-radius')] = 0
-                button_i.setStyleSheet(style_make(button_i.style_dict|button_i.extra_style_dict))
             else:
                 button_i.extra_style_dict[atuple('QPushButton', 'border-top-left-radius')] = 0
                 button_i.extra_style_dict[atuple('QPushButton', 'border-top-right-radius')] = 0
                 button_i.extra_style_dict[atuple('QPushButton', 'border-bottom-left-radius')] = 0
                 button_i.extra_style_dict[atuple('QPushButton', 'border-bottom-right-radius')] = 0
-                button_i.setStyleSheet(style_make(button_i.style_dict|button_i.extra_style_dict))
+            style_d = style_make(button_i.style_dict|button_i.extra_style_dict)
+            button_i.setStyleSheet(style_d)
             self.layout_0.addWidget(button_i)
-            button_i.clicked.connect(lambda: self.action_signal.emit({action_i:self.action_value[action_i]}))
-
+            button_i.clicked.connect(lambda: self.emit_action(i))
+            self.button_list.append(button_i)
         # update the position offset of the menu
         self.x_offset = self.item_style_d | atuple('display_x_offset')
         self.y_offset = self.item_style_d | atuple('display_y_offset')
         UIUpdater.set(alist(self.x_offset, self.y_offset), self._load_offset, alist())
+        paras = alist(spacing_f, self.height_f, self.extra_width, self.extra_height)
+        UIUpdater.set(paras, self.set_size, alist())
     
     def _load_offset(self, x_offset:int, y_offset:int):
         self.x_offset = x_offset
@@ -1046,16 +1069,16 @@ class AutoMenu(QWidget):
     def action(self, index:int, relative_position:QPoint, parent_pos:QPoint)->None:
         self.tab_index = index
         self.relative_position = relative_position
+        # self.set_size()
         x = self.relative_position.x() + parent_pos.x()+self.x_offset
         y = self.relative_position.y() + parent_pos.y()+self.y_offset
-        self.setGeometry(x, y, self.width(), self.height())
-        self.adjustSize()
+        self.move(x, y)
         self.show()
         self.raise_()
         QApplication.instance().installEventFilter(self)
 
-    def emit_action(self, action_value:dict):
-        self.action_signal.emit(action_value)
+    def emit_action(self, index_f:dict):
+        self.action_signal.emit(self.value_l[index_f])
 
     def am_exit(self):
         try:
@@ -1066,3 +1089,31 @@ class AutoMenu(QWidget):
             self.hide()
         else:
             self.close()
+
+    def set_width(self, extra_width:int):
+        width_f = max(QFontMetrics(self.button_list[0].font()).width(action_i) for action_i in self.action_l)+extra_width
+        for button_i in self.button_list:
+            button_i.setFixedWidth(width_f)
+        self.setFixedWidth(width_f+30)
+
+    def set_height(self, extra_height:int):
+        spacing_f = self.item_style_d | atuple('spacing')
+        height_t = self.height_f*len(self.button_list)+spacing_f*(len(self.button_list)-1)+extra_height
+        self.setFixedHeight(height_t+5)
+        pass
+
+    def set_size(self, spacing_f:int, height_f:int, extra_width:int, extra_height:int):
+        # spacing_f = UIUpdater.get(self.item_style_d|atuple('spacing'), 0)
+        # height_f = UIUpdater.get(self.height_f, 60)
+        # extra_width = UIUpdater.get(self.extra_width, 10)
+        # extra_height = UIUpdater.get(self.extra_height, 10)
+        width_f = max(QFontMetrics(self.button_list[0].font()).width(action_i) for action_i in self.action_l)+extra_width
+        for button_i in self.button_list:
+            button_i.setFixedSize(width_f, height_f)
+        height_t = height_f*len(self.button_list)+spacing_f*(len(self.button_list)-1)+extra_height
+        self.setFixedWidth(width_f+50)
+        self.setFixedHeight(height_t+5)
+
+    def hide(self):
+        self.action_signal.emit({})
+        super().hide()

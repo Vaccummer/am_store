@@ -6,6 +6,7 @@ import numpy as np
 from Scripts.ui.custom_widget import AIcon
 from Scripts.manager.config_ui import Config_Manager  
 from Scripts.manager.config_ui import UIUpdater
+from datetime import datetime
 # from Scripts.manager.ui import *
 
 
@@ -182,7 +183,6 @@ class SSHManager(QObject):
     def __init__(self, parent:QMainWindow, config:Config_Manager):
         super().__init__()
         self.thread_list = []
-        self.up = parent
         self.config = config.deepcopy()
         self.name = 'PathManager'
         self.config.group_chose(mode='Settings', widget=self.name, obj=None)
@@ -202,7 +202,7 @@ class SSHManager(QObject):
             self.remote_hosts = parse_ssh_config(self.host_config_path,
                                         fliter=self.config.get("hostname"))
         else:
-            self.up.tip("Warning", "SSH config file not found, please check the path", {"OK":""}, "")
+            #self.up.tip("Warning", "SSH config file not found, please check the path", {"OK":""}, "")
             self.remote_hosts = {}
         self.wsl_l = self.config.get("wsl")
         self.wsl_d = {i[0]:{'path':i[1], 'user':i[2]} for i in self.wsl_l}
@@ -328,8 +328,6 @@ class PathManager(SSHManager):
     def listdir(self, path_f:str)->List[list]:
         dir_l = []
         stat_l = []
-        dir_s = []
-        stat_s = []
         if self.host_type == 'WSL':
             path_f = self._wsl_path_preprocess(path_f)
         if self.host_type in ['Local', 'WSL']:
@@ -339,29 +337,26 @@ class PathManager(SSHManager):
                 for i in os.listdir(path_f):
                     path_t = os.path.join(path_f, i)
                     stat_t = os.stat(path_t)
-                    if self._filename_fliter(i):
-                        dir_l.append(i)
-                        stat_l.append(stat_t)
-                    else:
-                        dir_s.append(i)
-                        stat_s.append(stat_t)
-                return dir_l+dir_s, stat_l+stat_s
+                    dir_l.append(i)
+                    stat_l.append(stat_t)
+                return dir_l, stat_l
             except Exception as e:
                 warnings.warn(f'Local file search encounters error {e}')
                 return [], []
         elif self.host_type == 'Remote':
             try:
                 dir_contents = self.sftp.listdir_attr(path_f)
-                for entry in dir_contents:
-                    if not self._filename_fliter(entry.filename):
-                        continue
-                    if self._filename_fliter(entry.filename):
-                        dir_l.append(entry.filename)
-                        stat_l.append(entry)
-                    else:
-                        dir_s.append(entry.filename)
-                        stat_s.append(entry)
-                return dir_l+dir_s, stat_l+stat_s
+                return [i.filename for i in dir_contents], dir_contents
+                # for entry in dir_contents:
+                #     if not self._filename_fliter(entry.filename):
+                #         continue
+                #     if self._filename_fliter(entry.filename):
+                #         dir_l.append(entry.filename)
+                #         stat_l.append(entry)
+                #     else:
+                #         dir_s.append(entry.filename)
+                #         stat_s.append(entry)
+                # return dir_l+dir_s, stat_l+stat_s
             except FileNotFoundError:
                 return [], []
             except Exception as e:
@@ -369,6 +364,7 @@ class PathManager(SSHManager):
                 return [], []
         else:
             warnings.warn(f"Invalid host type: {self.host_type}")
+            return [], []
     
     def walk(self, src:str):
         return_l = []
@@ -581,4 +577,82 @@ class FileTransfer:
         except Exception as e:
             print(f"文件传输失败: {e}")
             return False
+
+class TrackThread(QThread):
+    output_signal = Signal(dict)
+    def __init__(self, file_name:str, monitor_path:str):
+        super().__init__()
+        self.file_name = file_name
+        self.monitor_path = monitor_path
+
+    def run(self):
+        try:
+            from file_watcher import FileWatcher
+            self.watcher = FileWatcher()
+            result_f = self.watcher.start(self.monitor_path, self.file_name, self.output_signal.emit)
+            error_f = ''
+        except Exception as e:
+            result_f = None
+            error_f = str(e)
+        self.output_signal.emit({'result':result_f, 'error':error_f})
+
+    def close(self):
+        self.quit()
+        self.wait()
+        try:
+            self.watcher.stop()
+        except Exception:
+            pass
+
+class PathTracker:
+    def __init__(self):
+        pass
+    
+    def _load_config(self):
+        pass
+
+    def create_tag(self):
+        name_f = f"__SuperLauncher_Tag.txt"
+        path_f = path_join(self.tag_folder, name_f)
+        if not os.path.exists(path_f):
+            with open(name_f, 'a') as f:
+                f.write(f"SuperLauncher_Tag\nFor Path Tracking")
+        self.path_f = path_f
+
+    def create_tracker(self):
+        drivers = self.get_drives()
+        if not drivers:
+            return
+        if not os.path.exists(self.path_f):
+            self.create_tag()
+        file_name = os.path.basename(self.path_f)
+        for driver in drivers:
+            pass
+    
+    @Slot(str)
+    def target_receiver(self, driver:str):
+        pass
+
+    def close_tracker(self):
+        self.close_timer = QTimer()
+        self.close_timer.timeout.connect(self.close_tracker_action)
+        self.close_timer.start(self.wait_time)
+    
+    def close_tracker_action(self):
+        for i in self.tracker_list:
+            i.close()
+    
+    def get_drives(self):
+        drivers = get_hard_drives()
+        if self.monitor_drivers:
+            drivers_t = []
+            for i in drivers:
+                for i_t in self.monitor_drivers:
+                    if i.startswith(i_t):
+                        drivers_t.append(i)
+                        break
+            return drivers_t
+        else:
+            return drivers
+
 
