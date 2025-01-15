@@ -83,7 +83,7 @@ class InfoTip(QDialog):
     def __init__(self,
                  type_f:Literal['Info', 'Warning', 'Error'], 
                  prompt_f:str, 
-                 buttons:dict[str,str|dict[Literal['colors', 'value',],bool|str|str]],
+                 buttons:dict,
                  config:Config_Manager=None,):
         super().__init__()
         self.VALUE = -10

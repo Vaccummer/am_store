@@ -2,8 +2,10 @@ from PySide2.QtGui import *
 from PySide2.QtWidgets import *
 from PySide2.QtGui import *
 from PySide2.QtCore import *
-from ..tools.toolbox import *
+from Scripts.tools.toolbox import *
 import numpy as np
+import Scripts.global_var as GV
+from typing import Union, Callable, Any
 
 class Asize(QSize):
     def __init__(self, width:int, height:int):
@@ -21,10 +23,9 @@ class AIcon(QIcon):
         elif isinstance(file_path, str):
             self.file_path = file_path
             super().__init__(file_path)
-        elif isinstance(file_path, QIcon):
-            super().__init__(file_path)
         else:
-            super().__init__()
+            self.file_path = ''
+            super().__init__(file_path)
         
     def get_file_path(self):
         return self.file_path
@@ -213,9 +214,34 @@ class UIUpdater(QObject):
     def _primary_init(cls,config:Config_Manager):
         cls.config_manager:Config_Manager = config.deepcopy()
         cls.config:dict = copy.deepcopy(cls.config_manager.config)
-    
+        cls.wkdr = config.wkdr
+
     @classmethod
-    def action(cls, key_f:atuple|alist[atuple], action_f:callable, type_f:None|str=None):
+    def after_process(cls, args_a:tuple, target_f):
+        if "path" in args_a:
+            if isinstance(target_f, list):
+                out_l = []
+                for i in target_f:
+                    if os.path.isabs(i):
+                        out_l.append(i)
+                    else:
+                        out_l.append(str((pathlib.Path(cls.wkdr)/pathlib.Path(i)).resolve()))
+                return out_l
+            elif isinstance(target_f, str):
+                if os.path.isabs(target_f):
+                    return target_f
+                else:
+                    return str((pathlib.Path(cls.wkdr)/pathlib.Path(target_f)).resolve())
+            else:
+                return target_f
+        elif "font" in args_a:
+            font_dict = {i[0]:i[1] for i in target_f}
+            return font_get(font_dict)
+        else:
+            return target_f
+        
+    @classmethod
+    def action(cls, key_f:atuple|alist[atuple], action_f:Callable, type_f:None|str=None):
         value_t = cls._getValue(key_f, cls.config)
         atuple_check = False
         if isinstance(key_f, atuple):
@@ -250,7 +276,7 @@ class UIUpdater(QObject):
             if not value_t:
                 return default_v
             else:
-                return value_t
+                return cls.after_process(key_f, value_t)
         elif isinstance(key_f, alist):
             value_l = []
             for i in key_f:
@@ -263,9 +289,8 @@ class UIUpdater(QObject):
             warnings.warn(f"UIUpdater.get: Invalid key type: {key_f}")
             return default_v
     @classmethod
-    def set(cls, key_f:Union[atuple,alist],action_f:callable,
-             type_f:Union[alist[Literal[None, 'size', 'font', 'icon', 'config', 'height']], 
-                          Literal[None, 'size', 'font', 'icon', 'config', 'height','margin','unpack', 'style']]=None):
+    def set(cls, key_f:Union[atuple,alist],action_f:Callable,
+             type_f:Union[alist[GV.UpdateSign], GV.UpdateSign]=None):
         atuple_check, value_t, value_ae = cls.action(key_f, action_f, type_f)
         if atuple_check:
             escape_sign = UIUpdater.cal_escape_sign(value_t, value_t, init_value=True)
@@ -278,7 +303,7 @@ class UIUpdater(QObject):
             cls.action(key_f, action_f, type_f)
             return None
         return data_c
-
+        
     @staticmethod
     def cal_escape_sign(value_t:str|dict|list|int|alist, value_n:str|dict|list|int|alist, init_value:bool=False)->dict|bool:
         if isinstance(value_t, alist):

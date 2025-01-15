@@ -1,4 +1,5 @@
 from PySide2.QtWidgets import QApplication
+from PySide2.QtCore import Slot, Signal # type: ignore
 from sympy import Q
 from Scripts.tools.toolbox import *
 from Scripts.ui.launcherUI import *
@@ -115,7 +116,7 @@ class BaseLauncher(QMainWindow):
 
         self.launcher_m = LauncherPathManager(self.config)
         self.shortcut_m = ShortcutsPathManager(self.config)
-        self.paths_m = PathManager(self, self.config)
+        self.paths_m = TransferPathManager(self, self.config)
 
     def _mainwindow_set(self):
         
@@ -136,7 +137,8 @@ class BaseLauncher(QMainWindow):
         painter.setPen(Qt.NoPen)
         painter.drawRoundedRect(self.rect(), 20, 20)
     
-    def tip(self, title:str, prompt_f:str, value_d:dict, default_v):
+    def tip(self, title:Literal['Info', 'Warning', 'Error'], prompt_f:str, 
+            value_d:dict, default_v):
         keys = list(value_d.keys())
         values = list(value_d.values())
         value_dn = {keys[i]: i for i in range(len(keys)) }
@@ -166,7 +168,7 @@ class BaseLauncher(QMainWindow):
         self.programm_exit()
     
 class UILauncher(BaseLauncher):
-    def __init__(self, config: dict, app: QApplication):
+    def __init__(self, config:Config_Manager, app: QApplication):
         super().__init__(config, app)
         self._init_layout()
         self._mainwindowUI()
@@ -265,7 +267,7 @@ class UILauncher(BaseLauncher):
 
 class ControlLauncher(UILauncher):
     update_as = Signal(str)
-    def __init__(self, config: dict, app: QApplication):
+    def __init__(self, config:Config_Manager, app: QApplication):
         super().__init__(config, app)
         self._obj_connect()
     
@@ -311,16 +313,17 @@ class ControlLauncher(UILauncher):
         # set inputbox text set
         self.associate_list.text_set_signal.connect(self.input_box.external_set_text)
     
-    @Slot(str)
+    @Slot(str) # type: ignore
     def _top_button_click(self, sign:Literal['minimum', 'maximum', 'close', 'entry']):
         match sign:
             case 'entry':
                 if self.shortcut_setting.isVisible():
                     return
-                self.shortcut_setting = ShortcutSetting(self, self.config.deepcopy())
+                self.shortcut_setting = ShortcutSetting(self, self.config.deepcopy(), self.shortcut_m)
                 self.shortcut_setting.showWin()
-    @Slot(dict)
-    def _input_box_signal_process(self, input_f:dict[Literal['key', 'text', 'type'], str]):
+    
+    @Slot(dict) # type: ignore
+    def _input_box_signal_process(self, input_f:dict[Literal['key', 'text', "type", 'paths'], str]):
         event_type = input_f['type']
         text = input_f['text']
         if event_type == 'key_press':
@@ -354,16 +357,18 @@ class ControlLauncher(UILauncher):
                 self.input_box.setText(paths_com)
         else:
             return
-    @Slot(str)
+    
+    @Slot(str)# type: ignore
     def _input_change(self, text:str):
         if GV.MODE == "Launcher":
-            self.update_as.emit(text)
+            self.update_as.emit(text)   # type: ignore
             driver_parttern = r"^([A-Za-z])[\\]$"
             dirver_match = re.match(driver_parttern, text)
             if dirver_match:
                 self.input_box.setText(f"{dirver_match.group(1)}:\\")
                 return
-    @Slot(list)
+    
+    @Slot(list) # type: ignore
     def _connection_check(self, result):
         
         sign_f, error = result
@@ -376,7 +381,7 @@ class ControlLauncher(UILauncher):
             self.path_switch_button.setState(2)
         else:
             self.path_switch_button.setState(0)
-    @Slot(dict)
+    @Slot(dict) # type: ignore
     def _updateUI(self, dict_f:dict):
         
         try:
@@ -391,7 +396,7 @@ class ControlLauncher(UILauncher):
             return True, ''
         except Exception as e:
              False, e
-    @Slot()
+    @Slot() # type: ignore
     def _refresh_setting(self):
         self._refresh_setting.disconnect()
         self._refresh_setting.connect(self.shortcut_setting.refresh_signal)

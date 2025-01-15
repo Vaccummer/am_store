@@ -29,7 +29,7 @@ import numpy
 import yaml
 import sys
 import pandas
-
+from win32com.client import Dispatch
 
 def is_path(string_f, exist_check:bool=False):
     # To judge whether a variable is Path or not
@@ -532,6 +532,25 @@ def is_admin():
         return ctypes.windll.shell32.IsUserAnAdmin()
     except:
         return False
+
+def link2path(path_f:str)->str:
+    '''
+    convert a shortcut path to its target path
+    if the target path does not exist or not a shortcut, return the original path
+    '''
+    isfile_check = os.path.isfile(path_f)
+    islink_check = path_f.lower().endswith('.lnk')
+    if isfile_check and islink_check:
+        shell = Dispatch('WScript.Shell')
+        shortcut = shell.CreateShortcut(path_f)
+        target_path = shortcut.TargetPath
+        if os.path.exists(target_path):
+            return target_path
+        else:
+            return path_f
+    else:
+        return path_f
+
 
 class atuple(tuple):
     def __new__(cls, *args):

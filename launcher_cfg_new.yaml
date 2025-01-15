@@ -245,17 +245,8 @@ Launcher:
     path:
       file_icon_folder: "./load/Launcher/file_icons"
       app_icon_folder: "./load/Launcher/app_icons"
-      default_app_icon: &default_button_icon "./load/Launcher/shortcut_setting/default/default_button_icon.svg"
-      default_folder_icon: &default_folder_icon "./load/Launcher/assoicate_list/default_icon_folder/folder.svg"
-      default_file_icon: &default_file_icon "./load/Launcher/assoicate_list/default_icon_folder/file.svg"
       # icons of certian format file is customed via UI, usually stored in $file_icon_folder
       # name of the icon is f"Ass_Icon_{extension}.{svg|png|icon}"
-      default_back_icon: ""
-      download_save_dir: "./load/Launcher/assoicate_list/download"
-      filelog_default_path: 'F:\\Windows_Data\\Desktop_File'
-      exe_icon_getter: "./3rdparty/get_exe_icon/main.exe"
-      file_icon_getter: "./3rdparty/get_file_icon/main.exe"
-
     style:
       main:
         widget:
@@ -290,10 +281,11 @@ Launcher:
         resize_fractor: 0.5
         animation_time: "none"
       button:
-        icon_proportion: 0.95
+        icon_proportion: 0.9
         background_colors: ["rgba(255, 255, 255, 20)", "#FFC300", "#FF5733"] # common, hover, pressed
         border_radius: 10
         animation_type: "shake" # 'shake' or 'resize', default is None
+        padding: [0, 0, 0, 10]
       menu:
         main:
           border: "none"
@@ -309,7 +301,7 @@ Launcher:
           display_x_offset: -20
           display_y_offset: -40
           padding: [0, 0, 0, 10]
-    max_exe_num: 15
+    max_app_num: 20
     max_item_maintain: 999
     max_dir_num: 999
     max_length: 600
@@ -349,11 +341,11 @@ Launcher:
       tab: [[Family, *jetbrains], [PixelSize, 60], [Weight, 70]]
     path:
       entry_icon: "./load/Launcher/entry_button.svg"
-      button_icons: &shortcut_button_icons "./load/Launcher/shortcut_botton/button_icons"
+      button_icons: "./load/Launcher/shortcut_botton/button_icons"
       taskbar_icon: "./load/Launcher/shortcut_setting/taskbar_icon.svg"
-      setting_xlsx: &shortcut_setting_xlsx "./load/Launcher/shortcut_obj/shortcut_set.xlsx"
-      default_app_icon: *default_button_icon # 和associate共享默认app_icon
-      default_button_icon: *default_button_icon # 和associate共享默认app_icon
+      setting_xlsx: "./load/Launcher/shortcut_obj/shortcut_set.xlsx"
+      # default_app_icon: *default_button_icon # 和associate共享默认app_icon
+      # default_button_icon: *default_button_icon # 和associate共享默认app_icon
       default_folder_icon: "./load/Launcher/shortcut_setting/default/default_folder_icon.svg"
       col_coordinate_icon: "./load/Launcher/shortcut_setting/col_icon/col_coordinate_icon.svg"
       col_name_icon: "./load/Launcher/shortcut_setting/col_icon/col_name_icon.svg"
@@ -752,3 +744,32 @@ Settings:
       tag_folder: "./tmp/tag"
     wait_time: 500
     monitor_drivers: [] # Disk to be monitored, just like ['C', 'D'], default is all
+
+Manager:
+  LauncherPathManager:
+    path:
+      settings_xlsx_path: "./load/Manager/LauncherPathManager/launcher_set.xlsx"
+      file_icon_folder: "./load/Manager/LauncherPathManager/common_file_icons"
+      app_icon_folder: "./load/Manager/LauncherPathManager/app_icons"
+      folder_icon_folder: "./load/Manager/LauncherPathManager/folder_icons"
+      exe_file_icon_folder: "./load/Manager/LauncherPathManager/exe_file_icons"
+      icon_cache_folder: "./load/Manager/LauncherPathManager/icon_cache"
+      default_app_icon: &default_button_icon "./load/Manager/LauncherPathManager/default/app.svg"
+      default_folder_icon: &default_folder_icon "./load/Manager/LauncherPathManager/default/folder.svg"
+      default_file_icon: &default_file_icon "./load/Manager/LauncherPathManager/default/file.svg"
+
+  ShortcutsPathManager:
+    a: 1
+
+  TransferPathManager:
+    path:
+      default_download_path: "F:\\Windows_Data\\Desktop_File"
+      download_filedialog_root: "./load"
+    filename_flitter: ["$"] # filename or dirname starts with these characters will be moved to the end of the list
+    separate_sign: "^--$"
+    ssh_config: "C:\\Users\\am\\.ssh\\config"
+    hostname: "all" # fliter hosts in config, if is "all", include all, if is null, exclude all. Use list format to assign multi host
+    wsl:
+      - ["ubuntu-24.04", "//wsl.localhost/Ubuntu-24.04", "am"] # ["hostname", "address", "username"]
+    connection_check_interval: 30
+    connection_timeout: 5

@@ -710,15 +710,15 @@ class BaseLauncherSetting(QWidget):
         self._process_ori_df()
     
     def _process_ori_df(self):
-        self.df:dict[str:pandas.DataFrame] = self.manager.df
-        self.data_dict = {}
-        for name_i, df_i in self.df.items():
-            index_i = 0
-            for _, row in df_i.iterrows():
-                self.data_dict.setdefault(name_i, {})
-                self.data_dict[name_i][index_i] = row.to_dict() | {'IconPath':''}
-                index_i += 1
-
+        self.app_info_d = self.manager.app_d
+        # self.df:dict[str:pandas.DataFrame] = self.manager.df
+        self.data_dict:dict[str, dict[int, GV.LauncherAppInfo]] = {}
+        for name_i, info_i in self.app_info_d.items():
+            list_i = self.data_dict.setdefault(info_i.group, [])
+            list_i.append(info_i.deepcopy())
+        for group_i, list_i in self.data_dict.items():
+            self.data_dict[group_i] = {i:app_i for i, app_i in enumerate(list_i)}
+        
     def _load_var(self):
         self.num = int(self.config.get('ori_line_num', obj=None))
         self.line_num = 0
@@ -781,8 +781,8 @@ class BaseLauncherSetting(QWidget):
         self.layout_0 = amlayoutV(align_h='c', spacing=5)
         UIUpdater.set(self.layout_spacing, self.layout_0.setSpacing)
         self.setLayout(self.layout_0)
-        self.objs_l = {}
-        self.widget_l = []
+        self.objs_l:dict[int, dict[str, QWidget]] = {}
+        self.widget_l:list[QWidget] = []
         self.tab_index = 0
 
     def _get_default_df(self, group:str):
@@ -1030,22 +1030,30 @@ class LauncherSetting(UILauncherSetting):
     def _line_fresh(self, page_name:str)->None:
         self.line_num = 0
         self.data_dict.setdefault(page_name, {})
-        self.dict_n = self.data_dict[page_name]
+        self.dict_n:dict[int, GV.LauncherAppInfo] = self.data_dict[page_name]
         for i in range(len(self.dict_n.keys())):
             if i >= self.num:
                 self._insert_line()
             self.widget_l[i].setVisible(True)
             self.objs_l[i]['number'].setText(str(i))
-            self.objs_l[i]['name'].setText(self.dict_n.get(i, {}).get('Name', ''))
-            self.objs_l[i]['chname'].setText(self.dict_n.get(i, {}).get('Chinese Name', ''))
-            self.objs_l[i]['exe'].setText(self.dict_n.get(i, {}).get('EXE Path', ''))
-            icon_c = self.dict_n.get('IconPath', '')
+            self.objs_l[i]['name'].setText(self.dict_n[i].name)
+            self.objs_l[i]['chname'].setText(self.dict_n[i].chname)
+            self.objs_l[i]['exe'].setText(self.dict_n[i].exe_path)
+            icon_c = self.dict_n[i].icon_path
             if icon_c:
-                self.objs_l[i]['icon'].setIcon(QIcon(icon_c))
+                self.objs_l[i]['icon'].setIcon(AIcon(icon_c))
             else:
-                icon_d = self.manager.get_app_icon(self.dict_n[i]['Name'], )
-                self.objs_l[i]['icon'].setIcon(AIcon(icon_d))
-                self.dict_n[i]['IconPath'] = icon_d
+                if not self.dict_n[i].name:
+                    icon_c = self.manager.default_app_icon
+                else:
+                    type_f = 'app'
+                    name_f = self.dict_n[i].name
+                    path_f = self.dict_n[i].exe_path
+                    host_f = 'Local'
+                    request = GV.IconQuery(type_f=type_f, name=name_f, group=page_name, path=path_f, host=host_f)
+                    icon_c = self.manager.get_app_icon(request)
+                self.objs_l[i]['icon'].setIcon(icon_c)
+                self.dict_n[i].icon_path = icon_c.file_path
             self.line_num += 1
         for i in range(len(self.widget_l)):
             if i >= len(self.dict_n.keys()):
@@ -1091,6 +1099,7 @@ class LauncherSetting(UILauncherSetting):
         #self.df_n.loc[len(self.df_n)] = ['', '', '', '', page_text, None]
         if self.line_num >= len(self.widget_l):
             self._init_single_line(self.line_num, default=True, insert=True)
+            self.dict_n[self.line_num] = GV.LauncherAppInfo(None, name='', chname='', group=page_text, exe_path='')
         else:
             self.widget_l[self.line_num].setVisible(True)
             self.objs_l[self.line_num]['number'].setText(str(self.line_num))
@@ -1113,7 +1122,7 @@ class LauncherSetting(UILauncherSetting):
             name_t = f'{name}_{i}'
             if name_t not in text_l:
                 break
-        self.data_dict[name_t] = {0:{'Name':'', 'Chinese Name':'', 'EXE Path':'', 'IconPath':''}}
+        self.data_dict[name_t] = {0:GV.LauncherAppInfo(None, name='', chname='', group=name_t, exe_path='')}
         self.tab_bar.addTab(name_t)
         if refresh:
             self.tab_bar.set_current_tab(name_t)
@@ -1143,6 +1152,8 @@ class LauncherSetting(UILauncherSetting):
     def sort_tab(self)->None:
         tab_text_l = self.tab_bar.get_texts()
         index_i = self.tab_bar.currentIndex()
+        self.tab_index = index_i
+        return
         df_l = []
         for i in tab_text_l:
             for j in self.df_l:
@@ -1152,23 +1163,23 @@ class LauncherSetting(UILauncherSetting):
         self.tab_index = index_i
 
     def _change_icon(self, index_f:int)->None:
-        file_filter = "Images (*.svg *.png *.jpg *.jpeg *.ico)"
+        file_filter = "Icons (*.svg *.png *.jpg *.jpeg *.ico *.bmp)"
         file_path, _ = QFileDialog.getOpenFileName(self, "Select an image", "", file_filter)
         if not file_path:
             return
         icon_i = QIcon(file_path)
         self.objs_l[index_f]['icon'].setIcon(icon_i)
         self.objs_l[index_f]['icon'].setProperty('icon_path', file_path)
-        self.dict_n['IconPath'] = file_path
+        self.dict_n[index_f].icon_path = file_path
     
     def name_edit_change(self, text:str)->None:
         edit_f:NameEdit = self.sender()
         type_f:str = edit_f.property('type')
         index_f:int = edit_f.property('index')
         if type_f == 'name':
-            self.dict_n[index_f]['Name'] = text
+            self.dict_n[index_f].name = text
         elif type_f == 'chname':
-            self.dict_n[index_f]['Chinese Name'] = text
+            self.dict_n[index_f].chname = text
         names = [i['name'].text() for i in self.objs_l.values()]
         if not text:
             edit_f.customBackground(True)
@@ -1183,7 +1194,7 @@ class LauncherSetting(UILauncherSetting):
     def exe_edit_write(self, text:str)->None:
         line_f = self.sender()
         index_f = line_f.property('index')
-        self.dict_n[index_f]['EXE Path'] = text
+        self.dict_n[index_f].exe_path = text
 
     def _exe_search(self, index_f:int)->None:
         options = QFileDialog.Options()
@@ -1202,47 +1213,45 @@ class LauncherSetting(UILauncherSetting):
             df_list.append(pandas.DataFrame([value | {'Group': group_name}]))
         return pandas.concat(df_list, ignore_index=True) if df_list else pandas.DataFrame()
 
-    
     def _reset(self)->None:
-        # title_f = 'Warning'
-        # prompt_f = 'Are you sure to reset pages to last stage?'
-        # value_d = {'Reset All':2, "Reset This Page":1, 'Cancel':-5}
-        # out_f = self.up.tip(title_f, prompt_f, value_d, -5)
         out_f =2
         page_n = self.tab_bar.get_current_text()
         match out_f:
             case 1:
-                if page_n not in self.df.keys():
-                    self.data_dict[page_n] = {0:{'Name':'', 'Chinese Name':'', 'EXE Path':'', 'IconPath':''}}
+                if page_n not in self.data_dict.keys():
+                    self.data_dict[page_n] = {0:GV.LauncherAppInfo(None, name='', chname='', group=page_n, exe_path='')}
                 else:
-                    self.data_dict[page_n] = {}
-                    for i in range(self.df[page_n].shape[0]):
-                        self.data_dict[page_n][i] = self.df[page_n].iloc[i].to_dict() | {'IconPath':''}
+                    self.data_dict[page_n].clear()
+                    index_i = 0
+                    for info_i in self.app_info_d.values():
+                        if info_i.group == page_n:
+                            self.data_dict[page_n][index_i] = info_i
+                            index_i += 1
                 self._line_fresh(self.tab_bar.get_current_text())
             case 2:
-                self.tab_bar.set_current_tab(next(iter(self.df.keys())))
-                for name_i in self.tab_bar.get_texts():
-                    if name_i not in self.df.keys():
-                        self.tab_bar._delete(name_i)
-                        self.data_dict.pop(name_i)
                 self._process_ori_df()
+                page_i = next(iter(self.data_dict.keys()))
+                self.tab_bar.set_current_tab(page_i)
+                self._line_fresh(page_i)
                 
     def _save(self):
         # title_f = 'Warning'
         # prompt_f = 'Are you sure to write in pages to local data?'
         # value_d = {'Save All':2, "Save This Page":1, 'Cancel':-5}
         # out_f = self.up.tip(title_f, prompt_f, value_d, -5)
-        out_f = 1
+        out_f = 2
         page_n = self.tab_bar.get_current_text()
         match out_f:
             case 1:
-                df = self._read_data(self.data_dict[page_n], page_n)
-                self.df[page_n] = df
-                self.manager.save_xlsx()
+                for info_i in self.data_dict[page_n].values():
+                    if info_i.name:
+                        self.manager.app_d[info_i.name] = info_i
+                self.manager.xlsx_save_signal.emit()
             case 2:
-                for group_name, dict_i in self.data_dict.items():
-                    df = self._read_data(dict_i, group_name)
-                    self.df[group_name] = df
-                
-                self.manager.save_xlsx()
+                self.manager.app_d.clear()
+                for info_d in self.data_dict.values():
+                    for info_i in info_d.values():
+                        if info_i.name:
+                            self.manager.app_d[info_i.name] = info_i
+                self.manager.xlsx_save_signal.emit()
 

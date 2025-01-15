@@ -1,6 +1,6 @@
-from PySide2.QtCore import *
-from PySide2.QtGui import *
-from PySide2.QtWidgets import *
+from PySide2.QtCore import Signal, Slot
+from PySide2.QtGui import QIcon, QFont, QPixmap, QWheelEvent
+from PySide2.QtWidgets import QPushButton, QWidget, QListWidget, QLineEdit, QMainWindow, QVBoxLayout
 import random
 from functools import partial
 from Scripts.manager.config_ui import *
@@ -378,7 +378,7 @@ class WheelEdit(AutoEdit):
         else:
             self.wheel_signal.emit(-1)
 
-class ModeButton(YohoPushButton, QObject):
+class ModeButton(YohoPushButton):
     textChanged = Signal(str)
     wheel_signal = Signal(int)
     def __init__(self, style_d, text_f='', font_f=None, height_f=None, color_state=0, parent=None):
@@ -552,7 +552,7 @@ class ModeListWidget(QListWidget):
     def get_max_height(self):
         return self.get_size()[1]
     
-class CustomComboBox(QWidget, QObject):
+class CustomComboBox(QWidget):
     index_changed = Signal(int)
     def __init__(self, modes:list, style_d:dict, box_height=None, box_font=QFont(), menu_font=QFont(),
                  parent:QMainWindow=None):

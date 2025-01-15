@@ -1,128 +1,315 @@
-from PySide2.QtWidgets import *
-from PySide2.QtGui import *
-from PySide2.QtCore import *
+from PySide2.QtWidgets import QMainWindow
+from PySide2.QtGui import QIcon
+from PySide2.QtCore import Signal, Slot, QObject
 from Scripts.tools.toolbox import *
+from Scripts.manager.config_ui import AIcon
+import Scripts.global_var as GV
 import numpy as np
-from Scripts.ui.custom_widget import AIcon
+from typing import *
 from Scripts.manager.config_ui import Config_Manager  
 from Scripts.manager.config_ui import UIUpdater
+import clr
+from PIL import Image
+from PIL.Image import Image as ImageType
+import io
+import pickle
 from datetime import datetime
-# from Scripts.manager.ui import *
+import hashlib
+clr.AddReference(os.path.abspath("./Scripts/manager/IconExtractor.dll"))
+from IconExtractor import Worker    # type: ignore
+import shutil
 
+class IconSet:
+    def __init__(self, path:str, icon:QIcon):
+        pass
 
-class LauncherPathManager(object):
+class LauncherPathManager(QObject):
+    xlsx_save_signal = Signal()
+    icon_save_signal = Signal(GV.IconSaveRequest)
+
     def __init__(self, config:Config_Manager):
+        super().__init__()
         self.config = config
-        self.data_path = AMPATH(self.config[atuple('Launcher', 'settings_xlsx_path')])
-        self.permit_col = ['Name', 'Chinese Name', 'EXE Path']
+        self._loadAll()
 
+    def _loadAll(self):
+        self.save_signal.connect(self.save2xlsx)
+        self.icon_save_signal.connect(self.app_icon_save)
+        self.data_path = UIUpdater.get(atuple('Manager', 'LauncherPathManager', 'path', 'settings_xlsx_path'), './load/Manager/LauncherPathManager/settings.xlsx')
+        self.permit_col = ['Name', 'Chinese Name', 'EXE Path'] 
         self.conduct_l = []
         self.name = 'PathManager'
         self.sign_for_separate = self.config.get('separate_sign', 'Settings', self.name)
         disallowed_chars_pattern = r'[<>:"/\\|?*]'
         if (not self.sign_for_separate) or re.findall(disallowed_chars_pattern, self.sign_for_separate):
             self.sign_for_separate = "^--$"
-        self._read_xlsx()
-        self.check()
+        self.df_app_ptr = atuple('Manager', 'LauncherPathManager', 'path', 'default_app_icon')
+        self.df_file_ptr = atuple('Manager', 'LauncherPathManager', 'path', 'default_file_icon')
+        self.df_folder_ptr = atuple('Manager', 'LauncherPathManager', 'path', 'default_folder_icon')
+        self.extractor_record:dict[str:bool] = {}
+        self.icon_cache_folder = UIUpdater.get(atuple('Manager', 'LauncherPathManager', 'path', 'icon_cache_folder'), 
+                                               './load/Manager/LauncherPathManager/icon_cache')
+        UIUpdater.set(alist(self.df_app_ptr, self.df_file_ptr, self.df_folder_ptr), self._load_default_icon, alist())   
+        self._load_app_info()
         self._load_icon_dict()
+        self.auto_get_icon()
+        
+    def _load_default_icon(self, df_app:str, df_file:str, df_folder:str):
+        self.default_app_icon = AIcon(df_app) if df_app else AIcon()
+        self.default_file_icon = AIcon(df_file) if df_file else AIcon()
+        self.default_folder_icon = AIcon(df_folder) if df_folder else AIcon()
+
+    def _load_icon_dict(self)->None:
+        # load icon path for app_d
+        '''
+        icons are stored in the folder as {group}{self.sign_for_separate}{app_name}.png, like Launcher--$Notepad.png
+        '''
+        self.app_icon_folder = UIUpdater.get(atuple('Manager', 'LauncherPathManager', 'path', 'app_icon_folder'), './load/Launcher/app_icons')
+        for name_i in os.listdir(self.app_icon_folder):
+            path_i = os.path.join(self.app_icon_folder, name_i)
+            if not self.check_format(path_i):
+                continue
+            group, app_name = os.path.splitext(name_i)[0].split(self.sign_for_separate)
+            if not all([group, app_name]):
+                os.remove(path_i)
+                continue
+            if self.app_d.get(app_name, None):
+                self.app_d[app_name].icon_path = path_i
+            else:
+                os.remove(path_i)
+        
+        # load icon path for common file_icon_d
+        '''
+        icons are stored in the folder as {ext_name}.png, like txt.png, jpg.png, etc.
+        '''
+        self.file_icon_folder = UIUpdater.get(atuple('Manager', 'LauncherPathManager', 'path', 'file_icon_folder'), '')
+        self.file_icon_d:dict[str,AIcon] = {}
+        for name_i in os.listdir(self.file_icon_folder):
+            path_i = os.path.join(self.file_icon_folder, name_i)
+            if not self.check_format(path_i):
+                continue
+            ext_name = os.path.splitext(name_i)[0]
+            self.file_icon_d[f'.{ext_name}'] = AIcon(path_i)
+        
+        # load icon path for folder_icon_d
+        '''
+        icons are stored in the folder as {hash_num}.png, like 1234567890.png, hash_num is the hash of tuple(host, path)
+        '''
+        self.folder_icons = UIUpdater.get(atuple('Manager', 'LauncherPathManager', 'path', 'folder_icon_folder'), 
+                                               './load/Manager/LauncherPathManager/folder_icons')
+        self.folder_icon_d:dict[str, AIcon] = {}
+        for name_i in os.listdir(self.folder_icons):
+            path_i = os.path.join(self.folder_icons, name_i)
+            if not self.check_format(path_i):
+                continue
+            hash_num = os.path.splitext(name_i)[0]
+            self.folder_icon_d[hash_num] = AIcon(path_i)
+        
+        # load icon path for exe_file_icon_d
+        '''
+        icons are stored in the folder as {hash_num}.png, like 1234567890.png, hash_num is the hash of tuple(host, exe_path)
+        '''
+        self.exe_file_icon_folder = UIUpdater.get(atuple('Manager', 'LauncherPathManager', 'path', 'exe_file_icon_folder'), '')
+        self.exe_file_icon_d:dict[str, AIcon] = {}
+        for name_i in os.listdir(self.exe_file_icon_folder):
+            path_i = os.path.join(self.exe_file_icon_folder, name_i)
+            name_r = os.path.splitext(name_i)[0]
+            if not self.check_format(path_i):
+                continue
+            self.exe_file_icon_d[name_r] = AIcon(path_i)
     
-    def _read_xlsx(self):
-        self.pure_df = pd.DataFrame()
-        self.df = OrderedDict()
+    def _load_app_info(self)->None: 
+        self.app_d:dict[str:GV.LauncherAppInfo] = {}
         with pd.ExcelFile(self.data_path) as xls:
             # read all sheets and add a column to indicate the group
             for sheet_name in xls.sheet_names:
                 df_t = pd.read_excel(self.data_path, sheet_name=sheet_name)
-                self.pure_df = pd.concat([self.pure_df, df_t], ignore_index=True)
-                for col_i in df_t.columns:
-                    if col_i not in self.permit_col:
-                        df_t.drop(col_i, axis=1, inplace=True)
                 df_t.dropna(axis=0, how='all', inplace=True)
                 df_t.fillna("", inplace=True)
-                self.df[sheet_name] = df_t
-        self.total_name_d = {}
-        self.total_names = []
-        for name_i, df_i in self.df.items():
-            self.total_name_d[name_i] = df_i['Name'].to_list()
-            self.total_names.extend(df_i['Name'].to_list())
-        return self.df
+                for row_i in df_t.iterrows():
+                    row_d = row_i[1].to_dict()
+                    name_i = row_d['Name']
+                    chname_i = row_d['Chinese Name']
+                    group_i = sheet_name
+                    exe_path_i = row_d['EXE Path']
+                    exe_path_i = exe_path_i if is_path(exe_path_i, exist_check=True) else ""
+                    ID_f = self.hash_app(name_i, group_i)
+                    self.app_d[name_i] = GV.LauncherAppInfo(ID=ID_f, name=name_i, chname=chname_i, group=group_i, exe_path=exe_path_i)
 
-    def save_xlsx(self):
-        with pd.ExcelWriter(self.data_path, mode='w') as writer:
-            for name_i, df_i in self.df.items():
-                df_i.to_excel(writer, sheet_name=name_i, index=False)
+    def auto_get_icon(self):
+        for app_i in self.app_d.values():
+            path_t = link2path(app_i.exe_path)
+            if is_path(path_t, exist_check=True) and os.path.splitext(path_t)[1].lower() in ['.exe', '.dll']:
+                icon_path = self.app_icon_extract(path_t, app_i.group, app_i.name)
+                if icon_path:
+                    app_i.icon_path = icon_path
+
+    def check_format(self, name_i:str)->bool:
+        check_file = is_path(name_i, exist_check=True)
+        check_ext = os.path.splitext(name_i)[1] in ['.png', '.svg', '.ico', 'jpg', 'jpeg', 'bmp']
+        return check_file and check_ext
+        
+    def extract_exe_icon(self, exe_path:str, index_f:int=0)->ImageType|None:
+        exe_path = link2path(exe_path)
+        if os.path.splitext(exe_path)[1].lower() not in ['.exe','dll']:
+            return None
+        try:
+            image_data = Worker.Extract(exe_path, index_f)
+            image_f = Image.open(io.BytesIO(image_data))
+            return image_f
+        except Exception as e:
+            #warnings.warn(f"Error extracting icon from {exe_path}: {e}")
+            return None
+
+    def app_icon_extract(self, exe_path:str, group:str, name:str, index_f:int=0)->str|None:
+        if self.extractor_record.get((exe_path, group, name), False):
+            return None
+        image_f = self.extract_exe_icon(exe_path, index_f)
+        if image_f is None:
+            return None
+        dst_name = f"{group}{self.sign_for_separate}{name}.png"
+        dst_path = os.path.join(self.app_icon_folder, dst_name)
+        image_f.save(dst_path)
+        self.extractor_record[(exe_path, group, name)] = True
+        return dst_path
     
-    def check(self):
-        for name_i, df_i in self.df.items():
-            self.df[name_i]['EXE Path'] = self.df[name_i]['EXE Path'].apply(lambda x: x if os.path.exists(x) else "")
-        #self.df['EXE Path'] = self.df['EXE Path'].apply(lambda x: x if os.path.exists(x) else "")
-    
-    def _load_icon_dict(self):
-        #self.default_app_icon_path = self.config.get('default_app_icon', mode="Launcher", widget='associate_list', obj="path")
-        self.default_app_icon = atuple('Launcher', 'associate_list', 'path','default_app_icon')
-        # self.default_app_icon = self.default_app_icon_path
-        self.app_icon_folder = self.config.get('app_icon_folder', mode="Launcher", widget='associate_list', obj="path")
-        self.app_icon_d = {name:{} for name in self.df.keys()}
-        for name_i in os.listdir(self.app_icon_folder):
-            path_i = os.path.join(self.app_icon_folder, name_i)
-            if os.path.isfile(path_i):
-                group_name, ext = os.path.splitext(name_i)
-                tmp_l = group_name.split(self.sign_for_separate)
-                if len(tmp_l) <= 1:
-                    continue
+    def exe_file_icon_extract(self, exe_path:str, save_path:str, UID:str=None)->str|None:
+        if self.extractor_record.get(UID, False):
+            return None
+        img_f = self.extract_exe_icon(exe_path, 0)
+        if img_f is None:
+            return None
+        img_f.save(save_path)
+        self.extractor_record[UID] = True
+        self.exe_file_icon_d[UID] = save_path
+        return save_path
+
+    def get_file_icon(self, request:GV.IconQuery)->str|AIcon:
+        host_i = request.host
+        path_i = request.path
+        if host_i == 'Local' and path_i.endswith('.exe'):
+            UID = self.hash_path(host_i, path_i)
+            if self.extractor_record.get(UID, False):
+                icon_t = self.exe_file_icon_d.get(UID)
+                if icon_t:
+                    return AIcon(icon_t)
                 else:
-                    group, app_name = tmp_l[:2]
-                if app_name in self.app_icon_d[group].keys():
-                    warnings.warn(f"Icon for {app_name} in group {group} already exists, skip {path_i}")
-                else:
-                    self.app_icon_d[group][app_name] = path_i
-        self.exe_icon_getter = self.config.get('exe_icon_getter', mode="Launcher", widget='associate_list', obj="path").replace('\\', '/')
+                    return self.default_app_icon
+            save_path = os.path.join(self.exe_file_icon_folder, f"{UID}.png")
+            temp_path = self.exe_file_icon_extract(path_i, save_path, UID)
+
+            if temp_path is None:
+                return self.default_app_icon
+            return AIcon(temp_path)
+        ext_name = os.path.splitext(request.name)[1]
+        return self.file_icon_d.get(ext_name, self.default_file_icon)
     
-    def get_app_icon(self, name, group=None)->Union[str, atuple]:
-        if group:
-            group_check = self.df.get(group, False)
-            if group_check is False:
-                return UIUpdater.get(self.default_app_icon, '')
-            else:
-                icon_path = self.app_icon_d[group].get(name, "")
+    def get_app_icon(self, request:GV.IconQuery)->AIcon:
+        exe_path = link2path(request.path)
+        if os.path.splitext(exe_path)[1].lower() in ['.exe','dll']:
+            path_t = self.app_icon_extract(exe_path, request.group, request.name)
+            if not path_t:
+                return self.default_app_icon
+            return AIcon(path_t)
         else:
-            icon_path, group = self._find_icon_in_all_groups(name)
-        if icon_path:
-            if isinstance(icon_path, atuple):
-                return UIUpdater.get(icon_path, '')
-            else:
-                return icon_path
-        if not group:
-            return UIUpdater.get(self.default_app_icon, '')
-
-        exe_entry = self.df[group][self.df[group]['Name'] == name]
-        if exe_entry.empty:
-            return UIUpdater.get(self.default_app_icon, '') 
-
-        exe_path = exe_entry.iloc[0]['EXE Path']
-        icon_key = f"{group}{self.sign_for_separate}{name}"
-        target_icon_path = os.path.join(self.app_icon_folder, icon_key).replace('\\', '/')+'.png'
-
-        if exe_path.endswith('.exe') and name not in self.conduct_l:
-            self.conduct_l.append(name)
-            if extract_icon(self.exe_icon_getter, exe_path, target_icon_path):
-                self.app_icon_d[group][name] = target_icon_path
-                return AIcon(self.app_icon_d[group][name])
-            else:
-                self.app_icon_d[group][name] = self.default_app_icon
-
-        return UIUpdater.get(self.default_app_icon, '')
-
-    def get_icon(self, name, group=None)->Union[str, atuple]:
-        return self.get_app_icon(name, group)
+            return self.default_app_icon
     
-    def _find_icon_in_all_groups(self, name):
-        for group, app_dict in self.app_icon_d.items():
-            icon_path = app_dict.get(name, "")
-            if icon_path:
-                return icon_path, group
-        return "", None
+    def get_folder_icon(self, request:GV.IconQuery)->AIcon:
+        hash_num = self.hash_path(request.host, request.path)
+        icon_t = self.folder_icon_d.get(hash_num, None)
+        if isinstance(icon_t, (AIcon,str)):
+            return icon_t
+        else:
+            return self.default_folder_icon
+    
+    def hash_path(self, host_i:str, path_i:str)->str:
+        path_i = host_i + 'path_for_folder_icon_or_exe_file_icon' + path_i
+        
+        return hash(str(hashlib.md5(path_i.encode()).hexdigest()[:16]))
+    
+    def hash_app(self, name:str, group:str)->str:
+        name_i = name + 'name_for_app_icon' + group
+        return hash(str(hashlib.md5(name_i.encode()).hexdigest()[:16]))
+    
+    def icon_query(self, request:GV.IconQuery)->AIcon:
+        match request.type_f:
+            case 'file':
+                return self.get_file_icon(request)
+            case 'app':
+                return self.get_app_icon(request.name, request.group)
+            case 'folder':
+                return self.get_folder_icon(request)
+            case _:
+                return self.default_file_icon
 
+    def app_icon_save(self, app_name:str, group:str, src_path:str)->str:
+        ext_name = os.path.splitext(src_path)[1]
+        if ext_name not in ['.png', '.svg', '.ico', 'jpg', 'jpeg', 'bmp']:
+            warnings.warn(f"Invalid icon format in app_icon_save: {ext_name}")
+            return
+        dst_name = f"{group}{self.sign_for_separate}{app_name}"
+        dst_path = os.path.join(self.app_icon_folder, dst_name+ext_name)
+        path_l = glob.glob(os.path.join(self.app_icon_folder, f"{dst_name}.*"))
+        for path_i in path_l:
+            os.remove(path_i)
+        shutil.copy(src_path, dst_path)
+        return dst_path
+
+    def path_icon_save(self, type_f:Literal['file', 'folder', 'exe'], host:str, path:str, src_path:str)->str:   
+        if not self.check_format(src_path):
+            return
+        icon_ext = os.path.splitext(src_path)[1]
+        match type_f:
+            case 'file':
+                save_name = os.path.splitext(path)[1].strip('.')    
+                path_l = glob.glob(os.path.join(self.file_icon_folder, f"{save_name}.*"))
+                dst_path = os.path.join(self.file_icon_folder, save_name+icon_ext)
+                
+            case 'folder':
+                hash_num = self.hash_path(host, path)
+                path_l = glob.glob(os.path.join(self.folder_icons, f"{hash_num}.*"))
+                dst_path = os.path.join(self.folder_icons, f"{hash_num}{icon_ext}")
+            case 'exe':
+                exe_hash = self.hash_path(host, path)
+                path_l = glob.glob(os.path.join(self.exe_file_icon_folder, f"{exe_hash}.*"))
+                dst_path = os.path.join(self.exe_file_icon_folder, f"{exe_hash}{icon_ext}")
+            case _:
+                warnings.warn(f"Invalid icon type in path_icon_save: {type_f}")
+                return
+        for path_i in path_l:
+            os.remove(path_i)
+        shutil.copy(src_path, dst_path)
+        return dst_path
+
+    @Slot()
+    def save2xlsx(self):
+        app_info_dict = {}
+        for info_i in self.app_d.values():
+            name_i = info_i.name
+            if not name_i:
+                continue
+            group_i = info_i.group
+            chname_i = info_i.chname
+            exe_path_i = info_i.exe_path
+            dict_t = {'Name':name_i, 'Chinese Name':chname_i, 'EXE Path':exe_path_i}
+            app_info_dict.setdefault(group_i, []).append(dict_t)
+        with pd.ExcelWriter(self.data_path, mode='w') as writer:
+            for name_i, df_i in app_info_dict.items():
+                df_t = pd.DataFrame(df_i)
+                df_t.to_excel(writer, sheet_name=name_i, index=False)
+        print(f'save to {self.data_path}')
+    @Slot(GV.IconSaveRequest)
+    def IconSaveRequest(self, request:GV.IconSaveRequest):
+        type_f = request.type_f
+        match type_f:
+            case 'app':
+                self.app_icon_save(request.name, request.group, request.src, request.path)
+            case 'file':
+                pass
+            case 'folder':
+                pass
+            case 'exe':
+                pass
 class ShortcutsPathManager(object):
     def __init__(self, config:Config_Manager):
         self.config = config
@@ -151,7 +338,7 @@ class ShortcutsPathManager(object):
         #self.default_icon = QIcon(self.config.get("default_button_icon", mode="Launcher", widget="shortcut_obj", obj="path"))
         self.default_icon = atuple('Launcher', 'shortcut_obj', 'path', 'default_button_icon')
         self.conduct_l = []
-        self.exe_icon_getter = self.config.get('exe_icon_getter', mode="Launcher", widget='associate_list', obj="path").replace('\\', '/')
+        # self.exe_icon_getter = self.config.get('exe_icon_getter', mode="Launcher", widget='associate_list', obj="path").replace('\\', '/')
     
     def geticon(self, name:str)->Union[str, atuple]:
         path_t = self.icon_dict.get(name, "")
@@ -173,7 +360,6 @@ class ShortcutsPathManager(object):
             else:
                 self.icon_dict[name] = self.default_icon
                 return self.default_icon
-
                           
     def save(self):
         self.df.to_excel(self.data_path, index=False)
@@ -267,9 +453,15 @@ class SSHManager(QObject):
             else:
                 self.con_res.emit([False, error_info])
 
-class PathManager(SSHManager):
+class TransferPathManager(SSHManager):
     def __init__(self, parent:QMainWindow, config:Config_Manager):
         super().__init__(parent, config)
+        self.path_ptr = atuple('Manager', 'TransferPathManager', 'path')
+        UIUpdater.set(self.path_ptr, self._loadPath, type_f='style')
+    
+    def _loadPath(self, path_d:dict, escape_sign:dict={}):
+        self.default_download_path = path_d.get('default_download_path', os.path.abspath('./tmp'))
+        self.download_filedialog_root = path_d.get('download_filedialog_root', os.path.abspath('./load'))
 
     def _filename_fliter(self, name:str)->bool:
         # return True if the file name is allowed else False
@@ -325,7 +517,7 @@ class PathManager(SSHManager):
         else:
             return False
         
-    def listdir(self, path_f:str)->List[list]:
+    def listdir(self, path_f:str)->tuple[list[str],list[os.stat_result]]:
         dir_l = []
         stat_l = []
         if self.host_type == 'WSL':
@@ -587,7 +779,7 @@ class TrackThread(QThread):
 
     def run(self):
         try:
-            from file_watcher import FileWatcher
+            from file_watcher import FileWatcher     # type: ignore
             self.watcher = FileWatcher()
             result_f = self.watcher.start(self.monitor_path, self.file_name, self.output_signal.emit)
             error_f = ''
