@@ -314,13 +314,14 @@ Launcher:
         time: "./load/Launcher/assoicate_list/default_icon_folder/sort_by_time.svg"
 
   shortcut_obj:
-    horizontal_button_num: 9
+    horizontal_button_num: 6
     vertical_button_num: 5
     Size:
       setting_window_size: [0.8*win_x, 0.8*win_y]
       title_height: 1.3*het
       entry_icon_r: 0.7*het
       icon_proportion: 0.8
+      name_label_width: 2.5*het
       button_r: 1.7*het
       button: [0.7*het, 0.7*het]
       line_height: 0.9*het
@@ -378,7 +379,7 @@ Launcher:
         animation_type: "resize" # 'shake' or 'resize', default is None
         animation_time: 200
       button_label:
-        background: "transparent"
+        background: "yellow"
         font_color: "#000000"
         border: "none"
         border_radius: 0
@@ -697,8 +698,8 @@ Settings:
           background: "transparent"
           border: "none"
           border_radius: 10
-          extra_width: 10
-          extra_height: 10
+          extra_width: 20
+          extra_height: 30
         item_button:
           spacing: 0
           background_colors: ["#A75A5A", "#FFC300", "#FF5733"] # common, hover, pressed
@@ -707,7 +708,7 @@ Settings:
           border_radius: 10
           display_x_offset: -15
           display_y_offset: -5
-          padding: [0, 0, 0, 0]
+          padding: [0, 0, 0, 10]
       tab_add_button:
         icon_proportion: 0.9
         background_colors: ["#F7F7F7", "#FFC300", "#FF5733"] # common, hover, pressed
@@ -745,6 +746,100 @@ Settings:
     wait_time: 500
     monitor_drivers: [] # Disk to be monitored, just like ['C', 'D'], default is all
 
+  LauncherInitializer:
+    path:
+      taskbar_icon: ""
+      arrow_icon: ""
+      temp_icon_folder: "./tmp/icon"
+      software_path_folder: "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs"
+    font:
+      title_font: [[Family, *yahei], [PixelSize, 12], [Weight, 70]]
+      group_font: [[Family, *yahei], [PixelSize, 12], [Weight, 70]]
+      menu_font: [[Family, *yahei], [PixelSize, 12], [Weight, 70]]
+      name_font: [[Family, *yahei], [PixelSize, 12], [Weight, 70]]
+      chname_font: [[Family, *yahei], [PixelSize, 12], [Weight, 70]]
+      exe_font: [[Family, *yahei], [PixelSize, 12], [Weight, 70]]
+      control_button_font: [[Family, *yahei], [PixelSize, 12], [Weight, 70]]
+    Size:
+      line_height: 30
+      group_width: 100
+      name_edit_width: 100
+      chname_edit_width: 100
+      exe_edit_width: 100
+      line_spaing: 10
+    style:
+      colname_button:
+        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"] # common, hover, pressed
+        border: "1px solid #F7F7F7"
+        border_radius: 10
+      frame:
+        background: "#F7F7F7"
+        border: "1px solid #F7F7F7"
+        border_radius: 10
+      scroll_area:
+        orbit_color: "#F7F7F7"
+        background_colors: ["black", "#FFC300", "#FF5733"] # common, hover, pressed
+        width: 20
+        border_radius: 5 # share with orbit
+        min_height: 30
+      group_edit:
+        font: [[Family, *yahei], [PixelSize, 12], [Weight, 70]]
+        background: "#F7F7F7"
+        border: "1px solid #F7F7F7"
+        border_radius: 10
+      group_button:
+        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"] # common, hover, pressed
+        border: "1px solid #F7F7F7"
+        border_radius: 10
+      group_menu:
+        main:
+          background: "transparent"
+          border: "none"
+          border_radius: 10
+          extra_width: 20
+          extra_height: 30
+        item_button:
+          spacing: 0
+          background_colors: ["#A75A5A", "#FFC300", "#FF5733"] # common, hover, pressed
+          font_colors: ["#000000", "#000000", "#000000"] # common, hover, pressed
+          border: "none"
+          border_radius: 10
+          display_x_offset: -15
+          display_y_offset: -5
+          padding: [0, 0, 0, 10]
+      icon_button:
+        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"] # common, hover, pressed
+        border: "1px solid #F7F7F7"
+        border_radius: 10
+      name_edit:
+        background: "#F7F7F7"
+        background_error: "#FF5733"
+        font_color: "#000000"
+        text_selected_color: "#FF5733"
+        text_selected_background: "#F7F7F7"
+        border: "1px solid #F7F7F7"
+        border_radius: 10
+      chname_edit:
+        background: "#F7F7F7"
+        background_error: "#FF5733"
+        font_color: "#000000"
+        text_selected_color: "#FF5733"
+        text_selected_background: "#F7F7F7"
+        border: "1px solid #F7F7F7"
+        border_radius: 10
+      exe_edit:
+        background: "#F7F7F7"
+        background_error: "#FF5733"
+        font_color: "#000000"
+        text_selected_color: "#FF5733"
+        text_selected_background: "#F7F7F7"
+        border: "1px solid #F7F7F7"
+        border_radius: 10
+      control_button:
+        background_colors: ["#F7F7F7", "#FFC300", "#FF5733"] # common, hover, pressed
+        border: "1px solid #F7F7F7"
+        border_radius: 10
+
 Manager:
   LauncherPathManager:
     path:
@@ -765,6 +860,9 @@ Manager:
     path:
       default_download_path: "F:\\Windows_Data\\Desktop_File"
       download_filedialog_root: "./load"
+    transfer_para:
+      local_transfer_thread_num: 10
+      local_transfer_chunk_size: 4 # in MB
     filename_flitter: ["$"] # filename or dirname starts with these characters will be moved to the end of the list
     separate_sign: "^--$"
     ssh_config: "C:\\Users\\am\\.ssh\\config"
@@ -773,3 +871,4 @@ Manager:
       - ["ubuntu-24.04", "//wsl.localhost/Ubuntu-24.04", "am"] # ["hostname", "address", "username"]
     connection_check_interval: 30
     connection_timeout: 5
+

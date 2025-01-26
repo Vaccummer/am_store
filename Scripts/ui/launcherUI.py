@@ -731,9 +731,8 @@ class PathModeSwitch(CustomComboBox):
         self.box_w.extra_style_dict[atuple('QPushButton', 'border-bottom-right-radius')] = 0
         self.box_w.setStyleSheet(style_make(self.box_w.style_dict|self.box_w.extra_style_dict))
 
-class InputBox(AutoEdit):   
+class InputBox(AutoEdit):
     key_press = Signal(dict)
-    geometry_signal = Signal(QRect)
     def __init__(self, parent:QMainWindow, config:Config_Manager):
         self.up = parent
         self.name = "input_box"
@@ -777,62 +776,9 @@ class InputBox(AutoEdit):
             case _:
                 return super().event(event)
     
-    def moveEvent(self, event):
-        new_position = event.pos()
-        self.geometry_signal.emit(QRect(new_position.x(), new_position.y(), self.width(), self.height()))
-        super().moveEvent(event)  
-
-    def resizeEvent(self, event):
-        new_size = event.size()
-        self.geometry_signal.emit(QRect(self.x(), self.y(), new_size.width(), new_size.height()))
-        super().resizeEvent(event)  
-
     @Slot(str)
     def external_set_text(self, text:str):
         self.setText(text)
-
-class SearchTogleButton2(YohoPushButton):
-    search_signal=Signal(dict) #{'url':str, 'sign':str}
-    def __init__(self, parent, config:Config_Manager):
-        self.up = parent
-        self.name = "search_togle_button"
-        config = config.deepcopy()
-        icons = atuple('Launcher', self.name, 'icons')
-        urls = atuple('Launcher', self.name, 'urls')
-        sign = atuple('Launcher', self.name, 'sign')
-        size = atuple('Launcher', self.name, 'Size', 'button_size')
-        style_d = atuple('Launcher', self.name, 'style')
-
-        self.url = config[urls][0]
-        button_size = atuple('Launcher', self.name, 'Size', 'button_size')
-        super().__init__(icon_i=config[icons][0], 
-                         style_config=style_d,
-                        size_f=button_size)
-        UIUpdater.set(alist(icons, urls, sign), self._updateURL, alist())
-        self.clicked.connect(self._click)
-    
-    def _updateURL(self, icons:atuple, urls:atuple, sign:atuple):
-        self.urls = urls
-        self.icons = icons[:len(urls)]
-        self.sign = sign
-        if self.url in self.urls:
-            return 
-        else:
-            self.url = urls[0]
-            self.setIcon(QIcon(self.icons[0]))
-        
-    def wheelEvent(self, event):
-        delta = event.angleDelta().y()  # 获取鼠标滚轮的增量
-        index_n = self.urls.index(self.url)
-        if delta > 0:
-            index_n = (index_n+1) % len(self.urls)
-        elif delta < 0: 
-            index_n = (index_n+len(self.icons)-1) % len(self.icons)
-        self.url = self.urls[index_n]
-        self.setIcon(AIcon(self.icons[index_n]))
-
-    def _click(self):
-        self.search_signal.emit({'url':self.url, 'sign':self.sign})
 
 class SearchTogleButton(YohoPushButton):
     search_signal=Signal(dict) #{'url':str, 'sign':str}
@@ -915,6 +861,7 @@ class ShortcutButton(QWidget):
         self.buttonlabel_list = []
         pre = ['Launcher', self.name]
         self.size_i = atuple(pre+['Size', 'button_r'])
+        self.name_label_width = atuple(pre+['Size', 'name_label_width'])
 
         self.font_i = atuple(pre+['font', 'button_title'])
         self.style_d = atuple(pre+['style', 'shortcut_button'])
@@ -941,11 +888,11 @@ class ShortcutButton(QWidget):
                 layout_i = QVBoxLayout()
                 button_i = YohoPushButton(icon_i=icon, style_config=self.style_d, size_f=self.size_i, an_time=150, icon_proportion=self.icon_proportion)
                 button_i.setProperty('path', path)
-                label_i = AutoLabel(text=name, font=self.font_i, style_config=self.button_label_style)
+                label_i = AutoLabel(text=name, font=self.font_i, style_config=self.button_label_style, width=self.name_label_width)
                 button_i.clicked.connect(self._launch)
                 self.buttonlabel_list.append((button_i, label_i))
                 layout_i.addWidget(button_i)
-                layout_i.addWidget(label_i)
+                #layout_i.addWidget(label_i)
                 layout_if.addLayout(layout_i)
                 index_f += 1
             self.layout_0.addLayout(layout_if)                    
@@ -1419,7 +1366,6 @@ class AsBACKup:
             return
 
     def _remote_transfer(self, src:str, dst:str, type_f:Literal['put', 'get']):
-        return
         bar = self.up.download_progress_bar
         if type_f == "put":
             tasks = self.src_dst_parsing(src, dst, 'local', 'remote')

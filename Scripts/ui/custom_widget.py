@@ -1,3 +1,4 @@
+from imp import reload
 from PySide2.QtCore import Signal, Slot
 from PySide2.QtGui import QIcon, QFont, QPixmap, QWheelEvent
 from PySide2.QtWidgets import QPushButton, QWidget, QListWidget, QLineEdit, QMainWindow, QVBoxLayout
@@ -245,6 +246,7 @@ class AutoLabel(QLabel):
             self.setPixmap(icon.pixmap(-1,-1))
 
 class AutoEdit(QLineEdit):
+    geometry_signal = Signal(dict)
     def __init__(self, text='', font:atuple=None, style_d={}, height:atuple=None, width:atuple=None, disable_scroll:bool=True):
         super().__init__()
         self.extra_style_dict = {}
@@ -363,6 +365,20 @@ class AutoEdit(QLineEdit):
                 QRect(rect.x(), rect.y(), 5, rect.height()),
                 color
             )
+
+    def moveEvent(self, event):
+        new_position = event.pos()
+        rect_ori = QRect(new_position.x(), new_position.y(), self.width(), self.height())
+        rect_new = self.mapToGlobal(rect_ori)
+        self.geometry_signal.emit({'abs':rect_new, 'rel':self.index})
+        super().moveEvent(event)  
+
+    def resizeEvent(self, event):
+        new_size = event.size()
+        rect_ori = QRect(self.x(), self.y(), new_size.width(), new_size.height())
+        rect_new = self.mapToGlobal(rect_ori)
+        self.geometry_signal.emit({'abs':rect_new, 'rel':self.index})
+        super().resizeEvent(event)  
 
 class WheelEdit(AutoEdit):
     wheel_signal = Signal(int)
@@ -1066,7 +1082,7 @@ class AutoMenu(QWidget):
         self.x_offset = x_offset
         self.y_offset = y_offset
 
-    def action(self, index:int, relative_position:QPoint, parent_pos:QPoint)->None:
+    def action(self, index:int, relative_position:QPoint, parent_pos:QPoint=QPoint(0, 0))->None:
         self.tab_index = index
         self.relative_position = relative_position
         # self.set_size()
@@ -1079,6 +1095,7 @@ class AutoMenu(QWidget):
 
     def emit_action(self, index_f:dict):
         self.action_signal.emit(self.value_l[index_f])
+        self.hide()
 
     def am_exit(self):
         try:
@@ -1117,3 +1134,120 @@ class AutoMenu(QWidget):
     def hide(self):
         self.action_signal.emit({})
         super().hide()
+
+class ScrollArea(QWidget):
+    def __init__(self, parent:QWidget, frame_d:dict, scroll_area_d:dict, line_spaing:int):
+        super().__init__(parent)
+        self.line_spaing = line_spaing
+        self.frame_d = frame_d
+        self.scroll_area_d = scroll_area_d
+        self._initUI()
+    
+    def _initUI(self)->None:
+        self.obj_layout = amlayoutV()
+        self.setLayout(self.obj_layout)
+        UIUpdater.set(self.line_spaing, self.obj_layout.setSpacing)
+        # Create a scroll area and add the content layout to it
+        self.scroll_content = QWidget()  # Create a widget to contain the layout
+        self.scroll_content.setLayout(self.obj_layout)
+        self.frame = QFrame()  # Create a frame to contain the scroll area
+        self.frame_layout = QVBoxLayout()
+        self.frame_layout.addWidget(self.scroll_content)
+        self.frame_layout.setContentsMargins(0, 0, 0, 0)
+        self.frame.setLayout(self.frame_layout)
+        self.frame.setObjectName("OuterFrame")
+        UIUpdater.set(self.frame_d, self.customFrameStyle, 'style')
+        
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setObjectName("myScrollArea")
+        self.scroll_area.setWidget(self.frame)  # Set the frame as the widget of the scroll area
+        self.scroll_area.setWidgetResizable(True)
+        UIUpdater.set(self.scroll_area_d, self.customScrollAreaStyle, 'style')
+
+    def customFrameStyle(self, frame_style:dict, escape_sign:dict={}):
+        bg_color = Udata(atuple('background'), 'transparent')
+        border_radius = Udata(atuple('border-radius'), 10)
+        border = Udata(atuple('border'), '5px solid gray')
+        if not hasattr(self, 'frame_style_dict'):
+            self.frame_style_dict = {}
+        if not hasattr(self, 'extra_frame_style_dict'):
+            self.extra_frame_style_dict = {}
+        temp_dict = {
+            'QFrame#OuterFrame':{
+                'background': bg_color,
+                'border-top-left-radius': border_radius[0],
+                'border-top-right-radius': border_radius[1],
+                'border-bottom-left-radius': border_radius[2],
+                'border-bottom-right-radius': border_radius[3],
+                'border': border,
+            }
+        }
+        self.frame_style_dict = process_style_dict(self.frame_style_dict, temp_dict, escape_sign, frame_style)
+        self.frame.setStyleSheet(style_make(self.frame_style_dict|self.extra_frame_style_dict))
+
+    def customScrollAreaStyle(self, scroll_style:dict, escape_sign:dict={}):
+        orbit_color = Udata(atuple('orbit_color'), 'rgba(255, 255, 255, 40)')
+
+        handle_colors = Udata(atuple('background_colors'), ["#F7F7F7", "#FFC300", "#FF5733"])
+        border_radius = Udata(atuple('border_radius'), 10)
+        min_height = Udata(atuple('min_height'), 20)
+        width = Udata(atuple('width'), 20)
+        border = Udata(atuple('border'), 'none')
+        margin = Udata(atuple('margin'), 5)
+
+        if not hasattr(self, 'scroll_area_style_dict'):
+            self.scroll_area_style_dict = {}
+        if not hasattr(self, 'extra_scroll_area_style_dict'):
+            self.extra_scroll_area_style_dict = {}
+        
+        temp_dict = {
+            "QScrollArea#myScrollArea": {
+                "background": 'transparent',
+                "border": 'none',
+            },
+            "QScrollBar": {
+                "border": border,
+                "background": orbit_color,
+                "width": width,
+                "margin": margin,
+                "border-top-left-radius": border_radius[0],
+                "border-top-right-radius": border_radius[1],
+                "border-bottom-left-radius": border_radius[2],
+                "border-bottom-right-radius": border_radius[3],
+            },
+            "QScrollBar::handle": {
+                "background": handle_colors[0],
+                "min-height": min_height,
+                "border-top-left-radius": border_radius[0],
+                "border-top-right-radius": border_radius[1],
+                "border-bottom-left-radius": border_radius[2],
+                "border-bottom-right-radius": border_radius[3],
+            },
+            "QScrollBar::handle:vertical:hover": {
+                "background": handle_colors[1],
+            },
+            "QScrollBar::handle:vertical:pressed": {
+                "background": handle_colors[2],
+            },
+            "QScrollBar::add-line": {
+                "background": 'transparent',
+                "height": "0px",
+                "subcontrol-position": "bottom",
+                "subcontrol-origin": "margin",
+            },
+            "QScrollBar::sub-line": {
+                "background": 'transparent',
+                "height": "0px",
+                "subcontrol-position": "top",
+                "subcontrol-origin": "margin",
+            },
+            "QScrollBar::sub-page, QScrollBar::add-page": {
+                "background": 'transparent',
+            }
+
+        }
+
+        self.scroll_area_style_dict = process_style_dict(self.scroll_area_style_dict, temp_dict, escape_sign, scroll_style)
+        self.scroll_area.setStyleSheet(style_make(self.scroll_area_style_dict|self.extra_scroll_area_style_dict))
+
+

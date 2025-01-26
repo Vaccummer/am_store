@@ -27,6 +27,24 @@ class FileOperation:
         self.src_host = src_host
         self.dst_host = dst_host
 
+class FileProcessProgressInfo:
+    __slots__ = ['ID', 'filename', 'progress']
+    def __init__(self, ID:str, filename:str, progress:float):
+        self.ID = ID
+        self.filename = filename
+        self.progress = progress
+
+class TransferInfo:
+    __slots__ = ['ID', 'src', 'dst', 'src_host', 'dst_host', 'size', 'type_f']
+    def __init__(self, ID:str, src:str, dst:str, src_host:str, dst_host:str, size:int, type_f:Literal['file', 'dir']):
+        self.ID = ID
+        self.src = src
+        self.dst = dst
+        self.src_host = src_host
+        self.dst_host = dst_host
+        self.size = size
+        self.type_f = type_f
+
 class IconQuery:
     __slots__ = ['type_f', 'name', 'chname', 'group', 'path', 'host']
     def __init__(self, type_f:Literal['file', 'app', "folder"], name:str, chname:str='', group:str=None, path:str='', host:str=''):
@@ -70,4 +88,3 @@ class IconSaveRequest:
         self.path = path
         self.host = host
         self.src = src
-  

@@ -1,3 +1,4 @@
+from genericpath import isfile
 from PySide2.QtWidgets import QMainWindow
 from PySide2.QtGui import QIcon
 from PySide2.QtCore import Signal, Slot, QObject
@@ -33,7 +34,7 @@ class LauncherPathManager(QObject):
         self._loadAll()
 
     def _loadAll(self):
-        self.save_signal.connect(self.save2xlsx)
+        self.xlsx_save_signal.connect(self.save2xlsx)
         self.icon_save_signal.connect(self.app_icon_save)
         self.data_path = UIUpdater.get(atuple('Manager', 'LauncherPathManager', 'path', 'settings_xlsx_path'), './load/Manager/LauncherPathManager/settings.xlsx')
         self.permit_col = ['Name', 'Chinese Name', 'EXE Path'] 
@@ -119,7 +120,7 @@ class LauncherPathManager(QObject):
             self.exe_file_icon_d[name_r] = AIcon(path_i)
     
     def _load_app_info(self)->None: 
-        self.app_d:dict[str:GV.LauncherAppInfo] = {}
+        self.app_d:dict[str,GV.LauncherAppInfo] = {}
         with pd.ExcelFile(self.data_path) as xls:
             # read all sheets and add a column to indicate the group
             for sheet_name in xls.sheet_names:
@@ -205,6 +206,9 @@ class LauncherPathManager(QObject):
         return self.file_icon_d.get(ext_name, self.default_file_icon)
     
     def get_app_icon(self, request:GV.IconQuery)->AIcon:
+        app_t = self.app_d.get(request.name, None)
+        if app_t:
+            return AIcon(app_t.icon_path)
         exe_path = link2path(request.path)
         if os.path.splitext(exe_path)[1].lower() in ['.exe','dll']:
             path_t = self.app_icon_extract(exe_path, request.group, request.name)
@@ -236,7 +240,7 @@ class LauncherPathManager(QObject):
             case 'file':
                 return self.get_file_icon(request)
             case 'app':
-                return self.get_app_icon(request.name, request.group)
+                return self.get_app_icon(request)
             case 'folder':
                 return self.get_folder_icon(request)
             case _:
@@ -310,8 +314,10 @@ class LauncherPathManager(QObject):
                 pass
             case 'exe':
                 pass
-class ShortcutsPathManager(object):
+
+class ShortcutsPathManager(QObject):
     def __init__(self, config:Config_Manager):
+        super().__init__()
         self.config = config
         self.col_name = ["Display_Name", "Icon_Path", "EXE_Path"]
         self.data_path = AMPATH(self.config.get("setting_xlsx", mode="Launcher", widget="shortcut_obj", obj="path"))
@@ -456,12 +462,20 @@ class SSHManager(QObject):
 class TransferPathManager(SSHManager):
     def __init__(self, parent:QMainWindow, config:Config_Manager):
         super().__init__(parent, config)
-        self.path_ptr = atuple('Manager', 'TransferPathManager', 'path')
+        self.name = 'TransferPathManager'
+        self.path_ptr = atuple('Manager', self.name, 'path')
+        self.para_ptr = atuple('Manager', self.name, 'transfer_para')
         UIUpdater.set(self.path_ptr, self._loadPath, type_f='style')
+        UIUpdater.set(self.para_ptr, self._loadPara, type_f='style')
     
     def _loadPath(self, path_d:dict, escape_sign:dict={}):
         self.default_download_path = path_d.get('default_download_path', os.path.abspath('./tmp'))
         self.download_filedialog_root = path_d.get('download_filedialog_root', os.path.abspath('./load'))
+
+    def _loadPara(self, para_d:dict, escape_sign:dict={}):
+        self.local_transfer_thread_num = para_d.get('local_transfer_thread_num', 4)
+        self.local_transfer_chunk_size = para_d.get('local_transfer_chunk_size', 4)
+        self.local_transfer_chunk_size *= 1024*1024
 
     def _filename_fliter(self, name:str)->bool:
         # return True if the file name is allowed else False
@@ -589,6 +603,193 @@ class TransferPathManager(SSHManager):
             warnings.warn(f'Host {self.hostname_n} connection encounters error {e}')
             return []
 
+class FileTransfer(QThread):
+    progress_signal = Signal(GV.FileProcessProgressInfo)
+    class SingleTask:
+        __slots__ = ['src', 'dst', 'src_host', 'dst_host', 'size', 'type_f']
+        def __init__(self, src:str, dst:str, src_host:str, dst_host:str, size:int, type_f:Literal['file', 'dir']):
+            self.src = src
+            self.dst = dst
+            self.src_host = src_host
+            self.dst_host = dst_host
+            self.size = size
+            self.type_f = type_f
+
+    def __init__(self, task_f:GV.TransferInfo, path_manager:TransferPathManager):
+        super().__init__()
+        self.task_f = task_f
+        self.manager = path_manager
+        self.ID = task_f.ID
+        self.close_sign = False
+        self.preprocess()
+
+    def preprocess(self):
+        self.walk_r = self.manager.walk(self.task_f.src)
+        self.total_size = sum([i[-1] for i in self.walk_r])+1
+        self.size_n = 0
+        self.size_i = 0
+        self.src_path = ''
+    
+    def _size_add(self, src_path:str, dst_path:str, size_i:int, size_t:int):
+        if src_path == self.src_path:
+            self.size_n  = self.size_n - self.size_i + size_i
+            self.size_i = size_i
+        else:
+            self.size_n += size_i
+            self.src_path = src_path
+            self.size_i = size_i
+        info_i = GV.FileProcessProgressInfo(self.ID, src_path, self.size_n/self.total_size)
+        self.progress_signal.emit(info_i)
+        if self.close_sign:
+            raise Exception('Transfer canceled')
+
+    def close(self):
+        self.close_sign = True
+
+    def run(self):
+        src_host = self.manager.host_types.get(self.task_f.src_host, 'Local')
+        dst_host = self.manager.host_types.get(self.task_f.dst_host, 'Local')
+        if src_host == 'Remote':
+            self.remote_transfer(type_f='get')
+            return
+        elif dst_host == 'Remote':
+            self.remote_transfer(type_f='put')
+            return
+        task_l = self._load_task(self.task_f.src, self.task_f.dst)
+        try:
+            asyncio.run(self._transfer(task_l))
+        except Exception as e:
+            if str(e) == 'Transfer canceled':
+                return
+            else:
+                warnings.warn(f"Transfer encounters error: {e}")
+                return
+
+    def remote_transfer(self, type_f:Literal['put', 'get']='put'):
+        i = 0
+        password = None
+        while i < 2:
+            try:
+                asyncio.run(self._remote_transfer(password, type_f))
+            except asyncssh.PermissionDenied:
+                i += 1
+                password = input(f"Please input password for {self.task_f.src_host}: ")
+            except Exception as e:
+                warnings.warn(f"Failed to connect to {self.task_f.src_host}: {e}")
+                i += 2
+                return
+
+    async def _remote_transfer(self, password:str=None, type_f:Literal['put', 'get']='put'):
+        if type_f == 'get':
+            config = self.manager.hostd.get(self.task_f.src_host, None)
+        elif type_f == 'put':
+            config = self.manager.hostd.get(self.task_f.dst_host, None)
+        
+        if not config:
+            if type_f == 'get':
+                warnings.warn(f"Invalid host config: {self.task_f.src_host}")
+            elif type_f == 'put':
+                warnings.warn(f"Invalid host config: {self.task_f.dst_host}")
+            return
+        
+        config_t = {
+            'host':config['HostName'],
+            'port':config.get('port', 22),
+            'username':config.get('User', os.getlogin()),
+            'password':password if password else ""
+        }
+
+        async with asyncssh.connect(**config_t) as conn:
+            async with conn.start_sftp_client() as sftp:
+                if type_f == 'put':
+                    await sftp.put(self.task_f.src, self.task_f.dst, recurse=True, progress_handler=self._size_add, max_requests=2)
+                elif type_f == 'get':
+                    await sftp.get(self.task_f.src, self.task_f.dst, recurse=True, progress_handler=self._size_add, max_requests=2)
+
+    def _load_task(self, src:str, dst:str)->list[SingleTask]:
+        if not os.path.exists(src):
+            return []
+        elif os.path.isfile(src):
+            dst_n = path_join(dst, os.path.basename(src))
+            return [FileTransfer.SingleTask(src, dst_n, self.manager.hostname_n, self.manager.hostname_n, os.path.getsize(src), 'file')]
+        task_f = []
+        path_lt = glob(os.path.join(src, '*'), recursive=True)
+        for path_i in path_lt:
+            if os.path.isfile(path_i):
+                task_f.append(LocalTransfer.TaskInfo(path_i, path_join(dst, os.path.basename(path_i)), os.path.getsize(path_i), 'file'))
+            elif not os.listdir(path_i):
+                path_join(dst, os.path.basename(path_i))
+            
+    async def _transfer(self, task_f:list[SingleTask]):
+        for i in range(0,len(task_f),self.manager.local_transfer_thread_num):
+            task_f_i = task_f[i:i+self.manager.local_transfer_thread_num]
+            task_l = []
+            for task_i in task_f_i:
+                task_l.append(self.copy_with_progress(task_i.src, task_i.dst, task_i.size))
+            await asyncio.gather(*task_l)
+            
+    async def copy_with_progress(self, src:str, dst:str, total_size:int):
+        copied_size = 0
+        with open(src, "rb") as fsrc, open(dst, "wb") as fdst:
+            while chunk := fsrc.read(int(self.manager.local_transfer_chunk_size)):  
+                fdst.write(chunk)
+                copied_size += len(chunk)
+                self._size_add(src, dst, copied_size, total_size)
+
+class LocalTransfer(QThread):
+    class TaskInfo:
+        __slots__ = ['src', 'dst', 'size', 'type_f']
+        def __init__(self, src:str, dst:str, size:int, type_f:Literal['file', 'dir']):
+            self.src = src
+            self.dst = dst
+            self.size = size
+            self.type_f = type_f
+    def __init__(self, src:str, dst:str, thread_num:int=4, chunk_size:int=1024*1024*4, callback:Callable[[str, str, int, int], None]=None):
+        super().__init__()
+        self.thread_num = thread_num
+        self.chunk_size = chunk_size
+        self.callback = callback
+        self.dir_d = {}
+        self.src = src
+        self.dst = dst
+        self.task_f = self._load_task(src, dst)
+    
+    def run(self):
+        if not self.task_f:
+            return
+        asyncio.run(self._transfer(self.task_f))
+
+    def _load_task(self, src:str, dst:str)->list[TaskInfo]:
+        if not os.path.exists(src):
+            return []
+        elif os.path.isfile(src):
+            dst_n = path_join(dst, os.path.basename(src))
+            return [LocalTransfer.TaskInfo(src, dst_n, os.path.getsize(src), 'file')]
+        task_f = []
+        path_lt = glob(os.path.join(src, '*'), recursive=True)
+        for path_i in path_lt:
+            if os.path.isfile(path_i):
+                task_f.append(LocalTransfer.TaskInfo(path_i, path_join(dst, os.path.basename(path_i)), os.path.getsize(path_i), 'file'))
+            elif not os.listdir(path_i):
+                path_join(dst, os.path.basename(path_i))
+            
+    async def _transfer(self, task_f):
+        for i in range(0,len(task_f),self.thread_num):
+            task_f_i = task_f[i:i+self.thread_num]
+            task_l = []
+            for task_i in task_f_i:
+                task_l.append(self.copy_with_progress(task_i.src, task_i.dst, task_i.size))
+            await asyncio.gather(*task_l)
+
+    async def copy_with_progress(self, src:str, dst:str, total_size:int):
+        copied_size = 0
+        with open(src, "rb") as fsrc, open(dst, "wb") as fdst:
+            while chunk := fsrc.read(int(self.chunk_size)):  
+                fdst.write(chunk)
+                copied_size += len(chunk)
+                if self.callback:
+                    self.callback(src, dst, copied_size, total_size)
+
 class ConnectionThread(QThread):
     finished_signal = Signal(list)
     def __init__(self, function:cre_ssh_con, config:dict, host_name:str, timeout:int=10):
@@ -668,7 +869,6 @@ class TransferMaintainer(QThread):
         #self.remote_max_chunck = config_f.get('remote_max_chunck')*1024**2
         self.remote_max_chunck = int(r_max*1024**2)
 
-    
     def _load_task(self, task:List[dict]):
         self.task_queue.extend(task)
     
@@ -708,7 +908,6 @@ class TransferMaintainer(QThread):
                 self.bar_state.emit([False, 0])
             self.stop_signal.emit(True)
     
-
     def progress_update(self, updated_progress:int):
         self.total_progress += updated_progress
         self.bar_state.emit([True, self.total_progress/self.total_size])
@@ -770,12 +969,17 @@ class FileTransfer:
             print(f"文件传输失败: {e}")
             return False
 
-class TrackThread(QThread):
-    output_signal = Signal(dict)
-    def __init__(self, file_name:str, monitor_path:str):
+class FileMonitor(QThread):
+    output_signal = Signal(str)
+    def __init__(self, monitor_dir:str, target_file:str, max_time:float|int):
+        '''
+        monitor_dir: the directory to be supervised
+        target_file: the original path of the target file
+        max_time: max time of the supervise process, in microsecond
+        '''
         super().__init__()
-        self.file_name = file_name
-        self.monitor_path = monitor_path
+        self.monitor_dir = monitor_dir
+        self.target_file = target_file
 
     def run(self):
         try:
@@ -788,6 +992,12 @@ class TrackThread(QThread):
             error_f = str(e)
         self.output_signal.emit({'result':result_f, 'error':error_f})
 
+    def sucess(self, dst:str):
+        self.output_signal.emit(dst)
+    
+    def close(self):
+        self.close_signal = True
+
     def close(self):
         self.quit()
         self.wait()
@@ -795,6 +1005,7 @@ class TrackThread(QThread):
             self.watcher.stop()
         except Exception:
             pass
+
 
 class PathTracker:
     def __init__(self):

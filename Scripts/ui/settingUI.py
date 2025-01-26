@@ -1,5 +1,7 @@
 import os
 import sys
+
+from sympy import group
 from Scripts.tools.toolbox import *
 from Scripts.manager.paths_transfer import *
 from PySide2.QtWidgets import QListWidget, QMainWindow, QWidget,QListWidgetItem,QPushButton, QHBoxLayout, QVBoxLayout, QLabel
@@ -674,15 +676,18 @@ class SheetControl(QTabBar):
         menu_style_d = atuple('Settings', 'LauncherSetting', 'style', 'tab_menu', 'main')
         item_style_d = atuple('Settings', 'LauncherSetting', 'style', 'tab_menu', 'item_button')
         actions = ['rename', 'delete']
-        values = [{'action':'rename'}, {'action':'delete'}]
         font_f = atuple('Settings', 'LauncherSetting', 'font', 'tab_menu')
         width_f = atuple('Settings', 'LauncherSetting', 'Size', 'tab_menu_button_width')
         height_f = atuple('Settings', 'LauncherSetting', 'Size', 'tab_menu_button_height')
-        self.menu = AutoMenu(main_style_d=menu_style_d, item_style_d=item_style_d, actions=actions, values=values, font=font_f, width_f=width_f, height_f=height_f)
+        self.menu = AutoMenu(main_style_d=menu_style_d, item_style_d=item_style_d, actions=actions, values={}, font=font_f, width_f=width_f, height_f=height_f)
         self.menu.hide()
 
     def open_context_menu(self, position:QPoint): 
         index = self.tabAt(position)
+        page_name = self.tabText(index)
+        if not index:
+            return
+        self.menu.value_l = [{'action':'rename', 'index':index, 'page':page_name}, {'action':'delete', 'index':index, 'page':page_name}]
         self.menu.action(index, position, self.mapToGlobal(QPoint(0, 0)))
         
     def move_tab(self, from_index, to_index):
@@ -694,8 +699,50 @@ class SheetControl(QTabBar):
     def _delete(self, index:int):
         if isinstance(index, str):
             index = self.get_texts().index(index)
-        
         self.removeTab(index)
+
+class GroupEdit(QWidget):
+    menu_show_signal = Signal(dict)
+    def __init__(self, font_f:QFont, edit_style:atuple, button_style:atuple, 
+                 height_f:atuple, width_f:atuple, parent:QWidget, index:int):
+        super().__init__()
+        self.up = parent
+        self.index = index
+        UIUpdater.set(font_f, self.setFont, 'font')
+        self.edit_d = edit_style
+        self.button_d = button_style
+        self.height_f = height_f
+        self.width_f = width_f
+    
+    def _initUI(self)->None:
+        self.layout0 = amlayoutH()
+        self.layout0.setContentsMargins(0, 0, 0, 0)
+
+        self.edit = AutoEdit(style_d=self.edit_d, height=self.height_f, width=self.width_f)
+        self.edit_rect = self.edit.geometry()
+        self.edit.geometry_signal.connect(self.move_obj)
+
+        self.button = YohoPushButton(style_d=self.button_d, height=self.height_f, width=self.width_f)
+        self.button.extra_style_dict[atuple('QPushButton', 'border-top-left-radius')] = 0
+        self.button.extra_style_dict[atuple('QPushButton', 'border-bottom-left-radius')] = 0
+        self.button.clicked.connect(self.menu_show)
+
+        self.layout0.addWidget(self.edit)
+        self.layout0.addWidget(self.button)
+        self.setLayout(self.layout0)
+        self.edit_rect = self.edit.geometry()
+
+    @Slot(dict)
+    def move_obj(self, rect:dict)->None:
+        self.edit_rect = rect['abs']
+        x_f = rect['rel'].x()+rect['rel'].width()-self.button.width()
+        y_f = rect['rel'].y()
+        self.button.setGeometry(x_f, y_f, self.button.width(), self.button.height())
+    
+    @Slot()
+    def menu_show(self)->None:
+        self.menu_show_signal.emit({'index':self.index, 'rect':self.edit_rect})
+
 
 class BaseLauncherSetting(QWidget):
     def __init__(self, config:Config_Manager, parent:QMainWindow, manager:LauncherPathManager):
@@ -1065,7 +1112,7 @@ class LauncherSetting(UILauncherSetting):
         self.tab_layout = amlayoutH('l', spacing=10)
         self.tab_wdiget.setLayout(self.tab_layout)
         self.tab_bar = SheetControl(parent=self, font_f=self.tab_font, style_main=self.tab_style, style_menu=self.meunu_style)
-        
+        self.tab_bar.menu.action_signal.connect(self.tab_menu_action)
         for name_i in self.data_dict.keys():
             self.tab_bar.addTab(name_i)
         
@@ -1254,4 +1301,232 @@ class LauncherSetting(UILauncherSetting):
                         if info_i.name:
                             self.manager.app_d[info_i.name] = info_i
                 self.manager.xlsx_save_signal.emit()
+
+    @Slot(dict)
+    def tab_menu_action(self, action_d:dict)->None:
+        if not action_d:
+            return
+        page_f = action_d['page']
+        match action_d['action']:
+            case 'rename':
+                self.rename_tab(page_f)
+            case 'delete':
+                self.delete_tab(page_f)
+
+
+class SoftwareInitializer(QWidget):
+    def __init__(self, manager:LauncherPathManager)->None:
+        super().__init__()
+        self.manager = manager
+        self.init_ui()
+        self.name = 'LauncherInitializer'
+
+    def _windowset(self):
+        self.drag_position = None
+        self.edge_drag = None
+        self.edge_threshold = 20
+        self.setWindowFlags(self.windowFlags() | Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setWindowTitle("Launcher Software Initializate")
+        UIUpdater.set(atuple("Settings", self.name,'path','taskbar_icon'), self.setWindowIcon,type_f='icon')
+        # For mouse control
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            if self.isNearEdge(event.pos()):
+                self.edge_drag = event.pos()
+                self.original_geometry = self.geometry()
+                event.accept()
+            else:
+                # x, y, w, h = self.get_geometry(self)
+                # if event.y() >y+h or event.x() > x+w:
+                if True:
+                    self.drag_position = event.globalPos() - self.frameGeometry().topLeft()
+                    event.accept()
+        else:
+            super().mousePressEvent(event)
+    def mouseMoveEvent(self, event):
+        # if self.edge_drag:
+        #     self.resizeWindow(event.pos())
+        if self.drag_position and event.buttons() == Qt.LeftButton:
+            self.move(event.globalPos() - self.drag_position)
+            event.accept()
+        else:
+            super().mouseMoveEvent(event)
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.drag_position = None
+            self.edge_drag = None
+            event.accept()
+        else:
+            super().mouseReleaseEvent(event)
+    def isNearEdge(self, pos):
+        x, y, w, h = self.get_geometry(self)
+        return (
+            pos.x() > w - self.edge_threshold or
+            pos.y() > h - self.edge_threshold
+        )
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        gradient = QLinearGradient(0, 0, 0, self.height())
+        gradient.setColorAt(0, QColor(113, 148, 139))
+        gradient.setColorAt(1, QColor(162, 245, 224))
+        painter.setBrush(gradient)
+        painter.setPen(Qt.NoPen)
+        painter.drawRoundedRect(self.rect(), 20, 20)
+    @staticmethod
+    def get_geometry(window_f):
+        geom_f = window_f.geometry()
+        return[geom_f.x(), geom_f.y(), geom_f.width(), geom_f.height()]
+
+    def _initPara(self)->None:
+        self.temp_icon_folder = self.manager.config.get(self.name, 'path', 'temp_icon_folder')
+        self.software_path_folder = self.manager.config.get(self.name, 'path', 'software_path_folder')
+        self.app_d = {}
+
+        self.arrow_icon = AIcon(atuple("Settings", self.name, 'path', 'arrow_icon'))
+        self.group_icon = AIcon(atuple("Settings", self.name, 'path', 'group_icon'))
+        self.icon_icon = AIcon(atuple("Settings", self.name, 'path', 'icon_icon'))
+        self.name_icon = AIcon(atuple("Settings", self.name, 'path', 'name_icon'))
+        self.chname_icon = AIcon(atuple("Settings", self.name, 'path', 'chname_icon'))
+        self.exe_icon = AIcon(atuple("Settings", self.name, 'path', 'exe_icon'))
+
+        self.colname_button_d = atuple("Settings", self.name, 'style', 'colname_button')
+        self.exe_paths = [app.exe_path for app in self.manager.app_d.values()]
+        self.group_edit_d = atuple("Settings", self.name, 'style', 'group_edit')
+        self.name_edit_d = atuple("Settings", self.name, 'style', 'name_edit')
+        self.chname_edit_d = atuple("Settings", self.name, 'style', 'chname_edit')
+        self.exe_edit_d = atuple("Settings", self.name, 'style', 'exe_edit')
+        self.icon_button_d = atuple("Settings", self.name, 'style', 'icon_button')
+        self.frame_d = atuple("Settings", self.name, 'style', 'frame')
+        self.scroll_area_d = atuple("Settings", self.name, 'style', 'scroll_area')
+        self.control_button_d = atuple("Settings", self.name, 'style', 'control_button')
+        self.menu_main_d = atuple("Settings", self.name, 'style', 'group_menu', 'main')
+        self.menu_item_d = atuple("Settings", self.name, 'style', 'group_menu', 'item_button')
+
+        self.line_height = atuple("Settings", self.name, 'Size', 'line_height')
+        self.group_width = atuple("Settings", self.name, 'Size', 'group_width')
+        self.name_edit_width = atuple("Settings", self.name, 'Size', 'name_edit_width')
+        self.chname_edit_width = atuple("Settings", self.name, 'Size', 'chname_edit_width')
+        self.exe_edit_width = atuple("Settings", self.name, 'Size', 'exe_edit_width')
+        self.line_spaing = atuple("Settings", self.name, 'Size', 'line_spaing')
+        self.colname_margin = atuple("Settings", self.name, 'Size', 'colname_margin')
+        self.line_margin = atuple("Settings", self.name, 'Size', 'line_margin')
+        self.control_button_width = atuple("Settings", self.name, 'Size', 'control_button_width')
+        self.control_button_height = atuple("Settings", self.name, 'Size', 'control_button_height')
+        self.control_button_margin = atuple("Settings", self.name, 'Size', 'control_button_margin')
+
+        self.group_font = atuple("Settings", self.name, 'font', 'group_font')
+        self.name_font = atuple("Settings", self.name, 'font', 'name_font')
+        self.chname_font = atuple("Settings", self.name, 'font', 'chname_font')
+        self.exe_font = atuple("Settings", self.name, 'font', 'exe_font')
+        self.control_button_font = atuple("Settings", self.name, 'font', 'control_button_font')
+        self.title_font = atuple("Settings", self.name, 'font', 'title_font')
+        self.menu_font = atuple("Settings", self.name, 'font', 'menu_font')
+
+    def _initData(self)->None:
+        path_l = glob(os.path.join(self.software_path_folder, '**'), recursive=True)
+        self.path_l = [link2path(i) for i in path_l if (not os.path.isdir(i)) and i not in self.exe_paths]
+        self.app_d = {}
+        for path_i in self.path_l:
+            ext:str = os.path.splitext(path_i)[1]
+            name = os.path.basename(path_i).split('.')[0]
+            chname = ''
+            if is_path(path_i, exist_check=True) and ext.lower() not in ['.exe','dll']:
+                icon_f = self.manager.extract_exe_icon(path_i)
+                if icon_f:
+                    icon_f.save(os.path.join(self.temp_icon_folder, f'{name}.png'))
+                    icon_path = os.path.join(self.temp_icon_folder, f'{name}.png')
+                else:
+                    icon_path = ''
+            else:
+                icon_path = ''
+            self.app_d[name] = GV.LauncherAppInfo(None, name, chname, 'Default', path_i, icon_path)
+
+    def _initUI(self)->None:
+        self.obj_l = []
+        self.layout0 = amlayoutV(align_h='center')
+        self._initTitles()
+    
+    def _initTitles(self)->None:
+        self.title_label = AutoEdit(text='Software Initializer', font=self.title_font)
+        self.layout_title = amlayoutH(align_v='center')
+        self.group_icon_button = YohoPushButton(icon_path=self.group_icon, style_config=self.colname_button_d, height=self.line_height, width=self.group_width)
+        self.name_icon_button = YohoPushButton(icon_path=self.name_icon, style_config=self.colname_button_d, height=self.line_height, width=self.name_edit_width)
+        self.chname_icon_button = YohoPushButton(icon_path=self.chname_icon, style_config=self.colname_button_d, height=self.line_height, width=self.chname_edit_width)
+        self.exe_icon_button = YohoPushButton(icon_path=self.exe_icon, style_config=self.colname_button_d, height=self.line_height, width=self.exe_edit_width)
+        self.icon_icon_button = YohoPushButton(icon_path=self.icon_icon, style_config=self.colname_button_d, height=self.line_height, width=self.icon_button_width)
+        add_obj(self.group_icon_button, self.name_icon_button, self.chname_icon_button, self.exe_icon_button, self.icon_icon_button, parent_f=self.layout_title)
+
+        self.layout0.addWidget((self.title_label))
+        self.layout0.addLayout(self.layout_title)
+        
+    @Slot(dict)
+    def showMenu(self, instruction:dict)->None:
+        index_f = instruction['index']
+        rec_f = instruction['rec']
+        groups_ori = [i['group'].text() for i in self.obj_l]
+        groups_new = []
+        values_new = []
+        for i in groups_ori:
+            if i not in groups_new:
+                groups_new.append(i)
+                values_new.append({'group':i, 'index':index_f})
+
+        if hasattr(self, 'menu'):
+            self.menu.close()
+
+        self.menu = AutoMenu(main_style_d=self.menu_main_d, item_style_d=self.menu_item_d, 
+                             actions=groups_new, values=values_new,font=self.menu_font)
+        self.menu.action_signal.connect(self.group_menu_action)
+        self.menu.action(0, rec_f.pos())
+    
+    @Slot(dict)
+    def group_menu_action(self, action_d:dict)->None:
+        index_f = action_d['index']
+        group_f = action_d['group']
+        self.obj_l[index_f]['group'].setText(group_f)
+
+    def _initLine(self, app_i:GV.LauncherAppInfo, index:int)->list:
+        group_edit = GroupEdit(text=app_i.group, font=self.group_font, height=self.line_height, width=self.group_width, index=index)
+        group_edit.button.setIcon(self.arrow_icon)
+
+        name_edit = NameEdit(text=app_i.name, font=self.name_font, height=self.line_height, width=self.name_edit_width)
+
+        chname_edit = NameEdit(text=app_i.chname, font=self.chname_font, height=self.line_height, width=self.chname_edit_width)
+        
+        exe_edit = ExePathLine(text=app_i.exe_path, font=self.exe_font, height=self.line_height, width=self.exe_edit_width)
+
+        icon_button = YohoPushButton(icon_path=app_i.icon_path, font=self.icon_button_d, height=self.line_height, width=self.icon_button_width)
+
+        return [group_edit, name_edit, chname_edit, exe_edit, icon_button]
+    
+    def _initLines(self)->None:
+        self.scroll_area = ScrollArea(self, self.frame_d, self.scroll_area_d, self.line_spaing)
+        self.layout0.addWidget(self.scroll_area)
+        self.scroll_l = self.scroll_area.obj_layout
+        for name_i, app_i in self.app_d.items():
+            group_edit, name_edit, chname_edit, exe_edit, icon_button = self._initLine(app_i, len(self.obj_l))
+            group_edit.menu_show_signal.connect(self.showMenu)
+            self.obj_l.append({'group':group_edit, 'name':name_edit, 'chname':chname_edit, 'exe':exe_edit, 'icon':icon_button})
+            line_layout = amlayoutH(align_v='center')
+            UIUpdater.set(self.line_margin, line_layout.setContentsMargins, 'margin')
+            add_obj(group_edit, name_edit, chname_edit, exe_edit, icon_button, parent_f=line_layout)
+            self.scroll_l.addLayout(line_layout)
+    
+    def _initControl(self)->None:
+        self.layout_bottom = amlayoutH(align_v='center')
+        self.save_button = YohoPushButton(text='Save', font=self.control_button_font, height=self.control_button_height, width=self.control_button_width)
+
+        self.cancel_button = YohoPushButton(text='Cancel', font=self.control_button_font, height=self.control_button_height, width=self.control_button_width)
+        add_obj(self.save_button, self.cancel_button, parent_f=self.layout_bottom)
+        UIUpdater.set(self.control_button_margin, self.layout_bottom.setContentsMargins, 'margin')
+        self.layout0.addLayout(self.layout_bottom)
+
+    def closeAction(self, save_f:bool)->None:
+        pass
+    
+
+
+
 
