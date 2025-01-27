@@ -1,35 +1,16 @@
-import os
-from glob import glob
-from am_store.common_tools import *
-import win32com.client
-def get_real_path(lnk_file):
-    # 创建一个 Shell 对象
-    shell = win32com.client.Dispatch("WScript.Shell")
-    # 解析 .lnk 文件
-    shortcut = shell.CreateShortCut(lnk_file)
-    # 返回目标路径
-    return shortcut.Targetpath
+from PySide2.QtGui import QFont, QFontDatabase
+from PySide2.QtWidgets import QApplication, QLabel
+from PySide2.QtCore import Qt
+QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
+app = QApplication([])
 
-src = r'C:\ProgramData\Microsoft\Windows\Start Menu'
-path_l = glob(os.path.join(src, '**'), recursive=True)
-path_l = [path for path in path_l if not os.path.isdir(path)]
-path_lt = []
-for path in path_l:
-    if path.endswith('.exe'):
-        path_lt.append(path)
-        continue
-    try:
-        out = get_real_path(path)
-        if out.endswith('.exe'):
-            path_lt.append(out)
-    except Exception as e:
-        pass
-path_lt = list(set(path_lt))
-for path in path_lt:
-    if path.startswith(r'C:\Windows'):
-        continue
-    elif 'unins' in os.path.basename(path).lower():
-        continue
-    else:
-        print(path)
+# 创建全局字体
+font = QFont("Arial", 10, 40)
+font.setStyleStrategy(QFont.PreferAntialias)  # 设置抗锯齿策略
+app.setFont(font)
 
+label = QLabel("Hello, Anti-Aliased Text!")
+label.setAlignment(Qt.AlignCenter)
+label.show()
+
+app.exec_()

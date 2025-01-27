@@ -782,7 +782,7 @@ class InputBox(AutoEdit):
 
 class SearchTogleButton(YohoPushButton):
     search_signal=Signal(dict) #{'url':str, 'sign':str}
-    def __init__(self, parent, config:Config_Manager, input_box_geometry:QRect):
+    def __init__(self, parent, config:Config_Manager):
         self.up = parent
         self.name = "search_togle_button"
         config = config.deepcopy()
@@ -801,9 +801,9 @@ class SearchTogleButton(YohoPushButton):
                         parent=parent)
         UIUpdater.set(alist(icons, urls, sign), self._updateURL, alist())
         self.clicked.connect(self._click)
-        self._update_geometry(input_box_geometry)
         self.show()
         self.raise_()
+        # self._init_geometry(input_box_geometry)
 
     def _updateURL(self, icons:atuple, urls:atuple, sign:atuple):
         self.urls = urls
@@ -828,10 +828,12 @@ class SearchTogleButton(YohoPushButton):
     def _click(self):
         self.search_signal.emit({'url':self.url, 'sign':self.sign})
     
-    def _update_geometry(self, input_box_geometry:QRect):
-        x, y, w, h = input_box_geometry.getRect()
-        x_n = x+w-self.width()
-        self.setGeometry(x_n, y, self.width(), self.height())
+    @Slot(dict)
+    def _update_geometry(self, input_box_geometry:dict):
+        rec:QRect = input_box_geometry['abs']
+        x_n = rec.x()-GV.GEOMETRY[0]+rec.width()-self.width()
+        y_n = rec.y()-GV.GEOMETRY[1]
+        self.setGeometry(x_n, y_n, self.width(), self.height())
 
 class ShortcutButton(QWidget):
     launch_signal = Signal(str)

@@ -367,18 +367,17 @@ class AutoEdit(QLineEdit):
             )
 
     def moveEvent(self, event):
-        new_position = event.pos()
-        rect_ori = QRect(new_position.x(), new_position.y(), self.width(), self.height())
-        rect_new = self.mapToGlobal(rect_ori)
-        self.geometry_signal.emit({'abs':rect_new, 'rel':self.index})
-        super().moveEvent(event)  
+        super().moveEvent(event)   
+        self._emit_rec()
 
     def resizeEvent(self, event):
-        new_size = event.size()
-        rect_ori = QRect(self.x(), self.y(), new_size.width(), new_size.height())
-        rect_new = self.mapToGlobal(rect_ori)
-        self.geometry_signal.emit({'abs':rect_new, 'rel':self.index})
         super().resizeEvent(event)  
+        self._emit_rec()
+
+    def _emit_rec(self):
+        point_ori = self.pos()
+        point_new = self.mapToGlobal(QPoint(0,0))
+        self.geometry_signal.emit({'abs':QRect(point_new.x(), point_new.y(), self.width(), self.height()), 'rel':QRect(point_ori.x(), point_ori.y(), self.width(), self.height())})
 
 class WheelEdit(AutoEdit):
     wheel_signal = Signal(int)
@@ -1135,12 +1134,13 @@ class AutoMenu(QWidget):
         self.action_signal.emit({})
         super().hide()
 
-class ScrollArea(QWidget):
+class ScrollArea(QScrollArea):
     def __init__(self, parent:QWidget, frame_d:dict, scroll_area_d:dict, line_spaing:int):
         super().__init__(parent)
         self.line_spaing = line_spaing
         self.frame_d = frame_d
         self.scroll_area_d = scroll_area_d
+        self.setObjectName("myScrollArea")
         self._initUI()
     
     def _initUI(self)->None:
@@ -1157,11 +1157,9 @@ class ScrollArea(QWidget):
         self.frame.setLayout(self.frame_layout)
         self.frame.setObjectName("OuterFrame")
         UIUpdater.set(self.frame_d, self.customFrameStyle, 'style')
-        
-        self.scroll_area = QScrollArea()
-        self.scroll_area.setObjectName("myScrollArea")
-        self.scroll_area.setWidget(self.frame)  # Set the frame as the widget of the scroll area
-        self.scroll_area.setWidgetResizable(True)
+    
+        self.setWidget(self.frame)  # Set the frame as the widget of the scroll area
+        self.setWidgetResizable(True)
         UIUpdater.set(self.scroll_area_d, self.customScrollAreaStyle, 'style')
 
     def customFrameStyle(self, frame_style:dict, escape_sign:dict={}):
@@ -1248,6 +1246,6 @@ class ScrollArea(QWidget):
         }
 
         self.scroll_area_style_dict = process_style_dict(self.scroll_area_style_dict, temp_dict, escape_sign, scroll_style)
-        self.scroll_area.setStyleSheet(style_make(self.scroll_area_style_dict|self.extra_scroll_area_style_dict))
+        self.setStyleSheet(style_make(self.scroll_area_style_dict|self.extra_scroll_area_style_dict))
 
 

@@ -495,7 +495,7 @@ class Terminal(QTextEdit):
         pass
 
 class ExePathLine(AutoEdit):
-    def __init__(self, style_d, tooltip_style, height_f:int, place_holder:str,font:QFont, disable_scroll:bool=False):
+    def __init__(self, style_d, tooltip_style, height_f:int, font:QFont, place_holder:str=None, disable_scroll:bool=False):
         super().__init__(text='', font=font, style_d=style_d, height=height_f, disable_scroll=disable_scroll)
         self.setPlaceholderText(place_holder)
         self.place_holder = place_holder
@@ -703,41 +703,44 @@ class SheetControl(QTabBar):
 
 class GroupEdit(QWidget):
     menu_show_signal = Signal(dict)
-    def __init__(self, font_f:QFont, edit_style:atuple, button_style:atuple, 
-                 height_f:atuple, width_f:atuple, parent:QWidget, index:int):
+    def __init__(self, text_f:str, font_f:QFont, edit_style:atuple, button_style:atuple, 
+                 height_f:atuple, width_f:atuple, index:int):
         super().__init__()
-        self.up = parent
         self.index = index
         UIUpdater.set(font_f, self.setFont, 'font')
+        self.font_f = font_f
         self.edit_d = edit_style
         self.button_d = button_style
         self.height_f = height_f
         self.width_f = width_f
-    
+        self._initUI()
+        self.edit.setText(text_f)
+        self.setStyleSheet('background-color:black;')
+
     def _initUI(self)->None:
         self.layout0 = amlayoutH()
         self.layout0.setContentsMargins(0, 0, 0, 0)
 
-        self.edit = AutoEdit(style_d=self.edit_d, height=self.height_f, width=self.width_f)
+        self.edit = AutoEdit(style_d=self.edit_d, height=self.height_f, width=self.width_f, font=self.font_f)
         self.edit_rect = self.edit.geometry()
         self.edit.geometry_signal.connect(self.move_obj)
 
-        self.button = YohoPushButton(style_d=self.button_d, height=self.height_f, width=self.width_f)
-        self.button.extra_style_dict[atuple('QPushButton', 'border-top-left-radius')] = 0
-        self.button.extra_style_dict[atuple('QPushButton', 'border-bottom-left-radius')] = 0
+        self.button = YohoPushButton(style_config=self.button_d, height_f=self.height_f, width_f=self.height_f,parent=self)
+        # self.button.extra_style_dict[atuple('QPushButton', 'border-top-left-radius')] = 0
+        # self.button.extra_style_dict[atuple('QPushButton', 'border-bottom-left-radius')] = 0
         self.button.clicked.connect(self.menu_show)
 
         self.layout0.addWidget(self.edit)
-        self.layout0.addWidget(self.button)
         self.setLayout(self.layout0)
-        self.edit_rect = self.edit.geometry()
 
     @Slot(dict)
     def move_obj(self, rect:dict)->None:
-        self.edit_rect = rect['abs']
-        x_f = rect['rel'].x()+rect['rel'].width()-self.button.width()
-        y_f = rect['rel'].y()
-        self.button.setGeometry(x_f, y_f, self.button.width(), self.button.height())
+        edit_geo = self.edit.geometry()
+        x = edit_geo.x() + edit_geo.width() - self.button.width()
+        y = edit_geo.y()
+        self.button.raise_()
+        self.button.setGeometry(x, y, self.button.width(), self.button.height())
+        # self.button.setGeometry(x, y, self.button.width(), self.button.height())
     
     @Slot()
     def menu_show(self)->None:
@@ -1316,10 +1319,14 @@ class LauncherSetting(UILauncherSetting):
 
 class SoftwareInitializer(QWidget):
     def __init__(self, manager:LauncherPathManager)->None:
+        self.edge_threshold = 10
+        self.drag_position = None
         super().__init__()
         self.manager = manager
-        self.init_ui()
         self.name = 'LauncherInitializer'
+        self._initPara()
+        self._initData()
+        self._initUI()
 
     def _windowset(self):
         self.drag_position = None
@@ -1379,21 +1386,26 @@ class SoftwareInitializer(QWidget):
         geom_f = window_f.geometry()
         return[geom_f.x(), geom_f.y(), geom_f.width(), geom_f.height()]
 
+    def showWin(self)->None:
+        self.setGeometry(GV.GEOMETRY[0], GV.GEOMETRY[1], 1600,900)
+        self.show()
+
     def _initPara(self)->None:
-        self.temp_icon_folder = self.manager.config.get(self.name, 'path', 'temp_icon_folder')
-        self.software_path_folder = self.manager.config.get(self.name, 'path', 'software_path_folder')
+        self.temp_icon_folder = UIUpdater.get(atuple("Settings", self.name, 'path', 'temp_icon_folder'), 'path')
+        self.software_path_folder = UIUpdater.get(atuple("Settings", self.name, 'path', 'software_path_folder'), 'path')
         self.app_d = {}
 
-        self.arrow_icon = AIcon(atuple("Settings", self.name, 'path', 'arrow_icon'))
-        self.group_icon = AIcon(atuple("Settings", self.name, 'path', 'group_icon'))
-        self.icon_icon = AIcon(atuple("Settings", self.name, 'path', 'icon_icon'))
-        self.name_icon = AIcon(atuple("Settings", self.name, 'path', 'name_icon'))
-        self.chname_icon = AIcon(atuple("Settings", self.name, 'path', 'chname_icon'))
-        self.exe_icon = AIcon(atuple("Settings", self.name, 'path', 'exe_icon'))
+        self.arrow_icon = atuple("Settings", self.name, 'path', 'arrow_icon')
+        self.group_icon = atuple("Settings", self.name, 'path', 'group_icon')
+        self.icon_icon = atuple("Settings", self.name, 'path', 'icon_icon')
+        self.name_icon = atuple("Settings", self.name, 'path', 'name_icon')
+        self.chname_icon = atuple("Settings", self.name, 'path', 'chname_icon')
+        self.exe_icon = atuple("Settings", self.name, 'path', 'exe_icon')
 
         self.colname_button_d = atuple("Settings", self.name, 'style', 'colname_button')
         self.exe_paths = [app.exe_path for app in self.manager.app_d.values()]
         self.group_edit_d = atuple("Settings", self.name, 'style', 'group_edit')
+        self.group_button_d = atuple("Settings", self.name, 'style', 'group_button')
         self.name_edit_d = atuple("Settings", self.name, 'style', 'name_edit')
         self.chname_edit_d = atuple("Settings", self.name, 'style', 'chname_edit')
         self.exe_edit_d = atuple("Settings", self.name, 'style', 'exe_edit')
@@ -1403,6 +1415,8 @@ class SoftwareInitializer(QWidget):
         self.control_button_d = atuple("Settings", self.name, 'style', 'control_button')
         self.menu_main_d = atuple("Settings", self.name, 'style', 'group_menu', 'main')
         self.menu_item_d = atuple("Settings", self.name, 'style', 'group_menu', 'item_button')
+        self.title_style = atuple("Settings", self.name, 'style', 'title')
+        self.tooltip_style = atuple("Settings", self.name, 'style', 'tooltip')
 
         self.line_height = atuple("Settings", self.name, 'Size', 'line_height')
         self.group_width = atuple("Settings", self.name, 'Size', 'group_width')
@@ -1410,6 +1424,7 @@ class SoftwareInitializer(QWidget):
         self.chname_edit_width = atuple("Settings", self.name, 'Size', 'chname_edit_width')
         self.exe_edit_width = atuple("Settings", self.name, 'Size', 'exe_edit_width')
         self.line_spaing = atuple("Settings", self.name, 'Size', 'line_spaing')
+        self.line_obj_spacing = atuple("Settings", self.name, 'Size', 'line_obj_spacing')
         self.colname_margin = atuple("Settings", self.name, 'Size', 'colname_margin')
         self.line_margin = atuple("Settings", self.name, 'Size', 'line_margin')
         self.control_button_width = atuple("Settings", self.name, 'Size', 'control_button_width')
@@ -1432,35 +1447,38 @@ class SoftwareInitializer(QWidget):
             ext:str = os.path.splitext(path_i)[1]
             name = os.path.basename(path_i).split('.')[0]
             chname = ''
-            if is_path(path_i, exist_check=True) and ext.lower() not in ['.exe','dll']:
+            if is_path(path_i, exist_check=True) and ext.lower() in ['.exe','dll']:
                 icon_f = self.manager.extract_exe_icon(path_i)
                 if icon_f:
                     icon_f.save(os.path.join(self.temp_icon_folder, f'{name}.png'))
                     icon_path = os.path.join(self.temp_icon_folder, f'{name}.png')
                 else:
-                    icon_path = ''
+                    continue
             else:
-                icon_path = ''
+                continue
             self.app_d[name] = GV.LauncherAppInfo(None, name, chname, 'Default', path_i, icon_path)
 
     def _initUI(self)->None:
         self.obj_l = []
         self.layout0 = amlayoutV(align_h='center')
+        self.setLayout(self.layout0)
         self._initTitles()
+        self._initLines()
+        self._initControl()
     
     def _initTitles(self)->None:
-        self.title_label = AutoEdit(text='Software Initializer', font=self.title_font)
+        self.title_label = AutoLabel(style_config=self.title_style, text='Software Initializer', font=self.title_font)
         self.layout_title = amlayoutH(align_v='center')
-        self.group_icon_button = YohoPushButton(icon_path=self.group_icon, style_config=self.colname_button_d, height=self.line_height, width=self.group_width)
-        self.name_icon_button = YohoPushButton(icon_path=self.name_icon, style_config=self.colname_button_d, height=self.line_height, width=self.name_edit_width)
-        self.chname_icon_button = YohoPushButton(icon_path=self.chname_icon, style_config=self.colname_button_d, height=self.line_height, width=self.chname_edit_width)
-        self.exe_icon_button = YohoPushButton(icon_path=self.exe_icon, style_config=self.colname_button_d, height=self.line_height, width=self.exe_edit_width)
-        self.icon_icon_button = YohoPushButton(icon_path=self.icon_icon, style_config=self.colname_button_d, height=self.line_height, width=self.icon_button_width)
+        self.group_icon_button = YohoPushButton(icon_i=self.group_icon, style_config=self.colname_button_d, height_f=self.line_height, width_f=self.group_width)
+        self.name_icon_button = YohoPushButton(icon_i=self.name_icon, style_config=self.colname_button_d, height_f=self.line_height, width_f=self.name_edit_width)
+        self.chname_icon_button = YohoPushButton(icon_i=self.chname_icon, style_config=self.colname_button_d, height_f=self.line_height, width_f=self.chname_edit_width)
+        self.exe_icon_button = YohoPushButton(icon_i=self.exe_icon, style_config=self.colname_button_d, height_f=self.line_height, width_f=self.exe_edit_width)
+        self.icon_icon_button = YohoPushButton(icon_i=self.icon_icon, style_config=self.colname_button_d, height_f=self.line_height, width_f=self.line_height)
         add_obj(self.group_icon_button, self.name_icon_button, self.chname_icon_button, self.exe_icon_button, self.icon_icon_button, parent_f=self.layout_title)
 
-        self.layout0.addWidget((self.title_label))
+        self.layout0.addWidget(self.title_label)
         self.layout0.addLayout(self.layout_title)
-        
+    
     @Slot(dict)
     def showMenu(self, instruction:dict)->None:
         index_f = instruction['index']
@@ -1488,16 +1506,22 @@ class SoftwareInitializer(QWidget):
         self.obj_l[index_f]['group'].setText(group_f)
 
     def _initLine(self, app_i:GV.LauncherAppInfo, index:int)->list:
-        group_edit = GroupEdit(text=app_i.group, font=self.group_font, height=self.line_height, width=self.group_width, index=index)
-        group_edit.button.setIcon(self.arrow_icon)
+        group_edit = GroupEdit(text_f=app_i.group, edit_style=self.group_edit_d, button_style=self.group_button_d, font_f=self.group_font, height_f=self.line_height, width_f=self.group_width, index=index)
+        UIUpdater.set(self.arrow_icon, group_edit.button.setIcon, type_f='icon')
 
-        name_edit = NameEdit(text=app_i.name, font=self.name_font, height=self.line_height, width=self.name_edit_width)
+        name_edit = NameEdit(style_d=self.name_edit_d, text_f=app_i.name, font=self.name_font, height=self.line_height)
+        UIUpdater.set(self.name_edit_width, name_edit.setMaximumWidth)
 
-        chname_edit = NameEdit(text=app_i.chname, font=self.chname_font, height=self.line_height, width=self.chname_edit_width)
-        
-        exe_edit = ExePathLine(text=app_i.exe_path, font=self.exe_font, height=self.line_height, width=self.exe_edit_width)
+        chname_edit = NameEdit(style_d=self.name_edit_d, text_f=app_i.chname, font=self.chname_font, height=self.line_height)
+        UIUpdater.set(self.chname_edit_width, chname_edit.setMaximumWidth)
 
-        icon_button = YohoPushButton(icon_path=app_i.icon_path, font=self.icon_button_d, height=self.line_height, width=self.icon_button_width)
+        exe_edit = ExePathLine(style_d=self.exe_edit_d,tooltip_style=self.tooltip_style, font=self.exe_font, height_f=self.line_height)
+
+        exe_edit.setText(app_i.exe_path)
+        exe_edit.setMaximumWidth((99999))
+
+
+        icon_button = YohoPushButton(style_config=self.icon_button_d, icon_i=app_i.icon_path, font_f=self.icon_button_d, height_f=self.line_height, width_f=self.line_height)
 
         return [group_edit, name_edit, chname_edit, exe_edit, icon_button]
     
@@ -1505,20 +1529,26 @@ class SoftwareInitializer(QWidget):
         self.scroll_area = ScrollArea(self, self.frame_d, self.scroll_area_d, self.line_spaing)
         self.layout0.addWidget(self.scroll_area)
         self.scroll_l = self.scroll_area.obj_layout
+        self.line_layout_l = []
         for name_i, app_i in self.app_d.items():
             group_edit, name_edit, chname_edit, exe_edit, icon_button = self._initLine(app_i, len(self.obj_l))
             group_edit.menu_show_signal.connect(self.showMenu)
             self.obj_l.append({'group':group_edit, 'name':name_edit, 'chname':chname_edit, 'exe':exe_edit, 'icon':icon_button})
             line_layout = amlayoutH(align_v='center')
+            UIUpdater.set(self.line_obj_spacing, line_layout.setSpacing, 'spacing')
             UIUpdater.set(self.line_margin, line_layout.setContentsMargins, 'margin')
-            add_obj(group_edit, name_edit, chname_edit, exe_edit, icon_button, parent_f=line_layout)
+            add_obj(icon_button,group_edit, name_edit, chname_edit, exe_edit,  parent_f=line_layout)
+            self.line_layout_l.append(line_layout)
             self.scroll_l.addLayout(line_layout)
     
     def _initControl(self)->None:
         self.layout_bottom = amlayoutH(align_v='center')
-        self.save_button = YohoPushButton(text='Save', font=self.control_button_font, height=self.control_button_height, width=self.control_button_width)
+        self.save_button = YohoPushButton(style_config=self.control_button_d, text_f='Save', font_f=self.control_button_font, height_f=self.control_button_height, width_f=self.control_button_width)
 
-        self.cancel_button = YohoPushButton(text='Cancel', font=self.control_button_font, height=self.control_button_height, width=self.control_button_width)
+        self.cancel_button = YohoPushButton(style_config=self.control_button_d, text_f='Cancel', font_f=self.control_button_font, height_f=self.control_button_height, width_f=self.control_button_width)
+
+        self.cancel_button.clicked.connect(partial(self.closeAction, False))
+        self.save_button.clicked.connect(partial(self.closeAction, True))
         add_obj(self.save_button, self.cancel_button, parent_f=self.layout_bottom)
         UIUpdater.set(self.control_button_margin, self.layout_bottom.setContentsMargins, 'margin')
         self.layout0.addLayout(self.layout_bottom)
@@ -1526,7 +1556,4 @@ class SoftwareInitializer(QWidget):
     def closeAction(self, save_f:bool)->None:
         pass
     
-
-
-
 

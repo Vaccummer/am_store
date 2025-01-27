@@ -68,13 +68,13 @@ class IconSaveRequest:
 
 class LauncherAppInfo:
     __slots__ = ['ID','name', 'chname', 'group', 'exe_path', 'icon_path']
-    def __init__(self, ID:int, name:str, chname:str, group:str, exe_path:str):
+    def __init__(self, ID:int, name:str, chname:str, group:str, exe_path:str, icon_path:str=''):
         self.ID = ID
         self.name = name
         self.chname = chname
         self.group = group
         self.exe_path = exe_path
-        self.icon_path = ''
+        self.icon_path = icon_path
 
     def deepcopy(self):
         return LauncherAppInfo(self.ID, self.name, self.chname, self.group, self.exe_path)

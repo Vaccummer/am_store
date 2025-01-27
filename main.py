@@ -1,5 +1,6 @@
 from PySide2.QtWidgets import QApplication
-from PySide2.QtCore import Slot, Signal # type: ignore
+from PySide2.QtCore import Slot, Signal,QCoreApplication # type: ignore
+from PySide2.QtGui import QSurfaceFormat
 from sympy import Q
 from Scripts.tools.toolbox import *
 from Scripts.ui.launcherUI import *
@@ -95,11 +96,15 @@ class BaseLauncher(QMainWindow):
         self.tray_icon.activated.connect(self.show)
         self.tray_icon.show()
     def resizeEvent(self, event):
-        GV.GEOMETRY = [self.geometry().x(), self.geometry().y(), self.geometry().width(), self.geometry().height()]
         super().resizeEvent(event)
+        geometry = self.geometry()
+        GV.GEOMETRY = [geometry.x(), geometry.y(), geometry.width(), geometry.height()]
+        
     def moveEvent(self, event):
-        GV.GEOMETRY = [self.geometry().x(), self.geometry().y(), self.geometry().width(), self.geometry().height()]
         super().moveEvent(event)
+        geometry = self.geometry()
+        GV.GEOMETRY = [geometry.x(), geometry.y(), geometry.width(), geometry.height()]
+        
     def basic_para_init(self):
         # for mouse click enven judge
         self.drag_position = None
@@ -211,11 +216,11 @@ class UILauncher(BaseLauncher):
         GV.HOST = self.path_switch_button.getMode(0)
         self.path_switch_button.index_changed.connect(self._change_host)
         self.input_box = InputBox(self, self.config)
-        self.search_togle_button = SearchTogleButton(self, self.config, input_box_geometry=self.input_box.geometry())
+        self.search_togle_button = SearchTogleButton(self, self.config)
+        self.input_box.geometry_signal.connect(self.search_togle_button._update_geometry)
 
         self.progress_bar = ProgressWidget(self)
         self.input_box_layout = amlayoutH(align_v="c", align_h='l', spacing=1)
-        self.input_box.geometry_signal.connect(self.search_togle_button._update_geometry)
         self.path_switch_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
         self.input_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         add_obj(self.path_switch_button, self.input_box, parent_f=self.input_box_layout)
@@ -223,6 +228,9 @@ class UILauncher(BaseLauncher):
         self.progress_layout = amlayoutH(align_h='l')
 
         add_obj(self.input_box_layout, self.progress_bar, parent_f=self.layout_input)
+
+        self.software_initializer = SoftwareInitializer(self.launcher_m)
+        self.software_initializer.showWin()
     
     def _initFuncUI(self):
         # first layer content
@@ -408,9 +416,12 @@ if __name__ == "__main__":
     #     print("Requesting admin privileges...")
     #     ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
     #     sys.exit()
-
     # QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
+    QCoreApplication.setAttribute(Qt.AA_UseDesktopOpenGL)
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
+    format = QSurfaceFormat()
+    format.setSamples(8)  
+    QSurfaceFormat.setDefaultFormat(format)
     app = QApplication([])
     path_t = os.path.abspath('./launcher_cfg_new.yaml')
     Config_Manager.set_config_path(path_t)
