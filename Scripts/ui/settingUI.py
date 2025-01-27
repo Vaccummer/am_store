@@ -703,8 +703,7 @@ class SheetControl(QTabBar):
 
 class GroupEdit(QWidget):
     menu_show_signal = Signal(dict)
-    def __init__(self, text_f:str, font_f:QFont, edit_style:atuple, button_style:atuple, 
-                 height_f:atuple, width_f:atuple, index:int):
+    def __init__(self, text_f:str, font_f:QFont, edit_style:atuple, button_style:atuple, height_f:atuple, width_f:atuple, index:int):
         super().__init__()
         self.index = index
         UIUpdater.set(font_f, self.setFont, 'font')
@@ -732,6 +731,7 @@ class GroupEdit(QWidget):
 
         self.layout0.addWidget(self.edit)
         self.setLayout(self.layout0)
+        UIUpdater.set(alist(self.width_f, self.height_f), self.setFixedSize, alist('width', 'height'))
 
     @Slot(dict)
     def move_obj(self, rect:dict)->None:

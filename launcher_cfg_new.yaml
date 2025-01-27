@@ -753,12 +753,12 @@ Settings:
       temp_icon_folder: "./tmp/icon"
       software_path_folder: "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs"
     font:
-      title_font: [[Family, *yahei], [PointSize, 12], [Weight, 70]]
-      group_font: [[Family, *yahei], [PointSize, 12], [Weight, 70]]
-      menu_font: [[Family, *yahei], [PointSize, 12], [Weight, 70]]
-      name_font: [[Family, *yahei], [PointSize, 12], [Weight, 70]]
+      title_font: [[Family, *jetbrains], [PointSize, 12], [Weight, 70]]
+      group_font: [[Family, *jetbrains], [PointSize, 12], [Weight, 70]]
+      menu_font: [[Family, *jetbrains], [PointSize, 12], [Weight, 70]]
+      name_font: [[Family, *jetbrains], [PointSize, 12], [Weight, 70]]
       chname_font: [[Family, *yahei], [PointSize, 12], [Weight, 70]]
-      exe_font: [[Family, *yahei], [PointSize, 12], [Weight, 70]]
+      exe_font: [[Family, *jetbrains], [PointSize, 12], [Weight, 70]]
       control_button_font: [[Family, *yahei], [PointSize, 12], [Weight, 70]]
     Size:
       line_height: 60

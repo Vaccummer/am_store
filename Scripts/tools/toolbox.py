@@ -319,6 +319,8 @@ def font_get(para_dict_f={"Family":None,
         para_dict_f = {i[0]:i[1] for i in para_dict_f}
     font_f = QFont()
     font_f.setStyleStrategy(QFont.PreferAntialias)
+    font_f.setStyleHint(QFont.Monospace)
+    font_f.setHintingPreference(QFont.PreferFullHinting)
     allowed_keys = ["Family", "PointSize", "Bold", "Italic", "Weight", "Underline", "StrikeOut", 
                     "LetterSpacing", "WordSpacing", "Stretch", 'PixelSize']
     for key, value in para_dict_f.items():
