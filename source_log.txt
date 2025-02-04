@@ -1,0 +1,21 @@
+ 
+:: WARNING: oneapi-vars.sh has already been run. Skipping re-execution.
+   To force a re-execution of oneapi-vars.sh, use the '--force' option.
+   Using '--force' can result in excessive use of your environment variables.
+  
+usage: source oneapi-vars.sh [--force] [--help] [...]
+  --force        Force oneapi-vars.sh to re-run, doing so may overload environment.
+  --help         Display this help message and exit.
+  ...            Additional args are passed to the etc/*/vars.sh scripts
+                 and should follow this script's arguments.
+  
+  Some POSIX shells do not accept command-line options. In that case, you can pass
+  command-line options via the SETVARS_ARGS environment variable. For example:
+  
+  $ SETVARS_ARGS="--help" ; export SETVARS_ARGS
+  $ . path/to/oneapi-vars.sh
+  
+  The SETVARS_ARGS environment variable is cleared on exiting oneapi-vars.sh.
+  
+  The oneAPI toolkits no longer support 32-bit libraries, starting with the 2025.0 toolkit release. See the oneAPI release notes for more details.
+  
