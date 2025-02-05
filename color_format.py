@@ -56,7 +56,7 @@ def tuple_to_style(tuple_list:list[tuple])->str|None:
         list_s.append('strike')
     return start_str + ' '.join(list_s) + ']'
 
-def call_back_exception(exc_type: Exception, exc_value: Exception, exc_traceback: Exception,color_config:TerminalErrorColorConfig=TerminalErrorColorConfig()):
+def call_back_exception(exc_type: Exception, exc_value: Exception, exc_traceback,color_config:TerminalErrorColorConfig=TerminalErrorColorConfig()):
     # __slots__ = ('filename', 'lineno', 'name', '_line', 'locals')
     exc_type = exc_type.__name__
     exc_value = exc_value
