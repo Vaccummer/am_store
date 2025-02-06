@@ -4,4 +4,15 @@
 # coding: utf-8
 # version: 1.0
 # address: https://github.com/Vaccummer/am_store.git
+# initialize
+from .tools.functions import *
+from .tools.classes import *
+from .ConsoleCustom.config import *
+from .Logger.logger import *
+import sys
+from functools import partial
 
+def init():
+    print_callback = partial(call_back_exception, cf=TerminalErrorColorConfig)
+    sys.excepthook = print_callback
+init()
