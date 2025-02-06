@@ -11,15 +11,19 @@ import logging
 import sys
 from typing import Callable, Any
 import re
+import os
+
 
 @dataclass
 class LogConfig:
-    DEBUG:Emoji = Emoji("wrench", variant='emoji')
-    INFO:Emoji = Emoji("rocket", variant='emoji')
-    WARNING:Emoji = Emoji("warning", variant='emoji')
-    ERROR:Emoji = Emoji("cross_mark", variant='emoji')
-    CRITICAL:Emoji = Emoji("fire", variant='emoji')
+    DEBUG:Emoji = ("color", "[#0000FF bold]")
+    INFO:Emoji = ("color", "[#00CED1 bold]")
+    WARNING:Emoji = ("color", "[#FFA500 bold]")
+    ERROR:Emoji = ("color", "[#C70C0C bold]")
+    CRITICAL:Emoji = ("color", "[#FF0000 bold]")
+
     STOP:str = "[/]"
+
 
     text:str = "[#DAE1E2]"
     time:str = "[#04485B]"
@@ -31,25 +35,12 @@ class LogConfig:
     keyword:str = "[#D97C0B]"
     exception_info:str = "[#C70C0C bold]"
 
-
-
 class LogLevel(Enum):
     DEBUG:int = 0
     INFO:int = 10
     WARNING:int = 20
     ERROR:int = 30
     CRITICAL:int = 40
-
-level_dict = {
-    LogLevel.DEBUG: "DEBUG",
-    LogLevel.INFO: "INFO",
-    LogLevel.WARNING: "WARNING",
-    LogLevel.ERROR: "ERROR",
-    LogLevel.CRITICAL: "CRITICAL"
-}
-
-LogLevel = LogLevel
-
 
 @dataclass
 class LogInfo:
@@ -61,50 +52,59 @@ class LogInfo:
     line:str = ""
     exception:Exception = None
 
+level_dict = {
+    LogLevel.DEBUG: "DEBUG",
+    LogLevel.INFO: "INFO",
+    LogLevel.WARNING: "WARNING",
+    LogLevel.ERROR: "ERROR",
+    LogLevel.CRITICAL: "CRITICAL"
+}
+
+LogLevel = LogLevel
+
 class AmLogger:
     def __init__(self, log_path:str, print_level:LogLevel=LogLevel.DEBUG, file_level:LogLevel=LogLevel.DEBUG, 
-                 use_rich:bool=True,color_config:LogConfig=LogConfig()):
+                 callback_level:LogLevel=LogLevel.DEBUG, color_config:LogConfig=LogConfig()):
+        assert log_path and os.path.exists(os.path.dirname(log_path)), "log_path is required and must have a valid directory"
+        self.log_path = log_path
         self.color_config = color_config
         self.print_level = print_level
         self.file_level = file_level
+        self.callback_level = callback_level
         self.callback = None
         self._start_time = time.time()
         self.log_cache = []
-        self.log_path = log_path
         self._init()
         try:
-            import rich
             from rich.console import Console
             self.console = Console(highlight=False)
             self.print = self.console.print
-            self.use_rich = True
-        except Exception as e:
-            self.console = None
-            self.use_rich = False
-            self.print = print
+        except ImportError:
+            raise ImportError('rich is not installed, use "pip install rich" to install it!')
 
     def _init(self):
         time_n = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(self._start_time))
         str_to_write = f"Programm started at {time_n}\n"
-        with open(self.log_path, "a", encoding="utf-8") as f:
-            f.write(str_to_write)
+        self.write(str_to_write)
+        self.max_name_len = max(len(i) for i in level_dict.values())+1
 
     def __del__(self):
-        time_start = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(self._start_time))
         time_n = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
         total_time = time.time()-self._start_time
 
         str_to_write = f"Programm terminated at {time_n}\n"
         str_to_write += f"Conducted for {total_time:.2f} seconds\n"
-        str_to_write += "="*150+'\n'
-        with open(self.log_path, "a", encoding="utf-8") as f:
-            f.write(str_to_write)
+        str_to_write += "="*120+'\n'
+        self.write(str_to_write)
 
     def setPrintLevel(self, level:LogLevel):
         self.print_level = level
 
     def setFileLevel(self, level:LogLevel):
         self.file_level = level
+
+    def setCallbackLevel(self, level:LogLevel):
+        self.callback_level = level
 
     def setCallback(self, callback:Callable[[LogInfo, str, str], Any]):
         self.callback = callback
@@ -120,42 +120,40 @@ class AmLogger:
             self.log_cache.append(log_info)
         except Exception as e:
             pass
-        str_terminal = self._getFormatStr(log_info)
-        self.print(str_terminal)
-        str_file = self._getLogStr(log_info)
-        with open(self.log_path, "a", encoding="utf-8") as f:
-            f.write(str(self.console.render_str(str_terminal))+"\n")
         
+        if level <= self.print_level:
+            str_terminal = self._getFormatStr(log_info)
+            self.print(str_terminal)
+        if level <= self.file_level:
+            str_file = self._getLogStr(log_info)
+            self.write(str_file+'\n')
         if self.callback:
-            try:
-                self.callback(log_info, str_terminal, str_file)
-            except Exception as e:
-                pass
+            if level <= self.callback_level:
+                try:
+                    self.callback(log_info, str_terminal, str_file)
+                except Exception as e:
+                    pass
 
     def _getFormatStr(self, log_info:LogInfo)->str:
-        # time:str = "\033[92m"
-        # filepath:str = "\033[92m"
-        # lineno:str = "\033[92m"
-        # line:str = "\033[92m"
-        # message:str = "\033[92m"
         str_out = ""
+
         level_name = level_dict[log_info.type]
 
         time_str = time.strftime("%H:%M:%S", time.localtime())
         str_out += f"{self.color_config.time}{time_str}{self.color_config.STOP}"
 
         level_format = getattr(self.color_config, f"{level_name}")
-        if isinstance(level_format, Emoji):
-            str_out += str(level_format)
+        if level_format[0] == "emoji":
+            str_out += f"{level_format[1]}"
         else:
-            str_out += f"{level_format}[{level_name}]{self.color_config.STOP}"
-
-
+            level_n = f'[{level_name}]'
+            level_n1 = level_n + ' '*(self.max_name_len-len(level_n))
+            str_out += f"{level_format[1]}{level_n1}{self.color_config.STOP}"
 
         exc = log_info.exception
         exc_info = str(exc) if str(exc) else log_info.message
         if exc:
-            str_out += f'  {self.color_config.keyword}Raise{self.color_config.STOP} {self.color_config.exception}{type(exc).__name__}:{self.color_config.STOP}'
+            str_out += f' {self.color_config.keyword}Raise{self.color_config.STOP} {self.color_config.exception}{type(exc).__name__}:{self.color_config.STOP}'
             str_out += f'{self.color_config.message}{exc_info}{self.color_config.STOP}'
         else:
 
@@ -169,40 +167,56 @@ class AmLogger:
     def _getLogStr(self, log_info:LogInfo)->str:
         str_out = ""
         level_name = level_dict[log_info.type]
+        level_format = getattr(self.color_config, f"{level_name}")
         time_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
         exc = log_info.exception
 
-        if exc:
-            str_out += f'[{level_name}] {time_str} At "{log_info.filepath}", line {log_info.lineno}, raise {type(exc).__name__}("{str(exc)}"). {log_info.message}'
+        if level_format[0] == "emoji":
+            level_str = f"{level_format[1]}"
         else:
-            str_out += f'[{level_name}] {time_str} At "{log_info.filepath}", line {log_info.lineno}: {log_info.line}'
+            level_n = f"[{level_name}]"
+            level_n1 = level_n + ' '*(self.max_name_len-len(level_n))
+            level_str = f"{level_n1}"
 
-
+        if exc:
+            str_out += f'{time_str} {level_str} Raise {type(exc).__name__}("{str(exc)}"), {log_info.message} -> "{log_info.filepath}":{log_info.lineno}, {log_info.line}'
+        else:
+            str_out += f'{time_str} {level_str} {log_info.message} -> "{log_info.filepath}":{log_info.lineno}, {log_info.line}'
         return str_out
 
-    def debug(self, message:str, exc:Exception=None):
+    def write(self, text_f:str)->None:
+        r'''
+        write won't include \n
+        '''
+        with open(self.log_path, "a", encoding="utf-8") as f:
+
+            f.write(text_f)
+
+    def debug(self, message:str, exc:Exception=None)->None:
        self._log(LogLevel.DEBUG, message, exc)
-   
-    def info(self, message:str, exc:Exception=None):
+
+    def info(self, message:str, exc:Exception=None)->None:
        self._log(LogLevel.INFO, message, exc)
    
-    def warning(self, message:str, exc:Exception=None):
+    def warning(self, message:str, exc:Exception=None)->None:
        self._log(LogLevel.WARNING, message, exc)
    
-    def error(self, message:str, exc:Exception=None):
+    def error(self, message:str, exc:Exception=None)->None:
        self._log(LogLevel.ERROR, message, exc)
 
-    def critical(self, message:str, exc:Exception=None):
+    def critical(self, message:str, exc:Exception=None)->None:
        self._log(LogLevel.CRITICAL, message, exc)
    
-
+def get_logger(log_path:str, print_level:LogLevel=LogLevel.DEBUG, file_level:LogLevel=LogLevel.DEBUG, 
+                 callback_level:LogLevel=LogLevel.DEBUG, color_config:LogConfig=LogConfig())->AmLogger:
+    return AmLogger(log_path, print_level, file_level, callback_level, color_config)
 
 if __name__ == "__main__":
-    logger = get_logger("test.log", "DEBUG")
-    logger.debug("This is a debug message")
-    logger.info("This is an info message")
-    logger.warning("This is a warning message")
-    logger.error("This is an error message")
+    logger = get_logger("test.log")
+    logger.debug("test")
+    logger.info("test")
+    logger.warning("test")
+    logger.error("test")
+    logger.critical("test")
 
-    logger.critical("This is a critical message")
 

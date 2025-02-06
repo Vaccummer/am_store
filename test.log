@@ -1,29 +1,7 @@
-Programm started at 2025-02-05 19:29:01
-[#04485B]19:29:01[/]🔧️ [#DAE1E2 italic]test[/] [bold #04485B]->[/] [#045B04 italic]"d:\CodeLib\Python\am_store\trial1.py"[/]:[#045B04 italic]5[/]
-[#04485B]19:29:01[/]🚀️ [#DAE1E2 italic]test[/] [bold #04485B]->[/] [#045B04 italic]"d:\CodeLib\Python\am_store\trial1.py"[/]:[#045B04 italic]6[/]
-[#04485B]19:29:01[/]⚠️  [#D97C0B]Raise[/] [#C70C0C bold]Exception:[/][#DAE1E2 italic]test[/] [bold #04485B]->[/] [#045B04 italic]"d:\CodeLib\Python\am_store\trial1.py"[/]:[#045B04 italic]7[/]
-Programm terminated at 2025-02-05 19:29:01
-Conducted for 0.11 seconds
-======================================================================================================================================================
-Programm started at 2025-02-05 19:36:35
-Programm terminated at 2025-02-05 19:36:35
+Programm started at 2025-02-06 12:40:27
+2025-02-06 12:40:27 [DEBUG]   test -> "d:\CodeLib\Python\am_store\trial1.py":5, logger.debug("test")
+2025-02-06 12:40:27 [INFO]    test -> "d:\CodeLib\Python\am_store\trial1.py":6, logger.info("test")
+2025-02-06 12:40:27 [WARNING] Raise Exception(""), test -> "d:\CodeLib\Python\am_store\trial1.py":7, logger.warning("test", exc=Exception())
+Programm terminated at 2025-02-06 12:40:27
 Conducted for 0.09 seconds
-======================================================================================================================================================
-Programm started at 2025-02-05 19:37:01
-Programm terminated at 2025-02-05 19:37:01
-Conducted for 0.09 seconds
-======================================================================================================================================================
-Programm started at 2025-02-05 19:37:10
-19:37:10🔧️ test -> "d:\CodeLib\Python\am_store\trial1.py":5
-19:37:10🚀️ test -> "d:\CodeLib\Python\am_store\trial1.py":6
-19:37:10⚠️  Raise Exception:test -> "d:\CodeLib\Python\am_store\trial1.py":7
-Programm terminated at 2025-02-05 19:37:10
-Conducted for 0.09 seconds
-======================================================================================================================================================
-Programm started at 2025-02-05 19:37:37
-19:37:37🔧️ test -> "d:\CodeLib\Python\am_store\trial1.py":5
-19:37:37🚀️ test -> "d:\CodeLib\Python\am_store\trial1.py":6
-19:37:37⚠️  Raise Exception:test -> "d:\CodeLib\Python\am_store\trial1.py":7
-Programm terminated at 2025-02-05 19:37:37
-Conducted for 0.14 seconds
-======================================================================================================================================================
+========================================================================================================================
