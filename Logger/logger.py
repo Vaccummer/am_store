@@ -21,6 +21,7 @@ class LogConfig:
     arrow:str = "[bold #04485B]"
     filepath:str = "[#045B04 italic]"
     lineno:str = "[#045B04 italic]"
+    title:str = "[#DAE1E2 italic]"
     message:str = "[#DAE1E2 italic]"
     exception:str = "[#C70C0C bold]"
     keyword:str = "[#D97C0B]"
@@ -36,6 +37,7 @@ class LogLevel(IntEnum):
 @dataclass
 class LogInfo:
     type:LogLevel
+    title:str
     message:str=""
     trigger_time:float=0.0
     filepath:str = ""
@@ -53,7 +55,7 @@ level_dict = {
 
 class AmLogger:
     def __init__(self, log_path:str, print_level:LogLevel=LogLevel.DEBUG, file_level:LogLevel=LogLevel.DEBUG, 
-                 callback_level:LogLevel=LogLevel.DEBUG, color_config:LogConfig=LogConfig()):
+                 callback_level:LogLevel=LogLevel.DEBUG, color_config:LogConfig=LogConfig(), silence_record:bool=False):
         assert log_path, "log_path is required"
         log_path = os.path.abspath(log_path)
         if not os.path.exists(os.path.dirname(log_path)):
@@ -66,29 +68,30 @@ class AmLogger:
         self.callback = None
         self._start_time = time.time()
         self.log_cache = []
+        self.silence_record = silence_record
         self._init()
+
+    def _init(self):
+        if not self.silence_record:
+            time_n = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(self._start_time))
+            str_to_write = f"Programm started at {time_n}\n"
+            self.write(str_to_write)
+            atexit.register(self._close)
+        self.max_name_len = max(len(i) for i in level_dict.values())+2
         try:
             from rich.console import Console
             self.console = Console(highlight=False)
             self.print = self.console.print
         except ImportError:
             raise ImportError('rich is not installed, use "pip install rich" to install it!')
-        atexit.register(self._close)
         
-    def _init(self):
-        time_n = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(self._start_time))
-        str_to_write = f"Programm started at {time_n}\n"
-        self.write(str_to_write)
-        self.max_name_len = max(len(i) for i in level_dict.values())+2
-    
     def _close(self):
         time_n = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
         total_time = time.time()-self._start_time
         str_to_write = f"Programm terminated at {time_n}\n"
         str_to_write += f"Conducted for {total_time:.2f} seconds\n"
         str_to_write += "="*120+'\n'
-        import builtins
-        with builtins.open(self.log_path, "a", encoding="utf-8")as f:
+        with open(self.log_path, "a", encoding="utf-8")as f:
             f.write(str_to_write)
 
     def setPrintLevel(self, level:LogLevel):
@@ -103,13 +106,13 @@ class AmLogger:
     def setCallback(self, callback:Callable[[LogInfo, str, str], Any]):
         self.callback = callback
 
-    def _log(self, level:LogLevel, msg:str, exc:Exception=None):
+    def _log(self, level:LogLevel, title:str, msg:str="", exc:Exception=None):
         frame = inspect.stack()[2]  
         frame_info = inspect.getframeinfo(frame[0])  
         caller_filename = frame_info.filename  
         caller_lineno = frame_info.lineno  
         caller_line = frame_info.code_context[0].strip()  
-        log_info = LogInfo(level, msg, time.time(), caller_filename, caller_lineno, caller_line, exc)
+        log_info = LogInfo(level, title, msg, time.time(), caller_filename, caller_lineno, caller_line, exc)
         try:
             self.log_cache.append(log_info)
         except Exception as e:
@@ -145,16 +148,17 @@ class AmLogger:
             str_out += f"{level_format[1]}{level_n1}{self.color_config.STOP}"
 
         exc = log_info.exception
-        exc_info = str(exc) if str(exc) else log_info.message
+        exc_info = str(exc) if str(exc) else log_info.title
         if exc:
-            str_out += f' {self.color_config.keyword}Raise{self.color_config.STOP} {self.color_config.exception}{type(exc).__name__}:{self.color_config.STOP}'
+            str_out += f' {self.color_config.keyword}Raise{self.color_config.STOP} {self.color_config.exception}{type(exc).__name__}: {self.color_config.STOP}'
             str_out += f'{self.color_config.message}{exc_info}{self.color_config.STOP}'
         else:
-
-            str_out += f' {self.color_config.message}{log_info.message}{self.color_config.STOP}'
+            str_out += f' {self.color_config.message}{log_info.title}{self.color_config.STOP}'
         
         str_out += f" {self.color_config.arrow}->{self.color_config.STOP}"
         str_out += f' {self.color_config.filepath}"{log_info.filepath}"{self.color_config.STOP}:{self.color_config.lineno}{log_info.lineno}{self.color_config.STOP}'
+        if log_info.message:
+            str_out += f'\n  {self.color_config.message}{log_info.message}{self.color_config.STOP}'
 
         return str_out
 
@@ -175,8 +179,11 @@ class AmLogger:
         if exc:
             str_out += f'{time_str} {level_str} Raise {type(exc).__name__}("{str(exc)}"), {log_info.message} -> "{log_info.filepath}":{log_info.lineno}, {log_info.line}'
         else:
-            str_out += f'{time_str} {level_str} {log_info.message} -> "{log_info.filepath}":{log_info.lineno}, {log_info.line}'
+            str_out += f'{time_str} {level_str} {log_info.title} -> "{log_info.filepath}":{log_info.lineno}, {log_info.line}'
+            if log_info.message:
+                str_out += f'\n  {log_info.message}'
         return str_out
+
 
     def write(self, text_f:str)->None:
         r'''
@@ -185,24 +192,28 @@ class AmLogger:
         with open(self.log_path, "a", encoding="utf-8") as f:
             f.write(text_f)
 
-    def debug(self, message:str, exc:Exception=None)->None:
-       self._log(LogLevel.DEBUG, message, exc)
+    def debug(self, title:str="", message:str="", exc:Exception=None)->None:
+       self._log(LogLevel.DEBUG, title, message, exc)
 
-    def info(self, message:str, exc:Exception=None)->None:
-       self._log(LogLevel.INFO, message, exc)
+    def info(self, title:str="", message:str="", exc:Exception=None)->None:
+       self._log(LogLevel.INFO, title, message, exc)
    
-    def warning(self, message:str, exc:Exception=None)->None:
-       self._log(LogLevel.WARNING, message, exc)
+    def warning(self, title:str="", message:str="", exc:Exception=None)->None:
+       self._log(LogLevel.WARNING, title, message, exc)
    
-    def error(self, message:str, exc:Exception=None)->None:
-       self._log(LogLevel.ERROR, message, exc)
+    def error(self, title:str="", message:str="", exc:Exception=None)->None:
+       '''
+       when exception is passed, exception.__name__ will be used as title
+       but message won't be overwritten
+       '''
+       self._log(LogLevel.ERROR, title, message, exc)
 
-    def critical(self, message:str, exc:Exception=None)->None:
-       self._log(LogLevel.CRITICAL, message, exc)
+    def critical(self, title:str="", message:str="", exc:Exception=None)->None:
+       self._log(LogLevel.CRITICAL, title, message, exc)
    
 def get_logger(log_path:str, print_level:LogLevel=LogLevel.DEBUG, file_level:LogLevel=LogLevel.DEBUG, 
-                 callback_level:LogLevel=LogLevel.DEBUG, color_config:LogConfig=LogConfig())->AmLogger:
-    return AmLogger(log_path, print_level, file_level, callback_level, color_config)
+                 callback_level:LogLevel=LogLevel.DEBUG, color_config:LogConfig=LogConfig(), silence_record:bool=False)->AmLogger:
+    return AmLogger(log_path, print_level, file_level, callback_level, color_config, silence_record)
 
 if __name__ == "__main__":
     logger = get_logger("test.log")

@@ -1,10 +1,7 @@
-from enum import Enum
 import traceback
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
 import time
-from typing import Optional
 
-from traitlets import default
 
 try:
     from rich.console import Console

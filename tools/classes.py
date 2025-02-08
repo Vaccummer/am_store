@@ -11,6 +11,8 @@ import PIL.Image
 import pandas
 import yaml
 import numpy
+# local library
+from .functions import pkl, path_join
 
 # tool class
 class AMImage:
@@ -34,7 +36,6 @@ class AMImage:
             return array_f.astype(numpy.uint8)
         else:
             return ((array_f-min_val)/(max_val-min_val)*255).astype(numpy.uint8)
-
     def __new__(cls, data) -> PIL.Image.Image:
         match data:
             case PIL.Image.Image():

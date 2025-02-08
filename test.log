@@ -1,7 +1,0 @@
-Programm started at 2025-02-06 12:40:27
-2025-02-06 12:40:27 [DEBUG]   test -> "d:\CodeLib\Python\am_store\trial1.py":5, logger.debug("test")
-2025-02-06 12:40:27 [INFO]    test -> "d:\CodeLib\Python\am_store\trial1.py":6, logger.info("test")
-2025-02-06 12:40:27 [WARNING] Raise Exception(""), test -> "d:\CodeLib\Python\am_store\trial1.py":7, logger.warning("test", exc=Exception())
-Programm terminated at 2025-02-06 12:40:27
-Conducted for 0.09 seconds
-========================================================================================================================

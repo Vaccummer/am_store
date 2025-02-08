@@ -13,6 +13,5 @@ import sys
 from functools import partial
 
 def init():
-    print_callback = partial(call_back_exception, cf=TerminalErrorColorConfig)
-    sys.excepthook = print_callback
-init()
+    sys.excepthook = partial(call_back_exception, cf=TerminalErrorColorConfig)
+
