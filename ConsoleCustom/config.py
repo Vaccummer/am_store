@@ -1,6 +1,8 @@
 import traceback
 from dataclasses import dataclass
 import time
+import sys
+from functools import partial
 
 
 try:
@@ -9,7 +11,6 @@ try:
     print_r = console.print
 except ImportError:
     raise ImportError('Module "rich" not found, use "pip install rich" to install it!')
-
 
 @dataclass
 class TerminalErrorColorConfig2:
@@ -117,6 +118,8 @@ def call_back_exception(exc_type: Exception, exc_value: Exception, exc_traceback
 
     console.print("-" * console.width, style="dim")
 
+def init():
+    sys.excepthook = partial(call_back_exception, cf=TerminalErrorColorConfig)
 
 
 

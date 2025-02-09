@@ -54,25 +54,34 @@ level_dict = {
 }
 
 class AmLogger:
-    def __init__(self, log_path:str, print_level:LogLevel=LogLevel.DEBUG, file_level:LogLevel=LogLevel.DEBUG, 
-                 callback_level:LogLevel=LogLevel.DEBUG, color_config:LogConfig=LogConfig(), silence_record:bool=False):
-        assert log_path, "log_path is required"
-        log_path = os.path.abspath(log_path)
-        if not os.path.exists(os.path.dirname(log_path)):
-            raise FileNotFoundError('"log_path" requires a valid directory!' )
-        self.log_path = log_path
+    _instance = None
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+    
+    def __init__(self, log_path:str|None=None, print_level:LogLevel=LogLevel.DEBUG, file_level:LogLevel=LogLevel.DEBUG, 
+                 callback_level:LogLevel=LogLevel.DEBUG, color_config:LogConfig=LogConfig(), silence_file_record:bool=False):
+        if log_path:
+            log_path = os.path.abspath(log_path)
+            if not os.path.exists(os.path.dirname(log_path)):
+                raise FileNotFoundError('"log_path" requires a valid directory!' )
+            self.log_path = log_path
+        else:
+            self.log_path = None
         self.color_config = color_config
         self.print_level = print_level
         self.file_level = file_level
         self.callback_level = callback_level
         self.callback = None
         self._start_time = time.time()
+
         self.log_cache = []
-        self.silence_record = silence_record
+        self.silence_file_record = silence_file_record
         self._init()
 
     def _init(self):
-        if not self.silence_record:
+        if not self.silence_file_record and self.log_path:
             time_n = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(self._start_time))
             str_to_write = f"Programm started at {time_n}\n"
             self.write(str_to_write)
@@ -86,6 +95,8 @@ class AmLogger:
             raise ImportError('rich is not installed, use "pip install rich" to install it!')
         
     def _close(self):
+        if self.silence_file_record or not self.log_path:
+            return
         time_n = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
         total_time = time.time()-self._start_time
         str_to_write = f"Programm terminated at {time_n}\n"
@@ -184,16 +195,21 @@ class AmLogger:
                 str_out += f'\n  {log_info.message}'
         return str_out
 
-
     def write(self, text_f:str)->None:
         r'''
         write won't include \n
         '''
+        if self.silence_file_record or not self.log_path:
+            return
         with open(self.log_path, "a", encoding="utf-8") as f:
             f.write(text_f)
 
+    def setSilenceFileRecord(self, silence:bool)->None:
+        self.silence_file_record = silence
+
     def debug(self, title:str="", message:str="", exc:Exception=None)->None:
        self._log(LogLevel.DEBUG, title, message, exc)
+
 
     def info(self, title:str="", message:str="", exc:Exception=None)->None:
        self._log(LogLevel.INFO, title, message, exc)
@@ -211,16 +227,23 @@ class AmLogger:
     def critical(self, title:str="", message:str="", exc:Exception=None)->None:
        self._log(LogLevel.CRITICAL, title, message, exc)
    
-def get_logger(log_path:str, print_level:LogLevel=LogLevel.DEBUG, file_level:LogLevel=LogLevel.DEBUG, 
-                 callback_level:LogLevel=LogLevel.DEBUG, color_config:LogConfig=LogConfig(), silence_record:bool=False)->AmLogger:
-    return AmLogger(log_path, print_level, file_level, callback_level, color_config, silence_record)
+def init_logger(log_path:str|None=None, print_level:LogLevel=LogLevel.DEBUG, file_level:LogLevel=LogLevel.DEBUG, 
+                 callback_level:LogLevel=LogLevel.DEBUG, color_config:LogConfig=LogConfig(), silence_file_record:bool=False)->AmLogger:
+    return AmLogger(log_path, print_level, file_level, callback_level, color_config, silence_file_record)
+
+def get_logger()->AmLogger:
+    if AmLogger._instance is None:
+        return init_logger()
+    return AmLogger._instance
 
 if __name__ == "__main__":
     logger = get_logger("test.log")
     logger.debug("test")
     logger.info("test")
     logger.warning("test")
+
     logger.error("test")
+
     logger.critical("test")
 
 

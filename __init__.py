@@ -9,9 +9,6 @@ from .tools.functions import *
 from .tools.classes import *
 from .ConsoleCustom.config import *
 from .Logger.logger import *
-import sys
-from functools import partial
+from .tools.file_operation import *
 
-def init():
-    sys.excepthook = partial(call_back_exception, cf=TerminalErrorColorConfig)
 
