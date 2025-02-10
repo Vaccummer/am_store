@@ -9,6 +9,6 @@ from .tools.functions import *
 from .tools.classes import *
 from .ConsoleCustom.config import *
 from .Logger.logger import *
-from .tools.file_operation import *
+from .tools import file_operation as file
 
 

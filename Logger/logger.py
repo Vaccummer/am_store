@@ -231,9 +231,9 @@ def init_logger(log_path:str|None=None, print_level:LogLevel=LogLevel.DEBUG, fil
                  callback_level:LogLevel=LogLevel.DEBUG, color_config:LogConfig=LogConfig(), silence_file_record:bool=False)->AmLogger:
     return AmLogger(log_path, print_level, file_level, callback_level, color_config, silence_file_record)
 
-def get_logger()->AmLogger:
+def get_logger(*args, **kwargs)->AmLogger:
     if AmLogger._instance is None:
-        return init_logger()
+        return init_logger(*args, **kwargs)
     return AmLogger._instance
 
 if __name__ == "__main__":

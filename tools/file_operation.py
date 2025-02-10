@@ -1,4 +1,5 @@
 from copy import deepcopy
+import shutil
 import sys
 import stat
 import os
@@ -15,6 +16,20 @@ exchange2 = "2exchangefindfunction"
 exchange3 = "3exchangefindfunction"
 exchange4 = "4exchangefindfunction"
 exchange5 = "5exchangefindfunction"
+
+color_list = [f"\033[{i}m" for i in range(37, 30, -1)]
+FILE_STORE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'file_store')
+FILE_DICT = {}
+
+def _init_file_store():
+    if not os.path.exists(FILE_STORE):
+        os.makedirs(FILE_STORE, exist_ok=True)
+        return
+    for file in os.listdir(FILE_STORE):
+        ext_name = os.path.splitext(file)[1]
+        FILE_DICT[ext_name] = os.path.join(FILE_STORE, file)
+
+_init_file_store()
 
 @dataclass
 class PathInFo:
@@ -47,6 +62,25 @@ class PreprocessResult:
         self.format:Literal['relative','user', 'absolute'] = format
         self.root:str = root
         self.recursive:bool = recursive
+
+class TreeNode:
+    def __init__(self, value:PathInFo|str):
+        self.value = value  
+        self.children = []  
+
+    def add(self, child):
+        self.children.append(child)
+
+    def __str__(self)->str:
+        return str(self.value)
+    
+def str_tree(tree:TreeNode, str_l:list[str]|None=None, depth:int=0)->list[str]:
+    if str_l is None:
+        str_l = []
+    str_l.append('-' * depth + f"{color_list[depth]}{str(tree)}\033[0m"+'\n')
+    for child in tree.children:
+        str_tree(child, str_l, depth+1)
+    return ''.join(str_l)
 
 def preprocess(pattern:str)->PreprocessResult:
     if pattern.startswith('~'):
@@ -159,8 +193,120 @@ def find(pattern:str, mode:Literal['a','f','d']='a', stat_need:bool=False, use_r
     _match_path(start_path, path_parts[0], mode, path_parts[1:], use_regex, total_match_result, silence)
     return [_to_result(r, stat_need) for r in total_match_result]
 
+def delete_cb(func, path_f, exc_info):
+    try:
+        os.chmod(path_f, stat.S_IWRITE)
+        func(path_f)
+        return True
+    except Exception as e:
+        logger.error(title='DeleteError', message=f'{type(e).__name__} when "{path_f}"->"/null", {e}')
 
-# if __name__ == '__main__':
+def _rm(path_f:str|Path)->None:
+    if os.path.isdir(path_f):
+        shutil.rmtree(path_f, onerror=delete_cb)
+    else:
+        try:
+            os.remove(path_f)
+        except PermissionError:
+            os.chmod(path_f, stat.S_IWRITE)
+            os.remove(path_f)
+
+def rm(path:str|Path, recursive:bool=False, use_regex:bool=False):
+    path_l = find(path, use_regex=use_regex)
+    for path_i in path_l:
+        if os.path.isdir(path) and not recursive:
+            continue
+        try:
+            _rm(path_i)
+        except Exception as e:
+            logger.error(message=f'"{path}"->/null', exc=e)
+    
+def mv(path:str|Path, new_path:str|Path, force:bool=False):
+    if os.path.exists(new_path):
+        if not force:
+            logger.warning(title='FileExists', message=f'Dst already exists: "{new_path}"')
+            return
+        else:
+            rm(new_path, recursive=True)
+    shutil.move(path, new_path)
+
+def size(path:str|Path)->int:
+    if not os.path.exists(path):
+        logger.warning(title='DirectoryInvalid', message=f'File or directory not found: "{path}"')
+    if os.path.isdir(path):
+        size_total = 0
+        for root, dirs, files in os.walk(path):
+            for file in files:
+                size_total += os.path.getsize(os.path.join(root, file))
+        return size_total
+    else:
+        return os.path.getsize(path)
+
+def new(path:str|Path, mkdir:bool=False)->bool:
+    path_f = os.path.abspath(path)
+    dir_path = os.path.dirname(path_f)
+    if not os.path.exists(dir_path):
+        if mkdir:
+            os.makedirs(dir_path, exist_ok=True)
+        else:
+            raise FileNotFoundError(f'Upper directory not found: "{dir_path}", use mkdir=True to create it')
+    ext_name = os.path.splitext(path_f)[1]
+    if not ext_name:
+        os.makedirs(path_f, exist_ok=True)
+        return True
+    else:
+        ori_path = FILE_DICT.get(ext_name, None)
+        if ori_path:
+            shutil.copy(ori_path, path_f)
+            return True
+        else:
+            logger.warning(title='FileNotFound', message=f"File Store don't have this file: {ext_name}")
+            return False
+
+def _tree(path:Path, depth:int, spec:bool, result_out:TreeNode)->None:
+    depth = max(depth, 0)
+    if depth == 0:
+        return
+    if not path.is_dir():
+        if spec:
+            node_i = TreeNode(PathInFo(path))
+            result_out.add(node_i)
+        else:
+            node_i = TreeNode(str(path.name))
+            result_out.add(node_i)
+    for p in path.iterdir():
+        if spec:
+            node_i = TreeNode(PathInFo(p))
+        else:
+            node_i = TreeNode(str(p.name))
+        if p.is_dir():
+            result_out.add(node_i)
+            _tree(p, depth-1, spec, node_i)
+        else:
+            result_out.add(node_i)
+
+def tree(path:str|Path, depth:int=1, spec:bool=False)->TreeNode:
+    '''
+    path: str, path to the directory
+    depth: int, depth of the tree
+    spec: bool, if true, data will be in PathInFo
+    '''
+    depth = max(depth, 1)
+    if not (os.path.exists(path) and os.path.isdir(path)):
+        logger.warning(title='DirectoryInvalid', message=f'Path is not a valid directory: "{path}"')
+        return {}
+    path_f = Path(path)
+    if spec:
+        result_out = TreeNode(PathInFo(path_f))
+    else:
+        result_out = TreeNode(str(path_f))
+    _tree(path_f, depth, spec, result_out)
+    return result_out
+    
+    
+if __name__ == '__main__':
+    a = Path('D:/Document/Desktop/amz/lib/')
+    print(str_tree(tree(r'D:\Document\Desktop\amz', spec=False, depth=4)))
 #     # for i in find(r'D:\Document\Desktop\amz\lib\**'):
 #     #     print(i)
 #     pass
