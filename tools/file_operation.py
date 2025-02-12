@@ -302,11 +302,9 @@ def tree(path:str|Path, depth:int=1, spec:bool=False)->TreeNode:
         result_out = TreeNode(str(path_f))
     _tree(path_f, depth, spec, result_out)
     return result_out
-    
-    
+
+
+
 if __name__ == '__main__':
     a = Path('D:/Document/Desktop/amz/lib/')
     print(str_tree(tree(r'D:\Document\Desktop\amz', spec=False, depth=4)))
-#     # for i in find(r'D:\Document\Desktop\amz\lib\**'):
-#     #     print(i)
-#     pass
